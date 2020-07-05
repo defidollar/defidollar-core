@@ -1,0 +1,15 @@
+{
+  "name": "defidollar-curve",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "compile": "truffle compile"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@chainlink/contracts": "0.0.7-beta",
+    "@openzeppelin/contracts": "^2.5.1"
+  }
+}
