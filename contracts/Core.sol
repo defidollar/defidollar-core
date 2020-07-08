@@ -16,9 +16,13 @@ contract Core is Ownable {
   uint constant MAX = 2**256 - 1;
 
   // All coins supported by the DefiDollar system
-  address[] public system_coins;
-  // Last price feed from the Oracle
-  uint[] public prices;
+  struct SystemCoin {
+    address token;
+    uint precision;
+    uint price; // feed from oracle
+  }
+  SystemCoin[] public system_coins;
+
   // The DefiDollar token
   DUSD public dusd;
   Oracle public oracle;
@@ -38,7 +42,7 @@ contract Core is Ownable {
     uint new_lp_supply;
   }
 
-  function initialize(DUSD _dusd, Oracle _oracle) public {
+  function initialize(DUSD _dusd, Oracle _oracle) public onlyOwner {
     require(
       address(dusd) == address(0x0) && address(oracle) == address(0x0),
       "Already initialized"
@@ -47,6 +51,9 @@ contract Core is Ownable {
     oracle = _oracle;
   }
 
+  event Debug(address indexed a);
+  event DebugUints(uint[] indexed a);
+  event DebugUint(uint indexed a);
   /**
   * @dev Mint DUSD
   * @param pool_id Curve pool ID defined by the defidollar system
@@ -61,13 +68,13 @@ contract Core is Ownable {
     returns (uint dusd_amount)
   {
     CurvePool memory pool = pools[pool_id];
+    SystemCoin[] memory _system_coins = system_coins;
 
     // pull user funds
-    address[] memory _system_coins = system_coins;
     for (uint i = 0; i < in_amounts.length; i++) {
       if (in_amounts[i] == 0) continue;
-      IERC20 token = IERC20(_system_coins[pool.system_coin_ids[i]]);
-      token.safeTransferFrom(msg.sender, address(this), in_amounts[i]);
+      SystemCoin memory coin = _system_coins[pool.system_coin_ids[i]];
+      IERC20(coin.token).safeTransferFrom(msg.sender, address(this), in_amounts[i]);
     }
 
     // gather current info about pool sizes and shares
@@ -88,9 +95,10 @@ contract Core is Ownable {
     // 2. the oracle price for the underlying coin
     for (uint i = 0; i < in_amounts.length; i++) {
       if (in_amounts[i] == 0) continue;
+      SystemCoin memory coin = _system_coins[pool.system_coin_ids[i]];
       uint delta = _calcDelta(info, pool_sizes[i], in_amounts[i], true);
       // Share of token received times the price of the coin
-      dusd_amount += delta * prices[pool.system_coin_ids[i]];
+      dusd_amount = dusd_amount.add(delta.mul(coin.price).div(coin.precision));
     }
 
     require(dusd_amount >= min_dusd_amount, "They see you slippin");
@@ -128,14 +136,13 @@ contract Core is Ownable {
     // determine the # of dusd the system should urn using:
     // 1. share in the curve pool
     // 2. the oracle price for the underlying coin
+    SystemCoin[] memory _system_coins = system_coins;
     for (uint i = 0; i < out_amounts.length; i++) {
       if (out_amounts[i] == 0) continue;
-      uint system_coin_index = pool.system_coin_ids[i];
-      IERC20 token = IERC20(system_coins[system_coin_index]);
-      token.safeTransfer(msg.sender, out_amounts[i]);
-
+      SystemCoin memory coin = _system_coins[pool.system_coin_ids[i]];
+      IERC20(coin.token).safeTransfer(msg.sender, out_amounts[i]);
       uint delta = _calcDelta(info, pool_sizes[i], out_amounts[i], false);
-      dusd_amount += delta * prices[system_coin_index];
+      dusd_amount = dusd_amount.add(delta.mul(coin.price).div(coin.precision));
     }
 
     require(dusd_amount <= max_dusd_amount, "They see you slippin");
@@ -151,25 +158,34 @@ contract Core is Ownable {
       feed.length == system_coins.length,
       "Invalid system state"
     );
-    prices = feed;
+    for (uint i = 0; i < feed.length; i++) {
+      system_coins[i].price = feed[i];
+    }
   }
 
   // This is risky (Bancor Hack scenario). Think about if we need strict token approvals during the actions at the cost of higher gas.
   function replenish_approvals() external {
     CurvePool[] memory _pools = pools;
-    address[] memory _system_coins = system_coins;
+    SystemCoin[] memory _system_coins = system_coins;
     for (uint i = 0; i < _pools.length; i++) {
       CurvePool memory pool = _pools[i];
       pool.curve_token.approve(address(pool.curve_deposit), MAX);
       for (uint j = 0; j < pool.system_coin_ids.length; j++) {
-        IERC20(_system_coins[pool.system_coin_ids[j]]).approve(address(pool.curve_deposit), MAX);
+        SystemCoin memory coin = _system_coins[pool.system_coin_ids[j]];
+        IERC20(coin.token).approve(address(pool.curve_deposit), MAX);
       }
     }
   }
 
   // Admin functions
-  function whitelistToken(address token) external onlyOwner {
-    system_coins.push(token);
+  function whitelistTokens(address[] calldata tokens, uint[] calldata decimals) external {
+    for (uint i = 0; i < tokens.length; i++) {
+      whitelistToken(tokens[i], decimals[i]);
+    }
+  }
+
+  function whitelistToken(address token, uint decimals) public onlyOwner {
+    system_coins.push(SystemCoin(token, 10 ** decimals, 0));
   }
 
   function addSupportedPool(
@@ -198,19 +214,26 @@ contract Core is Ownable {
     return portfolio;
   }
 
-  // @todo SafeMath
   function _calcDelta(
     LPShareInfo memory info,
     uint old_pool_size,
     uint amount,
     bool deposit
   ) internal pure returns (uint /* delta */) {
-    uint old_balance = (old_pool_size * info.old_lp_amount) / info.old_lp_supply;
-    if (deposit) {
-      uint new_balance = ((old_pool_size + amount) * info.new_lp_amount) / info.new_lp_supply;
-      return new_balance - old_balance;
+    uint old_balance;
+    if (info.old_lp_supply > 0) {
+      old_balance = old_pool_size.mul(info.old_lp_amount).div(info.old_lp_supply);
     }
-    uint new_balance = ((old_pool_size - amount) * info.new_lp_amount) / info.new_lp_supply;
-    return old_balance - new_balance;
+    uint new_balance;
+    if (deposit) {
+      if (info.new_lp_supply > 0) {
+        new_balance = old_pool_size.add(amount).mul(info.new_lp_amount).div(info.new_lp_supply);
+      }
+      return new_balance.sub(old_balance);
+    }
+    if (info.new_lp_supply > 0) {
+      new_balance = old_pool_size.sub(amount).mul(info.new_lp_amount).div(info.new_lp_supply);
+    }
+    return old_balance.sub(new_balance);
   }
 }

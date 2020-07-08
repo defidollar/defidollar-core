@@ -23,18 +23,16 @@ contract CoreBatch is Core {
   ) external
     returns (uint dusd_amount)
   {
-    address[] memory _system_coins = system_coins;
-    uint num_system_coins = _system_coins.length;
+    SystemCoin[] memory _system_coins = system_coins;
 
     // pull user funds
-    for (uint i = 0; i < num_system_coins; i++) {
+    for (uint i = 0; i < _system_coins.length; i++) {
       if (in_amounts[i] == 0) continue;
-      IERC20 token = IERC20(_system_coins[i]);
-      token.safeTransferFrom(msg.sender, address(this), in_amounts[i]);
+      IERC20(_system_coins[i].token).safeTransferFrom(msg.sender, address(this), in_amounts[i]);
     }
 
     // add liquidity to curve pools
-    uint[] memory coin_delta = new uint[](num_system_coins);
+    uint[] memory coin_delta = new uint[](_system_coins.length);
     { // scoped to avoid stack too deep
       LPShareInfo memory info;
       CurvePool memory pool;
@@ -55,9 +53,10 @@ contract CoreBatch is Core {
     }
 
     // mint DUSD
-    for (uint i = 0; i < num_system_coins; i++) {
+    for (uint i = 0; i < _system_coins.length; i++) {
       if (coin_delta[i] == 0) continue;
-      dusd_amount = dusd_amount.add(coin_delta[i].mul(prices[i]));
+      SystemCoin memory coin = _system_coins[i];
+      dusd_amount = dusd_amount.add(coin_delta[i].mul(coin.price).div(coin.precision));
     }
     require(dusd_amount >= min_dusd_amount, "They see you slippin");
     dusd.mint(msg.sender, dusd_amount);
@@ -78,12 +77,10 @@ contract CoreBatch is Core {
   ) external
     returns (uint dusd_amount)
   {
-    address[] memory _system_coins = system_coins;
-    uint num_system_coins = _system_coins.length;
-
+    SystemCoin[] memory _system_coins = system_coins;
 
     // Remove liquidity from pools
-    uint[] memory coin_delta = new uint[](num_system_coins);
+    uint[] memory coin_delta = new uint[](_system_coins.length);
     { // scoped to avoid stack too deep
       LPShareInfo memory info;
       CurvePool memory pool;
@@ -103,12 +100,12 @@ contract CoreBatch is Core {
     }
 
     // Transfer withdrawn coins to user and calculate dusd to burn
-    for (uint i = 0; i < num_system_coins; i++) {
+    for (uint i = 0; i < _system_coins.length; i++) {
       if (out_amounts[i] == 0) continue;
-      IERC20 token = IERC20(system_coins[i]);
+      SystemCoin memory coin = _system_coins[i];
       // solves a dual purpose of reverting if enough balance has not been accumulated
-      token.safeTransfer(msg.sender, out_amounts[i]);
-      dusd_amount = dusd_amount.add(coin_delta[i].mul(prices[i]));
+      IERC20(coin.token).safeTransfer(msg.sender, out_amounts[i]);
+      dusd_amount = dusd_amount.add(coin_delta[i].mul(coin.price).div(coin.precision));
     }
 
     // Burn DUSD

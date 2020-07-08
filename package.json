@@ -4,7 +4,10 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "compile": "truffle compile"
+    "compile": "truffle compile",
+    "migrate": "truffle migrate",
+    "ganache": "ganache-cli",
+    "test": "truffle test"
   },
   "author": "",
   "license": "ISC",

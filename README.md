@@ -82,7 +82,9 @@ Core contract deposits these in the chosen curve pools, receives curve LP tokens
 ```
 
 ### Development
-1. Compile
 ```
 npm run compile
+npm run ganache
+npm run migrate
+npm t
 ```

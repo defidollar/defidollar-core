@@ -1,8 +1,9 @@
 pragma solidity ^0.5.0;
 
 import "@chainlink/contracts/src/v0.5/interfaces/AggregatorInterface.sol";
+import {Ownable} from "@openzeppelin/contracts/ownership/Ownable.sol";
 
-contract Oracle {
+contract Oracle is Ownable {
   AggregatorInterface[] public refs;
   AggregatorInterface public ethUsdAggregator;
 
@@ -35,7 +36,7 @@ contract Oracle {
     return feed;
   }
 
-  function addAggregator(AggregatorInterface _aggregator) external /* onlyAdmin */ {
+  function addAggregator(AggregatorInterface _aggregator) external onlyOwner {
     refs.push(_aggregator);
   }
 }

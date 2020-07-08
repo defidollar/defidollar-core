@@ -6,5 +6,7 @@ interface ICurveDeposit {
 }
 
 interface ICurve {
-  function balances(uint arg) external view returns(uint);
+  function add_liquidity(uint[] calldata uamounts, uint min_mint_amount) external;
+  function remove_liquidity_imbalance(uint[] calldata uamounts, uint max_burn_amount) external;
+  function balances(uint i) external view returns(uint);
 }
