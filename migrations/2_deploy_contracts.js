@@ -1,4 +1,4 @@
-const Core = artifacts.require("Core");
+const Core = artifacts.require("CoreAdminFunctions");
 const DUSD = artifacts.require("DUSD");
 const Aggregator = artifacts.require("MockAggregator");
 const Oracle = artifacts.require("Oracle");
@@ -37,7 +37,7 @@ module.exports = async function(deployer) {
   await deployer.deploy(Oracle, aggregators.map(a => a.address), ethUsdAgg.address)
 
   const core = await Core.deployed()
-  await core.initialize(DUSD.address, Oracle.address)
+  await core.initialize(DUSD.address, Oracle.address, 102) // collateralization_ratio
 
   // Deploy Mock sUSD pool
   const tokens = reserves.map(a => a.address)

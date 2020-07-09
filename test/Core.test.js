@@ -1,7 +1,7 @@
 // const _deploy_contracts = require("../migrations/2_deploy_contracts");
 const assert = require('assert')
 
-const Core = artifacts.require("Core");
+const Core = artifacts.require("CoreAdminFunctions");
 const DUSD = artifacts.require("DUSD");
 const Reserve = artifacts.require("Reserve");
 const MockSusdToken = artifacts.require("MockSusdToken");

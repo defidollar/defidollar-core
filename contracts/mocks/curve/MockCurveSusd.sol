@@ -1,4 +1,4 @@
-pragma solidity ^0.5.12;
+pragma solidity 0.5.17;
 
 import "../../curve/ICurve.sol";
 import "./MockSusdToken.sol";

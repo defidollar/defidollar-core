@@ -1,4 +1,4 @@
-pragma solidity ^0.5.12;
+pragma solidity 0.5.17;
 
 interface ICurveDeposit {
   function add_liquidity(uint[] calldata uamounts, uint min_mint_amount) external;
