@@ -7,12 +7,15 @@ import {Ownable} from "@openzeppelin/contracts/ownership/Ownable.sol";
 
 import {Oracle} from "./oracle/Oracle.sol";
 import {DUSD} from "./DUSD.sol";
+import {SDUSD} from "./SDUSD.sol";
+import {IPool} from "./IPool.sol";
 
 contract Core is Ownable {
   using SafeERC20 for IERC20;
   using SafeMath for uint;
 
   uint constant MAX = 2**256 - 1;
+  uint constant PRECISION = 10 ** 18;
 
   // All coins supported by the DefiDollar system
   struct SystemCoin {
@@ -22,11 +25,12 @@ contract Core is Ownable {
   }
   SystemCoin[] public system_coins;
 
-  // The DefiDollar token
-  DUSD public dusd;
-  DUSD public dusd;
+  DUSD public dusd; // DefiDollar token
+  SDUSD public sDUSD; // Stake receipt
+
   Oracle public oracle;
   uint public staked_supply;
+  uint public dusd_value;
 
   struct CurvePool {
     uint[] system_coin_ids; // system indices of the coins accepted by the curve pool
@@ -38,8 +42,7 @@ contract Core is Ownable {
   event Burn(address account, uint amount);
   event FeedUpdated(uint[] feed);
 
-  // function initialize(DUSD _dusd, Oracle _oracle, uint _collateralization_ratio)
-  function initialize(DUSD _dusd, Oracle _oracle)
+  function initialize(DUSD _dusd, SDUSD _sDUSD, Oracle _oracle)
     public
     onlyOwner
   {
@@ -48,8 +51,8 @@ contract Core is Ownable {
       "Already initialized"
     );
     dusd = _dusd;
+    sDUSD = _sDUSD;
     oracle = _oracle;
-    // collateralization_ratio = _collateralization_ratio;
   }
 
   function mint(uint[] calldata delta, uint min_dusd_amount)
@@ -92,36 +95,47 @@ contract Core is Ownable {
     emit Burn(msg.sender, dusd_amount);
   }
 
-  function stake(uint dusd_amount) external {
+  function stake(uint amount) external {
     require(
-      dusd.transferFrom(msg.sender, address(this), dusd_amount),
-      "failed"
+      dusd.transferFrom(msg.sender, address(this), amount),
+      "Transfer failed"
     );
-    uint exchange_rate = get_staked_inventory() / staker_coin.totalSupply();
-    staker_coin.mint(msg.sender, exchange_rate * dusd_amount);
+    uint exchange_rate = get_non_circulating_inventory()
+      .mul(PRECISION)
+      .div(sDUSD.totalSupply());
+    sDUSD.mint(msg.sender, exchange_rate.mul(amount).div(PRECISION));
   }
 
-  function unstake(uint amount) external {
-    uint exchange_rate = get_staked_inventory() / staker_coin.totalSupply();
-    uint dusd_amount = exchange_rate * amount;
-    if (dusd_amount > staked_supply) {
-      dusd.mint(address(this), dusd_amount - staked_supply);
+  function unstake(uint sdusd_amount) external {
+    uint exchange_rate = get_non_circulating_inventory()
+      .mul(PRECISION)
+      .div(sDUSD.totalSupply());
+    sDUSD.burn(msg.sender, sdusd_amount);
+    uint dusd_amount = sdusd_amount.mul(exchange_rate).div(dusd_value);
+    uint balance = dusd.balanceOf(address(this));
+    if (balance < dusd_amount) {
+      dusd.mint(address(this), dusd_amount.sub(balance));
     }
     require(
       dusd.transfer(msg.sender, dusd_amount),
-      "failed"
+      "Transfer Failed"
     );
-    staker_coin.burn(msg.sender, amount);
   }
 
-  function get_staked_inventory() public view {
-    return get_inventory() - (dusd.totalSupply() - staked_supply);
+  function get_non_circulating_inventory() public view returns(uint) {
+    uint staked_value = get_staked_supply().mul(dusd_value);
+    return get_inventory().sub(staked_value);
+  }
+
+  function get_staked_supply() public view returns(uint) {
+    // @todo dusd.balanceOf(this) to get the staked supply might not be the best way - Think about it
+    return dusd.totalSupply().sub(dusd.balanceOf(address(this)));
   }
 
   function get_inventory() public view returns (uint inventory) {
     uint[] memory portfolio = new uint[](pools_addresses.length);
     for(uint i = 0; i < pools_addresses.length; i++) {
-      uint[] memory pool_portfolio = IPool(pools_addresses[i].portfolio());
+      uint[] memory pool_portfolio = IPool(pools_addresses[i]).portfolio();
       CurvePool memory pool = pools[pools_addresses[i]];
       for (uint j = 0; j < pool.system_coin_ids.length; j++) {
         portfolio[pool.system_coin_ids[j]] += pool_portfolio[j];
@@ -147,6 +161,9 @@ contract Core is Ownable {
     for (uint i = 0; i < feed.length; i++) {
       system_coins[i].price = feed[i];
     }
+    dusd_value = get_inventory()
+      .mul(PRECISION)
+      .div(dusd.totalSupply().sub(get_staked_supply()));
     emit FeedUpdated(feed);
   }
 

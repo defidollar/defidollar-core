@@ -6,8 +6,9 @@ import {SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import {ICurveDeposit, ICurve} from "./ICurve.sol";
 import {Core} from "../Core.sol";
+import {IPool} from "../IPool.sol";
 
-contract SUSDPool {
+contract SUSDPool is IPool {
   using SafeERC20 for IERC20;
   using SafeMath for uint;
 
@@ -122,16 +123,15 @@ contract SUSDPool {
     }
   }
 
-  function portfolio() public view returns(uint[] memory) {
+  function portfolio() public view returns(uint[] memory _portfolio) {
     uint lp_amount = curve_token.balanceOf(address(this));
     uint lp_supply = curve_token.totalSupply();
-    uint[] memory portfolio = new uint[](N_COINS);
+    _portfolio = new uint[](N_COINS);
     if (lp_supply > 0) {
       for (uint i = 0; i < N_COINS; i++) {
-        portfolio[i] = curve.balances(i).mul(lp_amount).div(lp_supply);
+        _portfolio[i] = curve.balances(i).mul(lp_amount).div(lp_supply);
       }
     }
-    return portfolio;
   }
 
   function _calcDepositDelta(
