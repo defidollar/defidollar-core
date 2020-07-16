@@ -2,7 +2,7 @@ pragma solidity 0.5.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
-import "../../curve/ICurve.sol";
+import "../ICurve.sol";
 import "./MockSusdToken.sol";
 
 contract MockSusdDeposit is ICurveDeposit {

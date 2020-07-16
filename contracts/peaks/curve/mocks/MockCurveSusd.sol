@@ -1,8 +1,9 @@
 pragma solidity 0.5.17;
 
-import "../../curve/ICurve.sol";
+import {ERC20Detailed as IERC20} from "@openzeppelin/contracts/token/ERC20/ERC20Detailed.sol";
+
+import "../ICurve.sol";
 import "./MockSusdToken.sol";
-import "../Reserve.sol";
 
 contract MockCurveSusd is ICurve {
   uint constant N_COINS = 4;
@@ -19,13 +20,13 @@ contract MockCurveSusd is ICurve {
   }
 
   function balances(uint i) external view returns(uint) {
-    return Reserve(underlying_coins[i]).balanceOf(address(this));
+    return IERC20(underlying_coins[i]).balanceOf(address(this));
   }
 
   function add_liquidity(uint[] calldata uamounts, uint min_mint_amount) external {
     uint to_mint;
     for (uint i = 0; i < N_COINS; i++) {
-      Reserve _token = Reserve(underlying_coins[i]);
+      IERC20 _token = IERC20(underlying_coins[i]);
       _token.transferFrom(msg.sender, address(this), uamounts[i]);
       to_mint += uamounts[i] * (10 ** (uint(18) - _token.decimals()));
     }
@@ -35,7 +36,7 @@ contract MockCurveSusd is ICurve {
 
   function remove_liquidity_imbalance(uint[] calldata uamounts, uint max_burn_amount) external {
     for (uint i = 0; i < N_COINS; i++) {
-      Reserve _token = Reserve(underlying_coins[i]);
+      IERC20 _token = IERC20(underlying_coins[i]);
       _token.transfer(msg.sender, uamounts[i]);
     }
     token.burn(msg.sender, max_burn_amount);

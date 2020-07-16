@@ -5,10 +5,10 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import {ICurveDeposit, ICurve} from "./ICurve.sol";
-import {Core} from "../Core.sol";
-import {IPool} from "../IPool.sol";
+import {Core} from "../../base/Core.sol";
+import {IPeak} from "../IPeak.sol";
 
-contract SUSDPool is IPool {
+contract CurveSusdPeak is IPeak {
   using SafeERC20 for IERC20;
   using SafeMath for uint;
 

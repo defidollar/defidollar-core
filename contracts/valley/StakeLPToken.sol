@@ -5,7 +5,7 @@ import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
-import {Core} from "./Core.sol";
+import {Core} from "../base/Core.sol";
 
 contract StakeLPToken is ERC20 {
   using SafeERC20 for IERC20;
@@ -16,9 +16,10 @@ contract StakeLPToken is ERC20 {
   IERC20 public stok;
   Core public core;
 
-  uint income_last;
+  uint income_diff;
 
   uint public rewardPerTokenStored;
+  uint public unitRewardForCurrentFeeWindow;
   mapping(address => uint256) public userRewardPerTokenPaid;
   mapping(address => uint256) public rewards;
 
@@ -26,8 +27,9 @@ contract StakeLPToken is ERC20 {
   event Withdrawn(address indexed user, uint256 amount);
   event RewardPaid(address indexed user, uint256 reward);
 
-  constructor(Core _core) public {
+  constructor(Core _core, IERC20 _stok) public {
     core = _core;
+    stok = _stok;
   }
 
   modifier onlyCore() {
@@ -36,17 +38,15 @@ contract StakeLPToken is ERC20 {
   }
 
   modifier updateReward(address account) {
-    uint income_now = core.getProtocolIncome();
-    rewardPerTokenStored = _rewardPerToken(income_now);
-    income_last = income_now;
     if (account != address(0)) {
-      rewards[account] = _earned(rewardPerTokenStored, account);
+      rewards[account] = earned(account);
       userRewardPerTokenPaid[account] = rewardPerTokenStored;
     }
     _;
+    update_unit_reward_for_current_fee_window(true);
   }
 
-  function stake(uint amount) external updateReward(msg.sender) {
+  function stake(uint amount) public updateReward(msg.sender) {
     require(amount > 0, "Cannot stake 0");
     stok.safeTransferFrom(msg.sender, address(this), amount);
     _mint(msg.sender, amount);
@@ -60,7 +60,7 @@ contract StakeLPToken is ERC20 {
     emit Withdrawn(msg.sender, amount);
   }
 
-  function exit() external {
+  function exit() public {
     withdraw(balanceOf(msg.sender));
     getReward();
   }
@@ -74,40 +74,38 @@ contract StakeLPToken is ERC20 {
     }
   }
 
-  // Helper view functions
+  /**
+  * @dev Difference of protocol income at 2 points
+  */
+  function update_income_diff(uint protocol_income) public onlyCore {
+    if (protocol_income > income_diff) {
+      income_diff = protocol_income.sub(income_diff);
+      rewardPerTokenStored = rewardPerTokenStored.add(unitRewardForCurrentFeeWindow.mul(income_diff).div(PRECISION));
+      update_unit_reward_for_current_fee_window(false);
+    } else {
+      income_diff = 0;
+    }
+  }
+
+  function update_unit_reward_for_current_fee_window(bool accumulate) internal {
+    uint total_supply = totalSupply();
+    if (total_supply > 0) {
+      if (!accumulate) {
+        unitRewardForCurrentFeeWindow = 0;
+      }
+      unitRewardForCurrentFeeWindow = unitRewardForCurrentFeeWindow.add(PRECISION.mul(PRECISION).div(total_supply));
+    } else {
+      unitRewardForCurrentFeeWindow = 0;
+    }
+  }
+
+  // View functions
   function earned(address account)
     public view returns (uint256)
   {
-    return _earned(_rewardPerToken(core.getProtocolIncome()), account);
-  }
-
-  // internal
-  function _rewardPerToken(uint income_now)
-    internal
-    view
-    returns (uint)
-  {
-    uint total_supply = totalSupply();
-    if (total_supply == 0 || income_now <= income_last) {
-      // No rewards accumulated if
-      // 1. If no tokens were staked during a period
-      // 2. The size of the income_now pool reduced (peg failure) from last time
-      return rewardPerTokenStored;
-    }
-    return rewardPerTokenStored.add(
-      income_now
-      .sub(income_last)
-      .mul(PRECISION)
-      .div(total_supply)
-    );
-  }
-
-  function _earned(uint rewardPerToken, address account)
-    internal view returns (uint256)
-  {
     return
       balanceOf(account)
-        .mul(rewardPerToken.sub(userRewardPerTokenPaid[account]))
+        .mul(rewardPerTokenStored.sub(userRewardPerTokenPaid[account]))
         .div(PRECISION)
         .add(rewards[account]);
   }

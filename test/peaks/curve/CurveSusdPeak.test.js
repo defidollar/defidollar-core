@@ -5,13 +5,13 @@ const DUSD = artifacts.require("DUSD");
 const Reserve = artifacts.require("Reserve");
 
 const MockSusdToken = artifacts.require("MockSusdToken");
-const SUSDPool = artifacts.require('SUSDPool')
+const CurveSusdPeak = artifacts.require('CurveSusdPeak')
 
 const toWei = web3.utils.toWei
 const toBN = web3.utils.toBN
 const MAX = web3.utils.toTwosComplement(-1);
 
-contract('SUSDPool', async (accounts) => {
+contract('CurveSusdPeak', async (accounts) => {
   const n_coins = 4
 
   before(async () => {
@@ -22,7 +22,7 @@ contract('SUSDPool', async (accounts) => {
       this.reserves.push(await Reserve.at((await this.core.system_coins(i)).token))
     }
     this.user = accounts[0]
-    this.pool = await SUSDPool.deployed()
+    this.pool = await CurveSusdPeak.deployed()
   })
 
   describe('mint/burn', async () => {

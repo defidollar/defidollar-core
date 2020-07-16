@@ -1,6 +1,7 @@
 const Core = artifacts.require("Core");
+const StakeLPToken = artifacts.require("StakeLPToken");
 const DUSD = artifacts.require("DUSD");
-const SUSDPool = artifacts.require("SUSDPool");
+const CurveSusdPeak = artifacts.require("CurveSusdPeak");
 const Aggregator = artifacts.require("MockAggregator");
 const Oracle = artifacts.require("Oracle");
 const Reserve = artifacts.require("Reserve");
@@ -10,10 +11,13 @@ const MockSusdDeposit = artifacts.require("MockSusdDeposit");
 const MockCurveSusd = artifacts.require("MockCurveSusd");
 
 const toBN = web3.utils.toBN
+const toWei = web3.utils.toWei
 
 module.exports = async function(deployer) {
   await deployer.deploy(Core);
+  const core = await Core.deployed()
   await deployer.deploy(DUSD, Core.address);
+
   // initialize system with 4 coins
   const reserves = [
     await Reserve.new(18), // dai
@@ -21,6 +25,7 @@ module.exports = async function(deployer) {
     await Reserve.new(6), // usdt
     await Reserve.new(18) // susd
   ]
+  const tokens = reserves.map(a => a.address)
 
   // Deploy oracle
   const ethPrice = toBN(200)
@@ -37,24 +42,15 @@ module.exports = async function(deployer) {
 
   await deployer.deploy(Oracle, aggregators.map(a => a.address), ethUsdAgg.address)
 
-  const core = await Core.deployed()
-  await core.initialize(DUSD.address, '0x0000000000000000000000000000000000000000', Oracle.address)
-
-  // Deploy Mock sUSD pool
-  const tokens = reserves.map(a => a.address)
-  await deployer.deploy(MockSusdToken)
-  await core.whitelistTokens(tokens, [18, 6, 6, 18])
-
-  const curve_token = await MockSusdToken.deployed()
-  const curve = await MockCurveSusd.new(curve_token.address, tokens)
-  const curve_deposit = await MockSusdDeposit.new(curve.address, curve_token.address, tokens)
-  const sUSDPool = await deployer.deploy(
-    SUSDPool,
-    curve_deposit.address, curve.address, curve_token.address,
-    core.address,
-    tokens
+  const stakeLPToken = await deployer.deploy(StakeLPToken, Core.address, DUSD.address)
+  await core.initialize(
+    DUSD.address,
+    stakeLPToken.address,
+    Oracle.address,
+    10000 // 0 redeem fee
+    // 10005 // .05% redeem fee
   )
-  await sUSDPool.replenish_approvals()
-  await core.whitelistPool(SUSDPool.address, [0, 1, 2, 3])
-  await core.updatePrices()
+  const initial_price = toWei('1')
+  await core.whitelist_tokens(tokens, [18, 6, 6, 18], new Array(4).fill(initial_price))
+  await core.sync_system()
 };

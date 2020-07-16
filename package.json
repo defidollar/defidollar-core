@@ -14,5 +14,8 @@
   "dependencies": {
     "@chainlink/contracts": "0.0.7-beta",
     "@openzeppelin/contracts": "^2.5.1"
+  },
+  "devDependencies": {
+    "eth-gas-reporter": "^0.2.17"
   }
 }
