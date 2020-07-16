@@ -33,12 +33,14 @@ contract SUSDPool is IPool {
     ICurveDeposit _curve_deposit,
     ICurve _curve,
     IERC20 _curve_token,
-    Core _core
+    Core _core,
+    address[N_COINS] memory _underlying_coins
   ) public {
     curve_deposit = _curve_deposit;
     curve = _curve;
     curve_token = _curve_token;
     core = _core;
+    underlying_coins = _underlying_coins;
   }
 
   /**
@@ -76,7 +78,7 @@ contract SUSDPool is IPool {
     for (uint i = 0; i < N_COINS; i++) {
       delta[i] = _calcDepositDelta(info, pool_sizes[i], in_amounts[i]);
     }
-    return core.mint(delta, min_dusd_amount);
+    return core.mint(delta, min_dusd_amount, msg.sender);
   }
 
   /**
@@ -111,15 +113,14 @@ contract SUSDPool is IPool {
       IERC20(coins[i]).safeTransfer(msg.sender, out_amounts[i]);
       delta[i] = _calcWithdrawDelta(info, pool_sizes[i], out_amounts[i]);
     }
-    return core.burn(delta, max_dusd_amount);
+    return core.burn(delta, max_dusd_amount, msg.sender);
   }
 
   // This is risky (Bancor Hack scenario). Think about if we need strict token approvals during the actions at the cost of higher gas.
   function replenish_approvals() external {
-    address[N_COINS] memory coins = underlying_coins;
     curve_token.approve(address(curve_deposit), MAX);
     for (uint i = 0; i < N_COINS; i++) {
-      IERC20(coins[i]).approve(address(curve_deposit), MAX);
+      IERC20(underlying_coins[i]).approve(address(curve_deposit), MAX);
     }
   }
 

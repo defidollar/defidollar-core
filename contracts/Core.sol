@@ -7,14 +7,14 @@ import {Ownable} from "@openzeppelin/contracts/ownership/Ownable.sol";
 
 import {Oracle} from "./oracle/Oracle.sol";
 import {DUSD} from "./DUSD.sol";
-import {SDUSD} from "./SDUSD.sol";
 import {IPool} from "./IPool.sol";
+import "./StakeLPToken.sol";
 
 contract Core is Ownable {
   using SafeERC20 for IERC20;
   using SafeMath for uint;
 
-  uint constant MAX = 2**256 - 1;
+  uint constant MAX = uint(-1);
   uint constant PRECISION = 10 ** 18;
 
   // All coins supported by the DefiDollar system
@@ -25,8 +25,8 @@ contract Core is Ownable {
   }
   SystemCoin[] public system_coins;
 
-  DUSD public dusd; // DefiDollar token
-  SDUSD public sDUSD; // Stake receipt
+  DUSD public dusd;
+  StakeLPToken public stakeLPToken;
 
   Oracle public oracle;
   uint public staked_supply;
@@ -42,21 +42,20 @@ contract Core is Ownable {
   event Burn(address account, uint amount);
   event FeedUpdated(uint[] feed);
 
-  function initialize(DUSD _dusd, SDUSD _sDUSD, Oracle _oracle)
+  function initialize(DUSD _dusd, StakeLPToken _stakeLPToken, Oracle _oracle)
     public
     onlyOwner
   {
-    require(
-      address(dusd) == address(0x0) && address(oracle) == address(0x0),
-      "Already initialized"
-    );
     dusd = _dusd;
-    sDUSD = _sDUSD;
     oracle = _oracle;
+    stakeLPToken = _stakeLPToken;
   }
 
-  function mint(uint[] calldata delta, uint min_dusd_amount)
-    external
+  function mint(
+    uint[] calldata delta,
+    uint min_dusd_amount,
+    address account
+  ) external
     returns (uint dusd_amount)
   {
     CurvePool memory pool = pools[msg.sender];
@@ -69,14 +68,16 @@ contract Core is Ownable {
       SystemCoin memory coin = coins[pool.system_coin_ids[i]];
       dusd_amount = dusd_amount.add(delta[i].mul(coin.price).div(coin.precision));
     }
+    dusd_amount = get_real_value(dusd_amount);
     require(dusd_amount >= min_dusd_amount, "They see you slippin");
-    dusd.mint(msg.sender, dusd_amount);
-    emit Mint(msg.sender, dusd_amount);
+    dusd.mint(account, dusd_amount);
+    emit Mint(account, dusd_amount);
   }
 
   function burn(
     uint[] calldata delta,
-    uint max_dusd_amount
+    uint max_dusd_amount,
+    address account
   ) external
     returns(uint dusd_amount)
   {
@@ -85,51 +86,16 @@ contract Core is Ownable {
       pool.system_coin_ids.length > 0,
       "Pool is not whitelisted"
     );
+
     SystemCoin[] memory coins = system_coins;
     for (uint i = 0; i < pool.system_coin_ids.length; i++) {
       SystemCoin memory coin = coins[pool.system_coin_ids[i]];
       dusd_amount = dusd_amount.add(delta[i].mul(coin.price).div(coin.precision));
     }
+    dusd_amount = get_real_value(dusd_amount);
     require(dusd_amount <= max_dusd_amount, "They see you slippin");
-    dusd.burn(msg.sender, dusd_amount);
-    emit Burn(msg.sender, dusd_amount);
-  }
-
-  function stake(uint amount) external {
-    require(
-      dusd.transferFrom(msg.sender, address(this), amount),
-      "Transfer failed"
-    );
-    uint exchange_rate = get_non_circulating_inventory()
-      .mul(PRECISION)
-      .div(sDUSD.totalSupply());
-    sDUSD.mint(msg.sender, exchange_rate.mul(amount).div(PRECISION));
-  }
-
-  function unstake(uint sdusd_amount) external {
-    uint exchange_rate = get_non_circulating_inventory()
-      .mul(PRECISION)
-      .div(sDUSD.totalSupply());
-    sDUSD.burn(msg.sender, sdusd_amount);
-    uint dusd_amount = sdusd_amount.mul(exchange_rate).div(dusd_value);
-    uint balance = dusd.balanceOf(address(this));
-    if (balance < dusd_amount) {
-      dusd.mint(address(this), dusd_amount.sub(balance));
-    }
-    require(
-      dusd.transfer(msg.sender, dusd_amount),
-      "Transfer Failed"
-    );
-  }
-
-  function get_non_circulating_inventory() public view returns(uint) {
-    uint staked_value = get_staked_supply().mul(dusd_value);
-    return get_inventory().sub(staked_value);
-  }
-
-  function get_staked_supply() public view returns(uint) {
-    // @todo dusd.balanceOf(this) to get the staked supply might not be the best way - Think about it
-    return dusd.totalSupply().sub(dusd.balanceOf(address(this)));
+    dusd.burn(account, dusd_amount);
+    emit Burn(account, dusd_amount);
   }
 
   function get_inventory() public view returns (uint inventory) {
@@ -138,7 +104,7 @@ contract Core is Ownable {
       uint[] memory pool_portfolio = IPool(pools_addresses[i]).portfolio();
       CurvePool memory pool = pools[pools_addresses[i]];
       for (uint j = 0; j < pool.system_coin_ids.length; j++) {
-        portfolio[pool.system_coin_ids[j]] += pool_portfolio[j];
+        portfolio[pool.system_coin_ids[j]] = portfolio[pool.system_coin_ids[j]].add(pool_portfolio[j]);
       }
     }
 
@@ -161,15 +127,34 @@ contract Core is Ownable {
     for (uint i = 0; i < feed.length; i++) {
       system_coins[i].price = feed[i];
     }
-    dusd_value = get_inventory()
-      .mul(PRECISION)
-      .div(dusd.totalSupply().sub(get_staked_supply()));
+    uint supply = dusd.totalSupply();
+    uint dusd_staked = stakeLPToken.totalSupply();
+    if (dusd_staked > 0 && dusd_staked < supply) {
+      supply = supply.sub(dusd_staked);
+    }
+    dusd_value = get_inventory().mul(PRECISION).div(supply);
+    if (dusd_value > PRECISION) {
+      dusd_value = PRECISION; // pegged at $1 :)
+    }
     emit FeedUpdated(feed);
+  }
+
+  function mintReward(address account, uint dollar_amount) public {
+    require(msg.sender == address(stakeLPToken), "Only stakeLPToken");
+    dusd.mint(account, dollar_amount.mul(PRECISION).div(dusd_value));
+  }
+
+  function get_real_value(uint dusd_amount) public view returns(uint) {
+    return dusd_amount.mul(PRECISION).div(dusd_value);
+  }
+
+  function getProtocolIncome() public view returns(uint) {
+    return get_inventory().sub(dusd.totalSupply().mul(dusd_value).div(PRECISION));
   }
 
   // Admin functions
   event TokenWhiteListed(address token);
-  event CurvePoolWhitelisted(uint pool_id);
+  event CurvePoolWhitelisted(address pool);
 
   function whitelistTokens(address[] calldata tokens, uint[] calldata decimals) external {
     for (uint i = 0; i < tokens.length; i++) {
@@ -180,5 +165,16 @@ contract Core is Ownable {
   function whitelistToken(address token, uint decimals) public onlyOwner {
     system_coins.push(SystemCoin(token, 10 ** decimals, 0));
     emit TokenWhiteListed(token);
+  }
+
+  function whitelistPool(address pool, uint[] calldata _system_coins) external onlyOwner {
+    uint num_system_coins = system_coins.length;
+    for (uint i = 0; i < _system_coins.length; i++) {
+      require(_system_coins[i] < num_system_coins, "Invalid system coin index");
+    }
+    pools_addresses.push(pool);
+    pools[pool] = CurvePool(new uint[](0));
+    pools[pool].system_coin_ids = _system_coins;
+    emit CurvePoolWhitelisted(pool);
   }
 }

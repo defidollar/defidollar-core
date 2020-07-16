@@ -1,5 +1,6 @@
-const Core = artifacts.require("CoreAdminFunctions");
+const Core = artifacts.require("Core");
 const DUSD = artifacts.require("DUSD");
+const SUSDPool = artifacts.require("SUSDPool");
 const Aggregator = artifacts.require("MockAggregator");
 const Oracle = artifacts.require("Oracle");
 const Reserve = artifacts.require("Reserve");
@@ -14,12 +15,12 @@ module.exports = async function(deployer) {
   await deployer.deploy(Core);
   await deployer.deploy(DUSD, Core.address);
   // initialize system with 4 coins
-  const reserves = await Promise.all([
-    Reserve.new(18), // dai
-    Reserve.new(6), // usdc
-    Reserve.new(6), // usdt
-    Reserve.new(18) // susd
-  ])
+  const reserves = [
+    await Reserve.new(18), // dai
+    await Reserve.new(6), // usdc
+    await Reserve.new(6), // usdt
+    await Reserve.new(18) // susd
+  ]
 
   // Deploy oracle
   const ethPrice = toBN(200)
@@ -37,21 +38,23 @@ module.exports = async function(deployer) {
   await deployer.deploy(Oracle, aggregators.map(a => a.address), ethUsdAgg.address)
 
   const core = await Core.deployed()
-  await core.initialize(DUSD.address, Oracle.address, 102) // collateralization_ratio
+  await core.initialize(DUSD.address, '0x0000000000000000000000000000000000000000', Oracle.address)
 
   // Deploy Mock sUSD pool
   const tokens = reserves.map(a => a.address)
   await deployer.deploy(MockSusdToken)
+  await core.whitelistTokens(tokens, [18, 6, 6, 18])
+
   const curve_token = await MockSusdToken.deployed()
   const curve = await MockCurveSusd.new(curve_token.address, tokens)
   const curve_deposit = await MockSusdDeposit.new(curve.address, curve_token.address, tokens)
-  await core.whitelistTokens(tokens, [18, 6, 6, 18])
-  await core.addSupportedPool(
-    curve_deposit.address,
-    curve.address,
-    curve_token.address,
-    [0, 1, 2, 3] // system_coin_ids
+  const sUSDPool = await deployer.deploy(
+    SUSDPool,
+    curve_deposit.address, curve.address, curve_token.address,
+    core.address,
+    tokens
   )
-  await core.replenish_approvals()
+  await sUSDPool.replenish_approvals()
+  await core.whitelistPool(SUSDPool.address, [0, 1, 2, 3])
   await core.updatePrices()
 };
