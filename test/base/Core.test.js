@@ -40,7 +40,7 @@ contract('Core', async (accounts) => {
     })
 
     it('burn', async () => {
-      await this.core.burn(this.amounts, toWei('10'), this.user)
+      await this.core.redeem(this.amounts, toWei('10'), this.user)
 
       dusd_balance = await this.dusd.balanceOf(this.user)
       assert.equal(dusd_balance.toString(), '0')

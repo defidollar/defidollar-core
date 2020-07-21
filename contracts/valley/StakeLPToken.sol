@@ -1,25 +1,48 @@
 pragma solidity 0.5.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import {Core} from "../base/Core.sol";
 
-contract StakeLPToken is ERC20 {
+contract LPTokenWrapper {
+  using SafeMath for uint256;
   using SafeERC20 for IERC20;
-  using SafeMath for uint;
-
-  uint constant PRECISION = 1e18;
 
   IERC20 public stok;
+
+  uint256 private _totalSupply;
+  mapping(address => uint256) private _balances;
+
+  function totalSupply() public view returns (uint256) {
+    return _totalSupply;
+  }
+
+  function balanceOf(address account) public view returns (uint256) {
+    return _balances[account];
+  }
+
+  function stake(uint256 amount) public {
+    _totalSupply = _totalSupply.add(amount);
+    _balances[msg.sender] = _balances[msg.sender].add(amount);
+    stok.safeTransferFrom(msg.sender, address(this), amount);
+  }
+
+  function withdraw(uint256 amount) public {
+    _totalSupply = _totalSupply.sub(amount);
+    _balances[msg.sender] = _balances[msg.sender].sub(amount);
+    stok.safeTransfer(msg.sender, amount);
+  }
+}
+
+contract StakeLPToken is LPTokenWrapper {
   Core public core;
 
   uint income_diff;
-
   uint public rewardPerTokenStored;
   uint public unitRewardForCurrentFeeWindow;
+
   mapping(address => uint256) public userRewardPerTokenPaid;
   mapping(address => uint256) public rewards;
 
@@ -43,20 +66,18 @@ contract StakeLPToken is ERC20 {
       userRewardPerTokenPaid[account] = rewardPerTokenStored;
     }
     _;
-    update_unit_reward_for_current_fee_window(true);
+    update_stokt_reward_for_current_fee_window(true);
   }
 
   function stake(uint amount) public updateReward(msg.sender) {
     require(amount > 0, "Cannot stake 0");
-    stok.safeTransferFrom(msg.sender, address(this), amount);
-    _mint(msg.sender, amount);
+    super.stake(amount);
     emit Staked(msg.sender, amount);
   }
 
   function withdraw(uint256 amount) public updateReward(msg.sender) {
     require(amount > 0, "Cannot withdraw 0");
-    _burn(msg.sender, amount);
-    stok.safeTransfer(msg.sender, amount);
+    super.withdraw(amount);
     emit Withdrawn(msg.sender, amount);
   }
 
@@ -80,22 +101,20 @@ contract StakeLPToken is ERC20 {
   function update_income_diff(uint protocol_income) public onlyCore {
     if (protocol_income > income_diff) {
       income_diff = protocol_income.sub(income_diff);
-      rewardPerTokenStored = rewardPerTokenStored.add(unitRewardForCurrentFeeWindow.mul(income_diff).div(PRECISION));
-      update_unit_reward_for_current_fee_window(false);
+      rewardPerTokenStored = rewardPerTokenStored.add(unitRewardForCurrentFeeWindow.mul(income_diff).div(1e18));
+      update_stokt_reward_for_current_fee_window(false);
     } else {
       income_diff = 0;
     }
   }
 
-  function update_unit_reward_for_current_fee_window(bool accumulate) internal {
+  function update_stokt_reward_for_current_fee_window(bool accumulate) internal {
     uint total_supply = totalSupply();
-    if (total_supply > 0) {
-      if (!accumulate) {
-        unitRewardForCurrentFeeWindow = 0;
-      }
-      unitRewardForCurrentFeeWindow = unitRewardForCurrentFeeWindow.add(PRECISION.mul(PRECISION).div(total_supply));
-    } else {
+    if (total_supply == 0 || !accumulate) {
       unitRewardForCurrentFeeWindow = 0;
+    }
+    if (total_supply > 0) {
+      unitRewardForCurrentFeeWindow = unitRewardForCurrentFeeWindow.add(uint(1e36).div(total_supply));
     }
   }
 
@@ -106,7 +125,7 @@ contract StakeLPToken is ERC20 {
     return
       balanceOf(account)
         .mul(rewardPerTokenStored.sub(userRewardPerTokenPaid[account]))
-        .div(PRECISION)
+        .div(1e18)
         .add(rewards[account]);
   }
 }

@@ -7,7 +7,7 @@ contract MockSusdToken is ERC20 {
     _mint(_to, _value);
   }
 
-  function burn(address _from, uint256 _value) public {
+  function redeem(address _from, uint256 _value) public {
     _burn(_from, _value);
   }
 }

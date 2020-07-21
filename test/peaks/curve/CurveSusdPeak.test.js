@@ -48,7 +48,7 @@ contract('CurveSusdPeak', async (accounts) => {
         const balance = await this.reserves[i].balanceOf(this.user)
         assert.equal(balance.toString(), '0')
       }
-      await this.pool.burn(this.amounts, toWei('10'))
+      await this.pool.redeem(this.amounts, toWei('10'))
       for (let i = 0; i < n_coins; i++) {
         const balance = await this.reserves[i].balanceOf(this.user)
         assert.equal(balance.toString(), this.amounts[i].toString())

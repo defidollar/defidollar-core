@@ -86,7 +86,7 @@ contract CurveSusdPeak is IPeak {
   * @param out_amounts Exact out_amounts in the same order as required by the curve pool
   * @param max_dusd_amount Max DUSD to burn, used for capping slippage
   */
-  function burn(
+  function redeem(
     uint[] calldata out_amounts,
     uint max_dusd_amount
   ) external
@@ -113,7 +113,7 @@ contract CurveSusdPeak is IPeak {
       IERC20(coins[i]).safeTransfer(msg.sender, out_amounts[i]);
       delta[i] = _calcWithdrawDelta(info, pool_sizes[i], out_amounts[i]);
     }
-    return core.burn(delta, max_dusd_amount, msg.sender);
+    return core.redeem(delta, max_dusd_amount, msg.sender);
   }
 
   // This is risky (Bancor Hack scenario). Think about if we need strict token approvals during the actions at the cost of higher gas.

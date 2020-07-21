@@ -42,7 +42,7 @@ contract Core is Ownable {
   address[] public peaks_addresses;
 
   event Mint(address account, uint amount);
-  event Burn(address account, uint amount);
+  event Redeem(address account, uint amount);
   event FeedUpdated(uint[] feed);
 
   function initialize(
@@ -83,7 +83,7 @@ contract Core is Ownable {
     emit Mint(account, dusd_amount);
   }
 
-  function burn(
+  function redeem(
     uint[] calldata delta,
     uint max_dusd_amount,
     address account
@@ -103,8 +103,8 @@ contract Core is Ownable {
     }
     dusd_amount = get_real_value(dusd_amount).mul(fee_factor).div(10000);
     require(dusd_amount <= max_dusd_amount, "They see you slippin");
-    dusd.burn(account, dusd_amount);
-    emit Burn(account, dusd_amount);
+    dusd.redeem(account, dusd_amount);
+    emit Redeem(account, dusd_amount);
   }
 
   /**
@@ -155,8 +155,7 @@ contract Core is Ownable {
 
   function mintReward(address account, uint dollar_amount) public {
     require(msg.sender == address(stakeLPToken), "Only stakeLPToken");
-    dusd.mint(account, dollar_amount);
-    // dusd.mint(account, dollar_amount.mul(PRECISION).div(dusd_value));
+    dusd.mint(account, dollar_amount.mul(PRECISION).div(dusd_value));
   }
 
   // View functions
@@ -180,7 +179,6 @@ contract Core is Ownable {
 
     for(uint i = 0; i < coins.length; i++) {
       SystemCoin memory coin = coins[i];
-      // inventory = inventory.add(portfolio[i].mul(coin.price));
       inventory = inventory.add(portfolio[i].mul(coin.price).div(coin.precision));
     }
   }

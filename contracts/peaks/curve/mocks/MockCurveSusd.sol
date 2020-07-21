@@ -39,6 +39,6 @@ contract MockCurveSusd is ICurve {
       IERC20 _token = IERC20(underlying_coins[i]);
       _token.transfer(msg.sender, uamounts[i]);
     }
-    token.burn(msg.sender, max_burn_amount);
+    token.redeem(msg.sender, max_burn_amount);
   }
 }
