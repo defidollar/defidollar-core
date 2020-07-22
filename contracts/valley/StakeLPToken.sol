@@ -39,14 +39,9 @@ contract LPTokenWrapper {
 contract StakeLPToken is LPTokenWrapper {
     Core public core;
 
-    uint public income_diff;
-    uint public lastUpdated;
-    uint public lastIncomeUpdate;
-    uint public rewardPerTokenStored;
-    uint public unitRewardForCurrentFeeWindow;
-    uint public windowTotal;
-    uint public lastWindowSize;
-
+    uint256 public lastUpdateTime;
+    uint256 public rewardPerTokenStored;
+    uint public timeWeightRewardPerToken;
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
 
@@ -57,17 +52,12 @@ contract StakeLPToken is LPTokenWrapper {
     constructor(Core _core, IERC20 _stok) public {
         core = _core;
         stok = _stok;
-        lastUpdated = now;
-        lastIncomeUpdate = now;
-    }
-
-    modifier onlyCore() {
-        require(msg.sender == address(core), "Only Core");
-        _;
+        // lastUpdateTime = block.timestamp;
     }
 
     modifier updateReward(address account) {
-        updateRewardForCurrentFeeWindow();
+        timeWeightRewardPerToken = rewardPerTokenForCurrentWindow();
+        lastUpdateTime = block.timestamp;
         if (account != address(0)) {
             rewards[account] = earned(account);
             userRewardPerTokenPaid[account] = rewardPerTokenStored;
@@ -75,22 +65,33 @@ contract StakeLPToken is LPTokenWrapper {
         _;
     }
 
-    function updateRewardForCurrentFeeWindow() internal {
-        uint total_supply = totalSupply();
-        if (total_supply > 0) {
-            uint window = now.sub(lastUpdated);
-            windowTotal += window;
-            unitRewardForCurrentFeeWindow = unitRewardForCurrentFeeWindow
-                // .add(uint(1e36).div(window).div(total_supply));
-                .add(window.mul(1e36).div(total_supply));
-        } else {
-            unitRewardForCurrentFeeWindow = 0;
+    function rewardPerTokenForCurrentWindow() public view returns (uint256) {
+        if (totalSupply() == 0) {
+            return timeWeightRewardPerToken;
         }
-        lastUpdated = now;
+        return
+            timeWeightRewardPerToken.add(
+                block.timestamp
+                    .sub(lastUpdateTime)
+                    .mul(1e36)
+                    .div(totalSupply())
+            );
     }
 
-    function stake(uint amount) public updateReward(msg.sender) {
+    function earned(address account) public view returns (uint256) {
+        return
+            balanceOf(account)
+                .mul(rewardPerTokenStored.sub(userRewardPerTokenPaid[account]))
+                .div(1e18)
+                .add(rewards[account]);
+    }
+
+    // stake visibility is public as overriding LPTokenWrapper's stake() function
+    function stake(uint256 amount) public updateReward(msg.sender) {
         require(amount > 0, "Cannot stake 0");
+        if (totalSupply() == 0) {
+            lastUpdateTime = block.timestamp;
+        }
         super.stake(amount);
         emit Staked(msg.sender, amount);
     }
@@ -101,17 +102,13 @@ contract StakeLPToken is LPTokenWrapper {
         emit Withdrawn(msg.sender, amount);
     }
 
-    function exit() public {
+    function exit() external {
         withdraw(balanceOf(msg.sender));
-        _getReward();
+        getReward();
     }
 
     function getReward() public updateReward(msg.sender) {
-        _getReward();
-    }
-
-    function _getReward() internal {
-        uint256 reward = rewards[msg.sender];
+        uint256 reward = earned(msg.sender);
         if (reward > 0) {
             rewards[msg.sender] = 0;
             core.mintReward(msg.sender, reward);
@@ -119,46 +116,10 @@ contract StakeLPToken is LPTokenWrapper {
         }
     }
 
-    event Debug(uint indexed a);
-    /**
-    * @dev Difference of protocol income at 2 points
-    */
-    function update_income_diff(uint protocol_income) public onlyCore {
-        updateRewardForCurrentFeeWindow();
-        emit Debug(windowTotal);
-        if (protocol_income > income_diff) {
-            income_diff = protocol_income.sub(income_diff);
-            rewardPerTokenStored = rewardPerTokenStored
-            .add(
-                unitRewardForCurrentFeeWindow
-                .mul(income_diff)
-                .div(now.sub(lastIncomeUpdate))
-                .div(1e18)
-            );
-            // lastWindowSize = now.sub(lastIncomeUpdate);
-            emit Debug(now.sub(lastIncomeUpdate));
-        } else {
-            income_diff = 0;
-        }
-        unitRewardForCurrentFeeWindow = 0;
-        lastIncomeUpdate = now;
-        windowTotal = 0;
-    }
-
-    function setWindow() public {
-        windowTotal = 0;
-    }
-
-    // View functions
-    function earned(address account)
-        public
-        view
-        returns (uint256)
-    {
-        return
-            balanceOf(account)
-            .mul(rewardPerTokenStored.sub(userRewardPerTokenPaid[account]))
-            .div(1e18)
-            .add(rewards[account]);
+    function notifyProtocolIncomeAmount(uint rewardRate) public {
+        timeWeightRewardPerToken = rewardPerTokenForCurrentWindow();
+        rewardPerTokenStored = rewardPerTokenStored.add(timeWeightRewardPerToken.mul(rewardRate).div(1e18));
+        timeWeightRewardPerToken = 0;
+        lastUpdateTime = block.timestamp;
     }
 }
