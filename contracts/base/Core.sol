@@ -3,14 +3,15 @@ pragma solidity 0.5.17;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import {Ownable} from "@openzeppelin/contracts/ownership/Ownable.sol";
 
 import {Oracle} from "../stream/Oracle.sol";
 import {StakeLPToken} from "../valley/StakeLPToken.sol";
 import {IPeak} from "../peaks/IPeak.sol";
 import {DUSD} from "./DUSD.sol";
+import {Initializable} from "../common/Initializable.sol";
+import {Ownable} from "../common/Ownable.sol";
 
-contract Core is Ownable {
+contract Core is Initializable, Ownable {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
 
@@ -43,35 +44,35 @@ contract Core is Ownable {
     mapping(address => Peak) peaks;
     address[] public peaks_addresses;
 
+    // END OF STORAGE VARIABLES
+
     event Mint(address account, uint amount);
     event Redeem(address account, uint amount);
     event FeedUpdated(uint[] feed);
-
-    constructor() public {
-        lastIncomeUpdate = block.timestamp;
-    }
+    event Debug(address indexed a);
 
     function initialize(
         DUSD _dusd,
         StakeLPToken _stakeLPToken,
         Oracle _oracle,
         uint _fee_factor
-    )
-        public
-        onlyOwner
+    )   public
+        notInitialized
     {
         dusd = _dusd;
         stakeLPToken = _stakeLPToken;
         oracle = _oracle;
         fee_factor = _fee_factor;
+        lastIncomeUpdate = block.timestamp;
+        // emit Debug(owner());
+        // transferOwnership(_owner);
     }
 
     function mint(
         uint[] calldata delta,
         uint min_dusd_amount,
         address account
-    )
-        external
+    )   external
         returns (uint dusd_amount)
     {
         Peak memory peak = peaks[msg.sender];
@@ -94,8 +95,7 @@ contract Core is Ownable {
         uint[] calldata delta,
         uint max_dusd_amount,
         address account
-    )
-        external
+    )   external
         returns(uint dusd_amount)
     {
         Peak memory peak = peaks[msg.sender];

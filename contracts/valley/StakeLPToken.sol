@@ -5,6 +5,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import {Core} from "../base/Core.sol";
+import {Initializable} from "../common/Initializable.sol";
 
 contract LPTokenWrapper {
     using SafeMath for uint256;
@@ -36,7 +37,7 @@ contract LPTokenWrapper {
     }
 }
 
-contract StakeLPToken is LPTokenWrapper {
+contract StakeLPToken is Initializable, LPTokenWrapper {
     Core public core;
 
     uint256 public lastUpdateTime;
@@ -49,10 +50,10 @@ contract StakeLPToken is LPTokenWrapper {
     event Withdrawn(address indexed user, uint256 amount);
     event RewardPaid(address indexed user, uint256 reward);
 
-    constructor(Core _core, IERC20 _stok) public {
+    function initialize(Core _core, IERC20 _stok) public notInitialized {
         core = _core;
         stok = _stok;
-        // lastUpdateTime = block.timestamp;
+        lastUpdateTime = block.timestamp;
     }
 
     modifier updateReward(address account) {

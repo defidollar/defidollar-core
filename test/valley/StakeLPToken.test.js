@@ -1,31 +1,17 @@
 const assert = require('assert')
-
-const Core = artifacts.require("Core");
-const DUSD = artifacts.require("DUSD");
-const Reserve = artifacts.require("Reserve");
-const StakeLPToken = artifacts.require("StakeLPToken");
+const utils = require('../utils.js')
 
 const toWei = web3.utils.toWei
 const toBN = web3.utils.toBN
 const MAX = web3.utils.toTwosComplement(-1);
 
-const n_coins = 4
-
 contract('StakeLPToken', async (accounts) => {
 
-  before(async () => {
-        this.core = await Core.deployed()
-        this.dusd = await DUSD.deployed()
-        this.stakeLPToken = await StakeLPToken.deployed()
-        this.reserves = []
-        this.decimals = []
-        for (let i = 0; i < n_coins; i++) {
-            this.reserves.push(await Reserve.at((await this.core.system_coins(i)).token))
-            this.decimals.push(await this.reserves[i].decimals())
-        }
+    before(async () => {
+        const artifacts = await utils.getArtifacts()
+        Object.assign(this, artifacts)
         this.user = accounts[0]
 
-        // setup
         this.amounts = [1, 2, 3, 4].map((n, i) => {
             return toBN(n).mul(toBN(10 ** this.decimals[i])).toString()
         })

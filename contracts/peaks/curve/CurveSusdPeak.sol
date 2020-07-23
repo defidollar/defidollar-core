@@ -7,8 +7,10 @@ import {SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {ICurveDeposit, ICurve} from "./ICurve.sol";
 import {Core} from "../../base/Core.sol";
 import {IPeak} from "../IPeak.sol";
+import {Initializable} from "../../common/Initializable.sol";
+import {Initializable} from "../../common/Initializable.sol";
 
-contract CurveSusdPeak is IPeak {
+contract CurveSusdPeak is Initializable, IPeak {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
 
@@ -19,7 +21,7 @@ contract CurveSusdPeak is IPeak {
 
     ICurveDeposit curve_deposit; // deposit contract
     ICurve curve; // swap contract
-    IERC20 curve_token; // LP token contract
+    IERC20 curveToken; // LP token contract
     Core core;
 
     struct LPShareInfo {
@@ -29,16 +31,18 @@ contract CurveSusdPeak is IPeak {
         uint new_lp_supply;
     }
 
-    constructor(
+    function initialize(
         ICurveDeposit _curve_deposit,
         ICurve _curve,
-        IERC20 _curve_token,
+        IERC20 _curveToken,
         Core _core,
         address[N_COINS] memory _underlying_coins
-    ) public {
+    )   public
+        notInitialized
+    {
         curve_deposit = _curve_deposit;
         curve = _curve;
-        curve_token = _curve_token;
+        curveToken = _curveToken;
         core = _core;
         underlying_coins = _underlying_coins;
     }
@@ -66,13 +70,13 @@ contract CurveSusdPeak is IPeak {
         }
 
         LPShareInfo memory info;
-        info.old_lp_amount = curve_token.balanceOf(address(this));
-        info.old_lp_supply = curve_token.totalSupply();
+        info.old_lp_amount = curveToken.balanceOf(address(this));
+        info.old_lp_supply = curveToken.totalSupply();
 
         curve_deposit.add_liquidity(in_amounts, 0);
 
-        info.new_lp_amount = curve_token.balanceOf(address(this));
-        info.new_lp_supply = curve_token.totalSupply();
+        info.new_lp_amount = curveToken.balanceOf(address(this));
+        info.new_lp_supply = curveToken.totalSupply();
 
         uint[] memory delta = new uint[](N_COINS);
         for (uint i = 0; i < N_COINS; i++) {
@@ -99,13 +103,13 @@ contract CurveSusdPeak is IPeak {
         }
 
         LPShareInfo memory info;
-        info.old_lp_amount = curve_token.balanceOf(address(this));
-        info.old_lp_supply = curve_token.totalSupply();
+        info.old_lp_amount = curveToken.balanceOf(address(this));
+        info.old_lp_supply = curveToken.totalSupply();
 
         curve_deposit.remove_liquidity_imbalance(out_amounts, MAX);
 
-        info.new_lp_amount = curve_token.balanceOf(address(this));
-        info.new_lp_supply = curve_token.totalSupply();
+        info.new_lp_amount = curveToken.balanceOf(address(this));
+        info.new_lp_supply = curveToken.totalSupply();
 
         address[N_COINS] memory coins = underlying_coins;
         uint[] memory delta = new uint[](N_COINS);
@@ -119,15 +123,15 @@ contract CurveSusdPeak is IPeak {
 
     // This is risky (Bancor Hack scenario). Think about if we need strict token approvals during the actions at the cost of higher gas.
     function replenish_approvals() external {
-        curve_token.approve(address(curve_deposit), MAX);
+        curveToken.approve(address(curve_deposit), MAX);
         for (uint i = 0; i < N_COINS; i++) {
             IERC20(underlying_coins[i]).approve(address(curve_deposit), MAX);
         }
     }
 
     function portfolio() public view returns(uint[] memory _portfolio) {
-        uint lp_amount = curve_token.balanceOf(address(this));
-        uint lp_supply = curve_token.totalSupply();
+        uint lp_amount = curveToken.balanceOf(address(this));
+        uint lp_supply = curveToken.totalSupply();
         _portfolio = new uint[](N_COINS);
         if (lp_supply > 0) {
             for (uint i = 0; i < N_COINS; i++) {

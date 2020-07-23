@@ -1,18 +1,9 @@
 const assert = require('assert')
-
-const Core = artifacts.require("Core");
-const DUSD = artifacts.require("DUSD");
-const Reserve = artifacts.require("Reserve");
-const StakeLPToken = artifacts.require("StakeLPToken");
-
-const MockCurveSusd = artifacts.require('MockCurveSusd')
-const MockSusdToken = artifacts.require("MockSusdToken");
-const CurveSusdPeak = artifacts.require('CurveSusdPeak')
+const utils = require('../utils.js')
 
 const toWei = web3.utils.toWei
 const toBN = web3.utils.toBN
 const MAX = web3.utils.toTwosComplement(-1);
-
 
 async function getBlockTime(tx) {
 	const block = await web3.eth.getBlock(tx.receipt.blockNumber)
@@ -27,17 +18,8 @@ contract('e2e flow', async (accounts) => {
 	const SCALE_36 = scale(1, 36)
 
 	before(async () => {
-		this.core = await Core.deployed()
-		this.dusd = await DUSD.deployed()
-		this.stakeLPToken = await StakeLPToken.deployed()
-		this.reserves = []
-		this.decimals = []
-		for (let i = 0; i < n_coins; i++) {
-			this.reserves.push(await Reserve.at((await this.core.system_coins(i)).token))
-			this.decimals.push(await this.reserves[i].decimals())
-		}
-		this.pool = await CurveSusdPeak.deployed()
-
+		const artifacts = await utils.getArtifacts()
+        Object.assign(this, artifacts)
 		this.amounts = [1, 2, 3, 4].map((n, i) => {
 			return toBN(n).mul(toBN(10 ** this.decimals[i]))
 		})
@@ -53,15 +35,14 @@ contract('e2e flow', async (accounts) => {
 		const tasks = []
 		for (let i = 0; i < n_coins; i++) {
 			tasks.push(this.reserves[i].mint(alice, this.amounts[i]))
-			tasks.push(this.reserves[i].approve(this.pool.address, this.amounts[i]))
+			tasks.push(this.reserves[i].approve(this.curveSusdPeak.address, this.amounts[i]))
 		}
 		await Promise.all(tasks)
-		await this.pool.mint(this.amounts, toWei('10'))
+		await this.curveSusdPeak.mint(this.amounts, toWei('10'))
 
 		const dusd_balance = await this.dusd.balanceOf(alice)
 		assert.equal(dusd_balance.toString(), toWei('10'))
-		this.curve_token = await MockSusdToken.deployed()
-		assert.equal((await this.curve_token.balanceOf(this.pool.address)).toString(), toWei('10'))
+		assert.equal((await this.curveToken.balanceOf(this.curveSusdPeak.address)).toString(), toWei('10'))
 		await this.assertions({ dusd_total_supply: toWei('10') })
 	})
 
@@ -70,15 +51,14 @@ contract('e2e flow', async (accounts) => {
 		const from = bob
 		for (let i = 0; i < n_coins; i++) {
 			tasks.push(this.reserves[i].mint(from, this.amounts[i]))
-			tasks.push(this.reserves[i].approve(this.pool.address, this.amounts[i], { from }))
+			tasks.push(this.reserves[i].approve(this.curveSusdPeak.address, this.amounts[i], { from }))
 		}
 		await Promise.all(tasks)
-		await this.pool.mint(this.amounts, toWei('10'), { from })
+		await this.curveSusdPeak.mint(this.amounts, toWei('10'), { from })
 
 		this.dusd_balance = await this.dusd.balanceOf(from)
 		assert.equal(this.dusd_balance.toString(), toWei('10'))
-		this.curve_token = await MockSusdToken.deployed()
-		assert.equal((await this.curve_token.balanceOf(this.pool.address)).toString(), toWei('20'))
+		assert.equal((await this.curveToken.balanceOf(this.curveSusdPeak.address)).toString(), toWei('20'))
 		await this.assertions({ dusd_total_supply: toWei('20') })
 	})
 
@@ -117,7 +97,6 @@ contract('e2e flow', async (accounts) => {
 	})
 
 	it('CurveSusdPeak accrues income=4', async () => {
-		this.mockCurveSusd = await MockCurveSusd.deployed()
 		this.protocolIncome = scale(4, 18)
 		const income = [1, 1, 1, 1].map((n, i) => {
 			return toBN(n).mul(toBN(10 ** this.decimals[i]))
@@ -233,7 +212,6 @@ contract('e2e flow', async (accounts) => {
 		let inventory = await this.core.get_inventory()
 		assert.equal(inventory.toString(), toWei('24'))
 
-		this.mockCurveSusd = await MockCurveSusd.deployed()
 		this.reward = toBN(6)
 		const income = [2, 1, 1, 2].map((n, i) => { // 5 tokens
 			return toBN(n).mul(toBN(10 ** this.decimals[i]))
