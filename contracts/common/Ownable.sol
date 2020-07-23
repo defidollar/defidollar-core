@@ -2,7 +2,7 @@ pragma solidity 0.5.17;
 
 
 contract Ownable {
-    bytes32 constant OWNER_SLOT = keccak256("matic.network.proxy.owner");
+    bytes32 constant OWNER_SLOT = keccak256("proxy.owner");
 
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
