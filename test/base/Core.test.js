@@ -11,7 +11,7 @@ contract('Core', async (accounts) => {
         const artifacts = await utils.getArtifacts()
         Object.assign(this, artifacts)
         this.user = accounts[1]
-        await this.core.whitelist_peak(accounts[0], [0, 1, 2, 3])
+        await this.core.whitelistPeak(accounts[0], [0, 1, 2, 3])
     })
 
     describe('mint/burn', async () => {

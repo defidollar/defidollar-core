@@ -9,24 +9,24 @@ contract MockCurveSusd is ICurve {
     uint constant N_COINS = 4;
 
     MockSusdToken token;
-    address[] underlying_coins;
+    address[] underlyingCoins;
 
     constructor(
         MockSusdToken _token,
-        address[] memory _underlying_coins
+        address[] memory _underlyingCoins
     ) public {
         token = _token;
-        underlying_coins = _underlying_coins;
+        underlyingCoins = _underlyingCoins;
     }
 
     function balances(uint i) external view returns(uint) {
-        return IERC20(underlying_coins[i]).balanceOf(address(this));
+        return IERC20(underlyingCoins[i]).balanceOf(address(this));
     }
 
     function add_liquidity(uint[] calldata uamounts, uint min_mint_amount) external {
         uint to_mint;
         for (uint i = 0; i < N_COINS; i++) {
-            IERC20 _token = IERC20(underlying_coins[i]);
+            IERC20 _token = IERC20(underlyingCoins[i]);
             _token.transferFrom(msg.sender, address(this), uamounts[i]);
             to_mint += uamounts[i] * (10 ** (uint(18) - _token.decimals()));
         }
@@ -36,7 +36,7 @@ contract MockCurveSusd is ICurve {
 
     function remove_liquidity_imbalance(uint[] calldata uamounts, uint max_burn_amount) external {
         for (uint i = 0; i < N_COINS; i++) {
-            IERC20 _token = IERC20(underlying_coins[i]);
+            IERC20 _token = IERC20(underlyingCoins[i]);
             _token.transfer(msg.sender, uamounts[i]);
         }
         token.redeem(msg.sender, max_burn_amount);

@@ -15,7 +15,7 @@ contract('StakeLPToken', async (accounts) => {
         this.amounts = [1, 2, 3, 4].map((n, i) => {
             return toBN(n).mul(toBN(10 ** this.decimals[i])).toString()
         })
-        await this.core.whitelist_peak(accounts[0], [0, 1, 2, 3])
+        await this.core.whitelistPeak(accounts[0], [0, 1, 2, 3])
         this.amount = toWei('10')
         await this.core.mint(this.amounts, this.amount, this.user)
     })

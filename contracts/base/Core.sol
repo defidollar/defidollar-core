@@ -11,6 +11,7 @@ import {DUSD} from "./DUSD.sol";
 import {Initializable} from "../common/Initializable.sol";
 import {Ownable} from "../common/Ownable.sol";
 
+
 contract Core is Initializable, Ownable {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
@@ -24,7 +25,7 @@ contract Core is Initializable, Ownable {
         uint precision;
         uint price; // feed from oracle
     }
-    SystemCoin[] public system_coins;
+    SystemCoin[] public systemCoins;
 
     DUSD public dusd;
     StakeLPToken public stakeLPToken;
@@ -33,117 +34,136 @@ contract Core is Initializable, Ownable {
     enum SystemHealth { GREEN, YELLOW, RED }
     SystemHealth public health;
 
-    uint public dusd_value = PRECISION;
-    uint public fee_factor;
+    uint public dusdValue = PRECISION;
+    uint public redeemFee;
     uint public lastIncomeUpdate;
     uint public lastProtocolIncome;
 
+    // Interface contracts for third-party protocol integrations
+    enum PeakState { Extinct, Active, Dormant }
     struct Peak {
-        uint[] system_coin_ids; // system indices of the coins accepted by the curve peak
+        uint[] systemCoinIds; // system indices of the coins accepted by the peak
+        PeakState state;
     }
     mapping(address => Peak) peaks;
-    address[] public peaks_addresses;
+    address[] public peaksAddresses;
 
     // END OF STORAGE VARIABLES
 
     event Mint(address account, uint amount);
     event Redeem(address account, uint amount);
     event FeedUpdated(uint[] feed);
-    event Debug(address indexed a);
+    event TokenWhiteListed(address token);
+    event PeakWhitelisted(address peak);
 
+    /**
+    * @dev Used to initialize contract state from the proxy
+    */
     function initialize(
         DUSD _dusd,
         StakeLPToken _stakeLPToken,
         Oracle _oracle,
-        uint _fee_factor
+        uint _redeemFee
     )   public
         notInitialized
     {
         dusd = _dusd;
         stakeLPToken = _stakeLPToken;
         oracle = _oracle;
-        fee_factor = _fee_factor;
+        redeemFee = _redeemFee;
         lastIncomeUpdate = block.timestamp;
-        // emit Debug(owner());
-        // transferOwnership(_owner);
-    }
-
-    function mint(
-        uint[] calldata delta,
-        uint min_dusd_amount,
-        address account
-    )   external
-        returns (uint dusd_amount)
-    {
-        Peak memory peak = peaks[msg.sender];
-        require(
-            peak.system_coin_ids.length > 0,
-            "Pool is not whitelisted"
-        );
-        SystemCoin[] memory coins = system_coins;
-        for (uint i = 0; i < peak.system_coin_ids.length; i++) {
-            SystemCoin memory coin = coins[peak.system_coin_ids[i]];
-            dusd_amount = dusd_amount.add(delta[i].mul(coin.price).div(coin.precision));
-        }
-        dusd_amount = get_real_value(dusd_amount);
-        require(dusd_amount >= min_dusd_amount, "They see you slippin");
-        dusd.mint(account, dusd_amount);
-        emit Mint(account, dusd_amount);
-    }
-
-    function redeem(
-        uint[] calldata delta,
-        uint max_dusd_amount,
-        address account
-    )   external
-        returns(uint dusd_amount)
-    {
-        Peak memory peak = peaks[msg.sender];
-        require(
-            peak.system_coin_ids.length > 0,
-            "Pool is not whitelisted"
-        );
-
-        SystemCoin[] memory coins = system_coins;
-        for (uint i = 0; i < peak.system_coin_ids.length; i++) {
-            SystemCoin memory coin = coins[peak.system_coin_ids[i]];
-            dusd_amount = dusd_amount.add(delta[i].mul(coin.price).div(coin.precision));
-        }
-        dusd_amount = get_real_value(dusd_amount).mul(fee_factor).div(10000);
-        require(dusd_amount <= max_dusd_amount, "They see you slippin");
-        dusd.redeem(account, dusd_amount);
-        emit Redeem(account, dusd_amount);
     }
 
     /**
-    * @dev Pull prices from the Oracle contract
+    * @notice Mint DUSD
+    * @dev Only whitelisted peaks can call this function
+    * @param delta Delta of system coins added to the system through a peak
+    * @param minDusdAmount Min DUSD amount to mint. Used to cap slippage
+    * @param account Account to mint DUSD to
+    * @return dusdAmount DUSD amount actually minted
+    */
+    function mint(
+        uint[] calldata delta,
+        uint minDusdAmount,
+        address account
+    )   external
+        returns (uint dusdAmount)
+    {
+        Peak memory peak = peaks[msg.sender];
+        require(
+            peak.state == PeakState.Active,
+            "Peak is inactive"
+        );
+        SystemCoin[] memory coins = systemCoins;
+        for (uint i = 0; i < peak.systemCoinIds.length; i++) {
+            SystemCoin memory coin = coins[peak.systemCoinIds[i]];
+            dusdAmount = dusdAmount.add(
+                delta[i].mul(coin.price).div(coin.precision)
+            );
+        }
+        dusdAmount = getRealValue(dusdAmount);
+        require(dusdAmount >= minDusdAmount, "They see you slippin");
+        dusd.mint(account, dusdAmount);
+        emit Mint(account, dusdAmount);
+    }
+
+    /**
+    * @notice Redeem DUSD
+    * @dev Only whitelisted peaks can call this function
+    * @param delta Delta of system coins removed from the system through a peak
+    * @param maxDusdAmount Max DUSD amount to burn. Used to cap slippage
+    * @param account Account to mint DUSD to
+    * @return dusdAmount DUSD amount actually redeemed
+    */
+    function redeem(
+        uint[] calldata delta,
+        uint maxDusdAmount,
+        address account
+    )   external
+        returns(uint dusdAmount)
+    {
+        Peak memory peak = peaks[msg.sender];
+        require(
+            peak.state != PeakState.Extinct,
+            "Peak is extinct"
+        );
+        SystemCoin[] memory coins = systemCoins;
+        for (uint i = 0; i < peak.systemCoinIds.length; i++) {
+            SystemCoin memory coin = coins[peak.systemCoinIds[i]];
+            dusdAmount = dusdAmount.add(
+                delta[i].mul(coin.price).div(coin.precision)
+            );
+        }
+        dusdAmount = getRealValue(dusdAmount).mul(redeemFee).div(10000);
+        require(dusdAmount <= maxDusdAmount, "They see you slippin");
+        dusd.redeem(account, dusdAmount);
+        emit Redeem(account, dusdAmount);
+    }
+
+    /**
+    * @notice Pull prices from the oracle and update system stats
+    * @dev Anyone can call this
     */
     function sync_system() external {
-        _update_feed();
-        update_system_stats();
+        _updateFeed();
+        updateSystemState();
     }
 
-    function _update_feed() internal {
-        uint[] memory feed = oracle.getPriceFeed();
-        require(
-            feed.length == system_coins.length,
-            "Invalid system state"
-        );
-        for (uint i = 0; i < feed.length; i++) {
-            system_coins[i].price = feed[i];
-        }
-        emit FeedUpdated(feed);
-    }
-
-    function update_system_stats() public returns(uint protocol_income) {
-        uint inventory = get_inventory(); // denominated in $s
+    /**
+    *
+    */
+    function updateSystemState()
+        public
+        returns(uint protocolIncome)
+    {
+        uint inventory = getInventory(); // denominated in $s
         uint supply = dusd.totalSupply();
         // if supply <= inventory, system is healthy
         if (supply <= inventory) {
             // income is only what is available after accounting for DUSD at $1
-            protocol_income = inventory.sub(supply);
+            protocolIncome = inventory.sub(supply);
             health = SystemHealth.GREEN;
-            dusd_value = PRECISION; // pegged at $1 :)
+            dusdValue = PRECISION; // pegged at $1 :)
         } else {
             // try to maintain the collateralization ratio using staked funds
             uint dusd_staked = stakeLPToken.totalSupply();
@@ -154,85 +174,160 @@ contract Core is Initializable, Ownable {
                 health = SystemHealth.YELLOW;
             } else {
                 // if not even the staked funds can make up for it, we devalue dusd
-                dusd_value = inventory.mul(PRECISION).div(supply);
+                dusdValue = inventory.mul(PRECISION).div(supply);
                 health = SystemHealth.RED;
             }
         }
 
         uint notifyIncome;
-        if (protocol_income > lastProtocolIncome) {
-            notifyIncome = protocol_income.sub(lastProtocolIncome);
+        if (protocolIncome > lastProtocolIncome) {
+            notifyIncome = protocolIncome.sub(lastProtocolIncome);
             stakeLPToken.notifyProtocolIncomeAmount(notifyIncome
                 .div(block.timestamp.sub(lastIncomeUpdate))
             );
         }
-        lastProtocolIncome = protocol_income;
+        lastProtocolIncome = protocolIncome;
         lastIncomeUpdate = block.timestamp;
     }
 
-    function mintReward(address account, uint dollar_amount) public {
+    /**
+    * @notice Mint staking rewards
+    * @param account Account to mint rewards to
+    * @param dollarAmount Reward amount denominated in dollars
+    */
+    function mintReward(address account, uint dollarAmount)
+        external
+    {
         require(msg.sender == address(stakeLPToken), "Only stakeLPToken");
-        dusd.mint(account, dollar_amount.mul(PRECISION).div(dusd_value));
+        dusd.mint(account, dollarAmount.mul(PRECISION).div(dusdValue));
     }
 
     // View functions
-    function get_real_value(uint dusd_amount) public view returns(uint) {
+
+    /**
+    * @notice Real dollar amount based on the fact that DUSD could be under-collateralized
+    */
+    function getRealValue(uint dollarAmount)
+        public
+        view
+        returns(uint)
+    {
         if (health == SystemHealth.RED) {
-            return dusd_amount.mul(PRECISION).div(dusd_value);
+            return dollarAmount.mul(PRECISION).div(dusdValue);
         }
-        return dusd_amount;
+        return dollarAmount;
     }
 
-    function get_inventory() public view returns (uint inventory) {
-        SystemCoin[] memory coins = system_coins;
+    /**
+    * @notice Returns the net system assets across all peaks
+    * @return inventory system assets denominated in dollars
+    */
+    function getInventory()
+        public
+        view
+        returns (uint inventory)
+    {
+        SystemCoin[] memory coins = systemCoins;
         uint[] memory portfolio = new uint[](coins.length);
-        for(uint i = 0; i < peaks_addresses.length; i++) {
-            uint[] memory peak_portfolio = IPeak(peaks_addresses[i]).portfolio();
-            Peak memory peak = peaks[peaks_addresses[i]];
-            for (uint j = 0; j < peak.system_coin_ids.length; j++) {
-                portfolio[peak.system_coin_ids[j]] = portfolio[peak.system_coin_ids[j]]
-                    .add(peak_portfolio[j]);
+        // retrieve assets accross all peaks
+        for(uint i = 0; i < peaksAddresses.length; i++) {
+            uint[] memory peakPortfolio = IPeak(peaksAddresses[i]).portfolio();
+            Peak memory peak = peaks[peaksAddresses[i]];
+            for (uint j = 0; j < peak.systemCoinIds.length; j++) {
+                portfolio[peak.systemCoinIds[j]] = portfolio[peak.systemCoinIds[j]].add(peakPortfolio[j]);
             }
         }
 
+        // multiply retrieved assets from with the price
         for(uint i = 0; i < coins.length; i++) {
             SystemCoin memory coin = coins[i];
-            inventory = inventory.add(portfolio[i].mul(coin.price).div(coin.precision));
+            inventory = inventory.add(
+                portfolio[i].mul(coin.price).div(coin.precision)
+            );
         }
     }
 
-    // Admin functions
-    event TokenWhiteListed(address token);
-    event PeakWhitelisted(address peak);
+    // onlyOwner functions
 
-    function whitelist_tokens(
+    /**
+    * @notice Whitelist new tokens supported by the peaks.
+    * These are vanilla coins like DAI, USDC, USDT etc.
+    * @dev onlyOwner ACL is provided by the whitelistToken call
+    * @param tokens Token addresses to whitelist
+    * @param decimals Token Precision
+    * @param initialPrices Intialize prices akin to retieving from an oracle
+    */
+    function whitelistTokens(
         address[] calldata tokens,
         uint[] calldata decimals,
-        uint[] calldata initial_prices
-    )
-        external
+        uint[] calldata initialPrices
+    )   external
+        onlyOwner
     {
         for (uint i = 0; i < tokens.length; i++) {
-            whitelistToken(tokens[i], decimals[i], initial_prices[i]);
+            _whitelistToken(tokens[i], decimals[i], initialPrices[i]);
         }
     }
 
-    function whitelistToken(address token, uint decimals, uint initial_price) public onlyOwner {
-        system_coins.push(SystemCoin(token, 10 ** decimals, initial_price));
-        emit TokenWhiteListed(token);
+    /**
+    * @notice Whitelist a new peak
+    * @param peak Address of the contract that interfaces with the 3rd-party protocol
+    * @param _systemCoins Indices of the system coins, the peak supports
+    */
+    function whitelistPeak(
+        address peak,
+        uint[] calldata _systemCoins
+    )   external
+        onlyOwner
+    {
+        uint numSystemCoins = systemCoins.length;
+        for (uint i = 0; i < _systemCoins.length; i++) {
+            require(_systemCoins[i] < numSystemCoins, "Invalid system coin index");
+        }
+        require(
+            peaks[peak].state == PeakState.Extinct,
+            "Peak already exists"
+        );
+        peaksAddresses.push(peak);
+        peaks[peak] = Peak(_systemCoins, PeakState.Active);
+        emit PeakWhitelisted(peak);
     }
 
-    function whitelist_peak(address peak, uint[] calldata _system_coins)
+    /**
+    * @notice Change a peaks status
+    */
+    function setPeakStatus(address peak, PeakState state)
         external
         onlyOwner
     {
-        uint num_system_coins = system_coins.length;
-        for (uint i = 0; i < _system_coins.length; i++) {
-            require(_system_coins[i] < num_system_coins, "Invalid system coin index");
+        require(
+            peaks[peak].state != PeakState.Extinct,
+            "Peak is extinct"
+        );
+        peaks[peak].state = state;
+    }
+
+    // Internal functions
+
+    function _updateFeed()
+        internal
+    {
+        uint[] memory feed = oracle.getPriceFeed();
+        require(
+            feed.length == systemCoins.length,
+            "Invalid system state"
+        );
+        for (uint i = 0; i < feed.length; i++) {
+            systemCoins[i].price = feed[i];
         }
-        peaks_addresses.push(peak);
-        peaks[peak] = Peak(new uint[](0));
-        peaks[peak].system_coin_ids = _system_coins;
-        emit PeakWhitelisted(peak);
+        emit FeedUpdated(feed);
+    }
+
+    function _whitelistToken(address token, uint decimals, uint initialPrice)
+        internal
+    {
+        require(decimals > 0, "Using a 0 decimal coin can break the system");
+        systemCoins.push(SystemCoin(token, 10 ** decimals, initialPrice));
+        emit TokenWhiteListed(token);
     }
 }

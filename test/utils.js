@@ -17,7 +17,7 @@ async function getArtifacts() {
     const reserves = []
     const decimals = []
     for (let i = 0; i < n_coins; i++) {
-        reserves.push(await Reserve.at((await core.system_coins(i)).token))
+        reserves.push(await Reserve.at((await core.systemCoins(i)).token))
         decimals.push(await reserves[i].decimals())
     }
     const stakeLPTokenProxy = await StakeLPTokenProxy.deployed()

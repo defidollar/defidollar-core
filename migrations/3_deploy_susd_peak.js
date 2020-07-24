@@ -13,7 +13,7 @@ module.exports = async function(deployer) {
   const core = await Core.at(coreProxy.address)
   const tokens = []
   for (let i = 0; i < 4; i++) {
-    tokens.push((await core.system_coins(i)).token)
+    tokens.push((await core.systemCoins(i)).token)
   }
 
   // Deploy Mock sUSD pool
@@ -25,7 +25,7 @@ module.exports = async function(deployer) {
     tokens
   )
 
-  const curve_deposit = await deployer.deploy(
+  const curveDeposit = await deployer.deploy(
     MockSusdDeposit,
     curve.address,
     curveToken.address,
@@ -34,10 +34,10 @@ module.exports = async function(deployer) {
 
   const curveSusdPeak = await deployer.deploy(CurveSusdPeak)
   await curveSusdPeak.initialize(
-    curve_deposit.address, curve.address, curveToken.address,
+    curveDeposit.address, curve.address, curveToken.address,
     core.address,
     tokens
   )
   await curveSusdPeak.replenish_approvals()
-  await core.whitelist_peak(CurveSusdPeak.address, [0, 1, 2, 3])
+  await core.whitelistPeak(CurveSusdPeak.address, [0, 1, 2, 3])
 }

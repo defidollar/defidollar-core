@@ -209,7 +209,7 @@ contract('e2e flow', async (accounts) => {
 	})
 
 	it('CurveSusdPeak accrues income=6', async () => {
-		let inventory = await this.core.get_inventory()
+		let inventory = await this.core.getInventory()
 		assert.equal(inventory.toString(), toWei('24'))
 
 		this.reward = toBN(6)
@@ -222,7 +222,7 @@ contract('e2e flow', async (accounts) => {
 		}
 		await Promise.all(tasks)
 
-		inventory = await this.core.get_inventory()
+		inventory = await this.core.getInventory()
 		assert.equal(inventory.toString(), toWei('30'))
 
 		this.protocolIncome = inventory.sub(this.dusd_total_supply).sub(this.protocolIncome)
@@ -231,7 +231,7 @@ contract('e2e flow', async (accounts) => {
 	it('update system stats', async () => {
 		this.lastIncomeUpdate = await this.core.lastIncomeUpdate()
 
-		const s = await this.core.update_system_stats()
+		const s = await this.core.updateSystemState()
 
 		const now = await getBlockTime(s)
 		const incomeWindow = now - parseInt(this.lastIncomeUpdate.toString(), 10)

@@ -62,6 +62,6 @@ module.exports = async function(deployer, network, accounts) {
         ).encodeABI()
     )
     const initial_price = toWei('1')
-    await core.whitelist_tokens(tokens, [18, 6, 6, 18], new Array(4).fill(initial_price))
+    await core.whitelistTokens(tokens, [18, 6, 6, 18], new Array(4).fill(initial_price))
     await core.sync_system()
 };

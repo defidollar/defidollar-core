@@ -10,21 +10,21 @@ contract MockSusdDeposit is ICurveDeposit {
 
     ICurve curve;
     MockSusdToken token;
-    address[] underlying_coins;
+    address[] underlyingCoins;
 
     constructor(
         ICurve _curve,
         MockSusdToken _token,
-        address[] memory _underlying_coins
+        address[] memory _underlyingCoins
     ) public {
         curve = _curve;
         token = _token;
-        underlying_coins = _underlying_coins;
+        underlyingCoins = _underlyingCoins;
     }
 
     function add_liquidity(uint[] calldata uamounts, uint min_mint_amount) external {
         for (uint i = 0; i < N_COINS; i++) {
-            IERC20 _token = IERC20(underlying_coins[i]);
+            IERC20 _token = IERC20(underlyingCoins[i]);
             _token.transferFrom(msg.sender, address(this), uamounts[i]);
             _token.approve(address(curve), uamounts[i]);
         }
@@ -41,7 +41,7 @@ contract MockSusdDeposit is ICurveDeposit {
         token.approve(address(curve), _tokens);
         curve.remove_liquidity_imbalance(uamounts, _tokens);
         for (uint i = 0; i < N_COINS; i++) {
-            IERC20 _token = IERC20(underlying_coins[i]);
+            IERC20 _token = IERC20(underlyingCoins[i]);
             _token.transfer(msg.sender, _token.balanceOf(address(this)));
         }
     }

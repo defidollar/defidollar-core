@@ -17,9 +17,9 @@ contract CurveSusdPeak is Initializable, IPeak {
     uint constant MAX = 2**256 - 1;
     uint constant N_COINS = 4;
 
-    address[N_COINS] public underlying_coins;
+    address[N_COINS] public underlyingCoins;
 
-    ICurveDeposit curve_deposit; // deposit contract
+    ICurveDeposit curveDeposit; // deposit contract
     ICurve curve; // swap contract
     IERC20 curveToken; // LP token contract
     Core core;
@@ -32,33 +32,33 @@ contract CurveSusdPeak is Initializable, IPeak {
     }
 
     function initialize(
-        ICurveDeposit _curve_deposit,
+        ICurveDeposit _curveDeposit,
         ICurve _curve,
         IERC20 _curveToken,
         Core _core,
-        address[N_COINS] memory _underlying_coins
+        address[N_COINS] memory _underlyingCoins
     )   public
         notInitialized
     {
-        curve_deposit = _curve_deposit;
+        curveDeposit = _curveDeposit;
         curve = _curve;
         curveToken = _curveToken;
         core = _core;
-        underlying_coins = _underlying_coins;
+        underlyingCoins = _underlyingCoins;
     }
 
     /**
     * @dev Mint DUSD
     * @param in_amounts Exact in_amounts in the same order as required by the curve pool
-    * @param min_dusd_amount Minimum DUSD to mint, used for capping slippage
+    * @param minDusdAmount Minimum DUSD to mint, used for capping slippage
     */
     function mint(
         uint[] calldata in_amounts,
-        uint min_dusd_amount
+        uint minDusdAmount
     ) external
-        returns (uint dusd_amount)
+        returns (uint dusdAmount)
     {
-        address[N_COINS] memory coins = underlying_coins;
+        address[N_COINS] memory coins = underlyingCoins;
         uint[N_COINS] memory pool_sizes;
 
         for (uint i = 0; i < N_COINS; i++) {
@@ -73,7 +73,7 @@ contract CurveSusdPeak is Initializable, IPeak {
         info.old_lp_amount = curveToken.balanceOf(address(this));
         info.old_lp_supply = curveToken.totalSupply();
 
-        curve_deposit.add_liquidity(in_amounts, 0);
+        curveDeposit.add_liquidity(in_amounts, 0);
 
         info.new_lp_amount = curveToken.balanceOf(address(this));
         info.new_lp_supply = curveToken.totalSupply();
@@ -82,20 +82,20 @@ contract CurveSusdPeak is Initializable, IPeak {
         for (uint i = 0; i < N_COINS; i++) {
             delta[i] = _calcDepositDelta(info, pool_sizes[i], in_amounts[i]);
         }
-        return core.mint(delta, min_dusd_amount, msg.sender);
+        return core.mint(delta, minDusdAmount, msg.sender);
     }
 
     /**
     * @dev Burn DUSD
     * @param out_amounts Exact out_amounts in the same order as required by the curve pool
-    * @param max_dusd_amount Max DUSD to burn, used for capping slippage
+    * @param maxDusdAmount Max DUSD to burn, used for capping slippage
     */
     function redeem(
         uint[] calldata out_amounts,
-        uint max_dusd_amount
+        uint maxDusdAmount
     )
         external
-        returns(uint dusd_amount)
+        returns(uint dusdAmount)
     {
         uint[N_COINS] memory pool_sizes;
         for (uint i = 0; i < N_COINS; i++) {
@@ -106,26 +106,27 @@ contract CurveSusdPeak is Initializable, IPeak {
         info.old_lp_amount = curveToken.balanceOf(address(this));
         info.old_lp_supply = curveToken.totalSupply();
 
-        curve_deposit.remove_liquidity_imbalance(out_amounts, MAX);
+        curveDeposit.remove_liquidity_imbalance(out_amounts, MAX);
 
         info.new_lp_amount = curveToken.balanceOf(address(this));
         info.new_lp_supply = curveToken.totalSupply();
 
-        address[N_COINS] memory coins = underlying_coins;
+        address[N_COINS] memory coins = underlyingCoins;
         uint[] memory delta = new uint[](N_COINS);
 
         for (uint i = 0; i < N_COINS; i++) {
             IERC20(coins[i]).safeTransfer(msg.sender, out_amounts[i]);
             delta[i] = _calcWithdrawDelta(info, pool_sizes[i], out_amounts[i]);
         }
-        return core.redeem(delta, max_dusd_amount, msg.sender);
+        return core.redeem(delta, maxDusdAmount, msg.sender);
     }
 
-    // This is risky (Bancor Hack scenario). Think about if we need strict token approvals during the actions at the cost of higher gas.
+    // This is risky (Bancor Hack scenario).
+    // Think about if we need strict token approvals during the actions at the cost of higher gas.
     function replenish_approvals() external {
-        curveToken.approve(address(curve_deposit), MAX);
+        curveToken.approve(address(curveDeposit), MAX);
         for (uint i = 0; i < N_COINS; i++) {
-            IERC20(underlying_coins[i]).approve(address(curve_deposit), MAX);
+            IERC20(underlyingCoins[i]).approve(address(curveDeposit), MAX);
         }
     }
 
