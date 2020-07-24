@@ -18,7 +18,7 @@ contract DUSD is ERC20 {
         _mint(account, amount);
     }
 
-    function redeem(address account, uint amount) public onlyCore {
+    function burn(address account, uint amount) public onlyCore {
         _burn(account, amount);
     }
 }

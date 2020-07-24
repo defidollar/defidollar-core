@@ -42,7 +42,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
 
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
-    uint public timeWeightRewardPerToken;
+    uint public timeWeightedRewardPerToken;
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
 
@@ -57,7 +57,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     modifier updateReward(address account) {
-        timeWeightRewardPerToken = rewardPerTokenForCurrentWindow();
+        timeWeightedRewardPerToken = rewardPerTokenForCurrentWindow();
         lastUpdateTime = block.timestamp;
         if (account != address(0)) {
             rewards[account] = earned(account);
@@ -68,10 +68,10 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
 
     function rewardPerTokenForCurrentWindow() public view returns (uint256) {
         if (totalSupply() == 0) {
-            return timeWeightRewardPerToken;
+            return timeWeightedRewardPerToken;
         }
         return
-            timeWeightRewardPerToken.add(
+            timeWeightedRewardPerToken.add(
                 block.timestamp
                     .sub(lastUpdateTime)
                     .mul(1e36)
@@ -117,10 +117,18 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
         }
     }
 
-    function notifyProtocolIncomeAmount(uint rewardRate) public {
-        timeWeightRewardPerToken = rewardPerTokenForCurrentWindow();
-        rewardPerTokenStored = rewardPerTokenStored.add(timeWeightRewardPerToken.mul(rewardRate).div(1e18));
-        timeWeightRewardPerToken = 0;
+    function notifyProtocolIncome(uint rewardRate, uint deficit)
+        public
+    {
+        require(
+            msg.sender == address(core),
+            "Not core is authorized to notify income"
+        );
+        timeWeightedRewardPerToken = rewardPerTokenForCurrentWindow();
+        rewardPerTokenStored = rewardPerTokenStored.add(
+            timeWeightedRewardPerToken.mul(rewardRate).div(1e18)
+        );
+        timeWeightedRewardPerToken = 0;
         lastUpdateTime = block.timestamp;
     }
 }
