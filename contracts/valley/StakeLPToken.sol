@@ -123,7 +123,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     function exit() external {
-        withdraw(balanceOf(msg.sender));
+        withdraw(withdrawAble(msg.sender));
         getReward();
     }
 

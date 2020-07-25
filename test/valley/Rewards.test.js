@@ -3,19 +3,12 @@ const utils = require('../utils.js')
 
 const toWei = web3.utils.toWei
 const toBN = web3.utils.toBN
-const MAX = web3.utils.toTwosComplement(-1);
 
-async function getBlockTime(tx) {
-	const block = await web3.eth.getBlock(tx.receipt.blockNumber)
-	return block.timestamp.toString()
-}
-
-contract('e2e flow', async (accounts) => {
+contract('Rewards flow', async (accounts) => {
 	const n_coins = 4
 	const alice = accounts[0]
 	const bob = accounts[1]
-	const SCALE_18 = scale(1, 18)
-	const SCALE_36 = scale(1, 36)
+	const SCALE_18 = utils.scale(1, 18)
 
 	before(async () => {
 		const artifacts = await utils.getArtifacts()
@@ -26,7 +19,7 @@ contract('e2e flow', async (accounts) => {
 	})
 
 	beforeEach(async () => {
-		await increaseBlockTime(3)
+		await utils.increaseBlockTime(3)
 	})
 
 	it('alice mints 10 (CurveSusdPeak)', async () => {
@@ -93,11 +86,11 @@ contract('e2e flow', async (accounts) => {
 			rewardPerTokenStored: '0'
 		})
 		this.lastUpdate = await this.stakeLPToken.lastUpdate()
-		assert.equal(this.lastUpdate.toString(), (await getBlockTime(stakeTx)).toString())
+		assert.equal(this.lastUpdate.toString(), (await utils.getBlockTime(stakeTx)).toString())
 	})
 
 	it('CurveSusdPeak accrues income=4', async () => {
-		this.protocolIncome = scale(4, 18)
+		this.protocolIncome = utils.scale(4, 18)
 		const income = [1, 1, 1, 1].map((n, i) => {
 			return toBN(n).mul(toBN(10 ** this.decimals[i]))
 		})
@@ -112,12 +105,12 @@ contract('e2e flow', async (accounts) => {
 		this.lastIncomeUpdate = await this.core.lastIncomeUpdate()
 
 		const s = await this.core.syncSystem()
-		const now = await getBlockTime(s)
+		const now = await utils.getBlockTime(s)
 
 		const incomeWindow = now - parseInt(this.lastIncomeUpdate.toString(), 10)
 		const rewardRate = this.protocolIncome.div(toBN(incomeWindow))
 		const stakeWindow = now - parseInt(this.lastUpdate.toString(), 10)
-		this.timeWeightedRewardPerToken = scale(stakeWindow, 18).div(toBN(4))
+		this.timeWeightedRewardPerToken = utils.scale(stakeWindow, 18).div(toBN(4))
 		this.rewardPerTokenStored = this.timeWeightedRewardPerToken.mul(rewardRate).div(SCALE_18)
 		await this.assertions({
 			dusd_total_supply: toWei('20'),
@@ -143,7 +136,7 @@ contract('e2e flow', async (accounts) => {
 		const from = bob
 		await this.dusd.approve(this.stakeLPToken.address, stake_amount, { from })
 		const s = await this.stakeLPToken.stake(stake_amount, { from })
-		const now = await getBlockTime(s)
+		const now = await utils.getBlockTime(s)
 
 		const dusd_bal = await this.dusd.balanceOf(bob)
 		assert.equal(dusd_bal.toString(), toWei('4')) // 10 - 6
@@ -153,7 +146,7 @@ contract('e2e flow', async (accounts) => {
 
 		const window = now - parseInt(this.lastUpdate.toString(), 10)
 		// just before Bob stakes, supply was 4
-		this.timeWeightedRewardPerToken = scale(window, 18).div(toBN(4))
+		this.timeWeightedRewardPerToken = utils.scale(window, 18).div(toBN(4))
 		await this.assertions({
 			dusd_total_supply: toWei('20'),
 			dusdStaked: toWei('10'),
@@ -178,9 +171,9 @@ contract('e2e flow', async (accounts) => {
 
 		const s = await this.stakeLPToken.getReward()
 
-		const now = await getBlockTime(s)
+		const now = await utils.getBlockTime(s)
 		let dusd_bal = await this.dusd.balanceOf(alice)
-		assert.equal(dusd_bal.toString(), scale(6, 18).add(this.aliceReward).toString()) // 6 + 4 reward
+		assert.equal(dusd_bal.toString(), utils.scale(6, 18).add(this.aliceReward).toString()) // 6 + 4 reward
 
 		const bal = await this.stakeLPToken.balanceOf(alice)
 		assert.equal(bal.toString(), toWei('4')) // original staked amount
@@ -195,8 +188,8 @@ contract('e2e flow', async (accounts) => {
 		assert.equal(this.aliceRewards.toString(), '0')
 
 		const window = now - parseInt(this.lastUpdate.toString(), 10)
-		this.timeWeightedRewardPerToken = this.timeWeightedRewardPerToken.add(scale(window, 18).div(toBN(10))) // totalSupply=10
-		this.dusd_total_supply = scale(20, 18).add(this.aliceReward)
+		this.timeWeightedRewardPerToken = this.timeWeightedRewardPerToken.add(utils.scale(window, 18).div(toBN(10))) // totalSupply=10
+		this.dusd_total_supply = utils.scale(20, 18).add(this.aliceReward)
 		await this.assertions({
 			dusd_total_supply: this.dusd_total_supply.toString(),
 			dusdStaked: toWei('10'),
@@ -231,14 +224,14 @@ contract('e2e flow', async (accounts) => {
 	it('update system stats', async () => {
 		this.lastIncomeUpdate = await this.core.lastIncomeUpdate()
 
-		const s = await this.core.calcProtocolIncome()
+		const s = await this.core.notifyProtocolIncomeAndDeficit()
 
-		const now = await getBlockTime(s)
+		const now = await utils.getBlockTime(s)
 		const incomeWindow = now - parseInt(this.lastIncomeUpdate.toString(), 10)
 		const rewardRate = this.protocolIncome.div(toBN(incomeWindow))
 		const stakeWindow = now - parseInt(this.lastUpdate.toString(), 10)
 		const timeWeightedRewardPerToken = this.timeWeightedRewardPerToken.add(
-			scale(stakeWindow, 18).div(toBN(10))) // totalSupply=10
+			utils.scale(stakeWindow, 18).div(toBN(10))) // totalSupply=10
 		this.rewardPerTokenStored = this.rewardPerTokenStored.add(
 			timeWeightedRewardPerToken
 			.mul(rewardRate)
@@ -280,39 +273,3 @@ contract('e2e flow', async (accounts) => {
 		}
 	}
 })
-
-function scale(num, decimals) {
-	return toBN(num).mul(toBN(10).pow(toBN(decimals)))
-}
-
-async function increaseBlockTime(seconds) {
-	await web3.currentProvider.send(
-		{
-			jsonrpc: '2.0',
-			method: 'evm_increaseTime',
-			params: [seconds],
-			id: new Date().getTime()
-		},
-		() => {}
-	)
-	return mineOneBlock()
-}
-
-function mineOneBlock() {
-	return web3.currentProvider.send(
-		{
-			jsonrpc: '2.0',
-			method: 'evm_mine',
-			id: new Date().getTime()
-		},
-		() => {}
-	)
-}
-
-function printReceipt(r) {
-	r.receipt.rawLogs.forEach(l => {
-		if (l.topics[0] == '0x8a36f5a234186d446e36a7df36ace663a05a580d9bea2dd899c6dd76a075d5fa') {
-			console.log(toBN(l.topics[1].slice(2), 'hex').toString())
-		}
-	})
-}

@@ -38,7 +38,11 @@ module.exports = async function(deployer, network, accounts) {
         // set price = $1 but relative to eth
         await aggregators[i].setLatestAnswer(toBN(web3.utils.toWei('1')).div(ethPrice))
     }
-    await deployer.deploy(Oracle, aggregators.map(a => a.address), ethUsdAgg.address)
+    await deployer.deploy(
+        Oracle,
+        aggregators.map(a => a.address),
+        ethUsdAgg.address
+    )
 
     // B. StakeLPToken
     await deployer.deploy(StakeLPToken);

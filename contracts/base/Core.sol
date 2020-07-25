@@ -164,38 +164,36 @@ contract Core is Initializable, Ownable {
         external
     {
         _updateFeed();
-        calcProtocolIncome();
+        notifyProtocolIncomeAndDeficit();
     }
 
     /**
     * @notice Updates the
     *   Notifies stakeLPToken about the protocol income so that rewards become claimable.
     * @dev Anyone can call this anytime they like. For instance,
-    *   if the user thinks they have accrued a large reward, they should call calcProtocolIncome and then claim reward.
+    *   if the user thinks they have accrued a large reward, they should call notifyProtocolIncomeAndDeficit and then claim reward.
     * @return overCollateralizationAmount
     */
-    function calcProtocolIncome()
+    function notifyProtocolIncomeAndDeficit()
         public
     {
         totalAssets = totalSystemAssets(); // denominated in dollars
         uint supply = dusd.totalSupply();
-        if (supply >= totalAssets) {
-            // no income
-            return;
+        // supply >= totalAssets means no income
+        if (supply < totalAssets) {
+            uint overCollateralizationAmount = totalAssets.sub(supply);
+            if (overCollateralizationAmount > lastOverCollateralizationAmount) {
+                // if block.timestamp == lastIncomeUpdate, that means there were multiple updates in a single block
+                // and we are ok with letting that revert
+                uint rewardRate = overCollateralizationAmount
+                    .sub(lastOverCollateralizationAmount)
+                    .div(block.timestamp.sub(lastIncomeUpdate));
+                stakeLPToken.notifyProtocolIncome(rewardRate);
+                lastOverCollateralizationAmount = overCollateralizationAmount;
+                lastIncomeUpdate = block.timestamp;
+            }
         }
-        uint overCollateralizationAmount = totalAssets.sub(supply);
-        if (overCollateralizationAmount <= lastOverCollateralizationAmount) {
-            // no income
-            return;
-        }
-        // if block.timestamp == lastIncomeUpdate, that means there were multiple updates in a single block
-        // and we are ok with letting that revert
-        uint rewardRate = overCollateralizationAmount
-            .sub(lastOverCollateralizationAmount)
-            .div(block.timestamp.sub(lastIncomeUpdate));
-        stakeLPToken.notifyProtocolIncome(rewardRate);
-        lastOverCollateralizationAmount = overCollateralizationAmount;
-        lastIncomeUpdate = block.timestamp;
+        _notifyDeficit(supply);
     }
 
     // View functions
@@ -321,15 +319,18 @@ contract Core is Initializable, Ownable {
             totalAssets = totalAssets.sub(usd);
             newSupply = supply.sub(dusdAmount);
         }
+        _notifyDeficit(newSupply);
+        return dusdAmount;
+    }
 
-        if (newSupply > totalAssets) {
+    function _notifyDeficit(uint supply) internal {
+        if (supply > totalAssets) {
             inDeficit = true;
-            stakeLPToken.notify(newSupply.sub(totalAssets));
+            stakeLPToken.notify(supply.sub(totalAssets));
         } else if (inDeficit) {
             inDeficit = false;
             stakeLPToken.notify(0);
         }
-        return dusdAmount;
     }
 
     function _updateFeed()

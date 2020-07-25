@@ -17,4 +17,12 @@ contract Reserve is ERC20Detailed, ERC20Mintable {
         _mint(account, amount);
         return true;
     }
+
+    function burn(address account, uint amount)
+        public
+        returns (bool)
+    {
+        _burn(account, amount);
+        return true;
+    }
 }
