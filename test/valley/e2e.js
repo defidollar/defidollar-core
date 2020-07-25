@@ -92,8 +92,8 @@ contract('e2e flow', async (accounts) => {
 			timeWeightedRewardPerToken: '0',
 			rewardPerTokenStored: '0'
 		})
-		this.lastUpdateTime = await this.stakeLPToken.lastUpdateTime()
-		assert.equal(this.lastUpdateTime.toString(), (await getBlockTime(stakeTx)).toString())
+		this.lastUpdate = await this.stakeLPToken.lastUpdate()
+		assert.equal(this.lastUpdate.toString(), (await getBlockTime(stakeTx)).toString())
 	})
 
 	it('CurveSusdPeak accrues income=4', async () => {
@@ -116,7 +116,7 @@ contract('e2e flow', async (accounts) => {
 
 		const incomeWindow = now - parseInt(this.lastIncomeUpdate.toString(), 10)
 		const rewardRate = this.protocolIncome.div(toBN(incomeWindow))
-		const stakeWindow = now - parseInt(this.lastUpdateTime.toString(), 10)
+		const stakeWindow = now - parseInt(this.lastUpdate.toString(), 10)
 		this.timeWeightedRewardPerToken = scale(stakeWindow, 18).div(toBN(4))
 		this.rewardPerTokenStored = this.timeWeightedRewardPerToken.mul(rewardRate).div(SCALE_18)
 		await this.assertions({
@@ -126,8 +126,8 @@ contract('e2e flow', async (accounts) => {
 			timeWeightedRewardPerToken: '0', // has been reset
 			rewardPerTokenStored: this.rewardPerTokenStored.toString(),
 		})
-		this.lastUpdateTime = await this.stakeLPToken.lastUpdateTime()
-		assert.equal(this.lastUpdateTime.toString(), now.toString())
+		this.lastUpdate = await this.stakeLPToken.lastUpdate()
+		assert.equal(this.lastUpdate.toString(), now.toString())
 	})
 
 	it('alice has earned', async () => {
@@ -151,7 +151,7 @@ contract('e2e flow', async (accounts) => {
 		const bal = await this.stakeLPToken.balanceOf(bob)
 		assert.equal(bal.toString(), stake_amount)
 
-		const window = now - parseInt(this.lastUpdateTime.toString(), 10)
+		const window = now - parseInt(this.lastUpdate.toString(), 10)
 		// just before Bob stakes, supply was 4
 		this.timeWeightedRewardPerToken = scale(window, 18).div(toBN(4))
 		await this.assertions({
@@ -165,8 +165,8 @@ contract('e2e flow', async (accounts) => {
 		let earned = await this.stakeLPToken.earned(bob)
 		assert.equal(earned.toString(), '0')
 
-		this.lastUpdateTime = await this.stakeLPToken.lastUpdateTime()
-		assert.equal(this.lastUpdateTime.toString(), now.toString())
+		this.lastUpdate = await this.stakeLPToken.lastUpdate()
+		assert.equal(this.lastUpdate.toString(), now.toString())
 	})
 
 	it('Alice claims reward', async () => {
@@ -194,7 +194,7 @@ contract('e2e flow', async (accounts) => {
 		this.aliceRewards = await this.stakeLPToken.rewards(alice)
 		assert.equal(this.aliceRewards.toString(), '0')
 
-		const window = now - parseInt(this.lastUpdateTime.toString(), 10)
+		const window = now - parseInt(this.lastUpdate.toString(), 10)
 		this.timeWeightedRewardPerToken = this.timeWeightedRewardPerToken.add(scale(window, 18).div(toBN(10))) // totalSupply=10
 		this.dusd_total_supply = scale(20, 18).add(this.aliceReward)
 		await this.assertions({
@@ -204,12 +204,12 @@ contract('e2e flow', async (accounts) => {
 			timeWeightedRewardPerToken: this.timeWeightedRewardPerToken.toString(),
 			rewardPerTokenStored: this.rewardPerTokenStored.toString(), // didn't change
 		})
-		this.lastUpdateTime = await this.stakeLPToken.lastUpdateTime()
-		assert.equal(this.lastUpdateTime.toString(), now.toString())
+		this.lastUpdate = await this.stakeLPToken.lastUpdate()
+		assert.equal(this.lastUpdate.toString(), now.toString())
 	})
 
 	it('CurveSusdPeak accrues income=6', async () => {
-		let inventory = await this.core.systemNetWorth()
+		let inventory = await this.core.totalSystemAssets()
 		assert.equal(inventory.toString(), toWei('24'))
 
 		this.reward = toBN(6)
@@ -222,7 +222,7 @@ contract('e2e flow', async (accounts) => {
 		}
 		await Promise.all(tasks)
 
-		inventory = await this.core.systemNetWorth()
+		inventory = await this.core.totalSystemAssets()
 		assert.equal(inventory.toString(), toWei('30'))
 
 		this.protocolIncome = inventory.sub(this.dusd_total_supply).sub(this.protocolIncome)
@@ -231,12 +231,12 @@ contract('e2e flow', async (accounts) => {
 	it('update system stats', async () => {
 		this.lastIncomeUpdate = await this.core.lastIncomeUpdate()
 
-		const s = await this.core.updateSystemState()
+		const s = await this.core.calcProtocolIncome()
 
 		const now = await getBlockTime(s)
 		const incomeWindow = now - parseInt(this.lastIncomeUpdate.toString(), 10)
 		const rewardRate = this.protocolIncome.div(toBN(incomeWindow))
-		const stakeWindow = now - parseInt(this.lastUpdateTime.toString(), 10)
+		const stakeWindow = now - parseInt(this.lastUpdate.toString(), 10)
 		const timeWeightedRewardPerToken = this.timeWeightedRewardPerToken.add(
 			scale(stakeWindow, 18).div(toBN(10))) // totalSupply=10
 		this.rewardPerTokenStored = this.rewardPerTokenStored.add(
@@ -252,8 +252,8 @@ contract('e2e flow', async (accounts) => {
 			rewardPerTokenStored: this.rewardPerTokenStored.toString(),
 			incomeDiff: this.incomeDiff
 		})
-		this.lastUpdateTime = await this.stakeLPToken.lastUpdateTime()
-		assert.equal(this.lastUpdateTime.toString(), now.toString())
+		this.lastUpdate = await this.stakeLPToken.lastUpdate()
+		assert.equal(this.lastUpdate.toString(), now.toString())
 
 		this.lastIncomeUpdate = await this.core.lastIncomeUpdate()
 		assert.equal(this.lastIncomeUpdate.toString(), now.toString())

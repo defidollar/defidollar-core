@@ -10,7 +10,7 @@ contract Reserve is ERC20Detailed, ERC20Mintable {
     {
     }
 
-    function mint(address account, uint256 amount)
+    function mint(address account, uint amount)
         public
         returns (bool)
     {

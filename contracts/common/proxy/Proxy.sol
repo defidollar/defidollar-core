@@ -30,7 +30,7 @@ contract Proxy is IERCProxy {
         }
     }
 
-    function proxyType() external pure returns (uint256 proxyTypeId) {
+    function proxyType() external pure returns (uint proxyTypeId) {
         // Upgradeable proxy
         proxyTypeId = 2;
     }

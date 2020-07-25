@@ -48,7 +48,7 @@ contract UpgradableProxy is Ownable, Proxy {
         if (_target == address(0)) {
             return false;
         }
-        uint256 size;
+        uint size;
         assembly {
             size := extcodesize(_target)
         }

@@ -8,30 +8,26 @@ import {Core} from "../base/Core.sol";
 import {Initializable} from "../common/Initializable.sol";
 
 contract LPTokenWrapper {
-    using SafeMath for uint256;
+    using SafeMath for uint;
     using SafeERC20 for IERC20;
 
     IERC20 public stok;
 
-    uint256 private _totalSupply;
-    mapping(address => uint256) private _balances;
+    uint public totalSupply;
+    mapping(address => uint) private _balances;
 
-    function totalSupply() public view returns (uint256) {
-        return _totalSupply;
-    }
-
-    function balanceOf(address account) public view returns (uint256) {
+    function balanceOf(address account) public view returns (uint) {
         return _balances[account];
     }
 
-    function stake(uint256 amount) public {
-        _totalSupply = _totalSupply.add(amount);
+    function stake(uint amount) public {
+        totalSupply = totalSupply.add(amount);
         _balances[msg.sender] = _balances[msg.sender].add(amount);
         stok.safeTransferFrom(msg.sender, address(this), amount);
     }
 
-    function withdraw(uint256 amount) public {
-        _totalSupply = _totalSupply.sub(amount);
+    function withdraw(uint amount) public {
+        totalSupply = totalSupply.sub(amount);
         _balances[msg.sender] = _balances[msg.sender].sub(amount);
         stok.safeTransfer(msg.sender, amount);
     }
@@ -40,25 +36,35 @@ contract LPTokenWrapper {
 contract StakeLPToken is Initializable, LPTokenWrapper {
     Core public core;
 
-    uint256 public lastUpdateTime;
-    uint256 public rewardPerTokenStored;
     uint public timeWeightedRewardPerToken;
-    mapping(address => uint256) public userRewardPerTokenPaid;
-    mapping(address => uint256) public rewards;
+    uint public rewardPerTokenStored;
+    uint public lastUpdate;
+    uint public deficit;
 
-    event Staked(address indexed user, uint256 amount);
-    event Withdrawn(address indexed user, uint256 amount);
-    event RewardPaid(address indexed user, uint256 reward);
+    mapping(address => uint) public userRewardPerTokenPaid;
+    mapping(address => uint) public rewards;
+
+    event Staked(address indexed user, uint amount);
+    event Withdrawn(address indexed user, uint amount);
+    event RewardPaid(address indexed user, uint reward);
+
+    modifier onlyCore() {
+        require(
+            msg.sender == address(core),
+            "Not authorized"
+        );
+        _;
+    }
 
     function initialize(Core _core, IERC20 _stok) public notInitialized {
         core = _core;
         stok = _stok;
-        lastUpdateTime = block.timestamp;
+        lastUpdate = block.timestamp;
     }
 
     modifier updateReward(address account) {
         timeWeightedRewardPerToken = rewardPerTokenForCurrentWindow();
-        lastUpdateTime = block.timestamp;
+        lastUpdate = block.timestamp;
         if (account != address(0)) {
             rewards[account] = earned(account);
             userRewardPerTokenPaid[account] = rewardPerTokenStored;
@@ -66,20 +72,20 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
         _;
     }
 
-    function rewardPerTokenForCurrentWindow() public view returns (uint256) {
-        if (totalSupply() == 0) {
+    function rewardPerTokenForCurrentWindow() public view returns (uint) {
+        if (totalSupply == 0) {
             return timeWeightedRewardPerToken;
         }
         return
             timeWeightedRewardPerToken.add(
                 block.timestamp
-                    .sub(lastUpdateTime)
+                    .sub(lastUpdate)
                     .mul(1e36)
-                    .div(totalSupply())
+                    .div(totalSupply)
             );
     }
 
-    function earned(address account) public view returns (uint256) {
+    function earned(address account) public view returns (uint) {
         return
             balanceOf(account)
                 .mul(rewardPerTokenStored.sub(userRewardPerTokenPaid[account]))
@@ -88,19 +94,32 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function
-    function stake(uint256 amount) public updateReward(msg.sender) {
+    function stake(uint amount) public updateReward(msg.sender) {
         require(amount > 0, "Cannot stake 0");
-        if (totalSupply() == 0) {
-            lastUpdateTime = block.timestamp;
+        if (totalSupply == 0) {
+            lastUpdate = block.timestamp;
         }
         super.stake(amount);
         emit Staked(msg.sender, amount);
     }
 
-    function withdraw(uint256 amount) public updateReward(msg.sender) {
+    function withdraw(uint amount) public updateReward(msg.sender) {
         require(amount > 0, "Cannot withdraw 0");
+        require(amount <= withdrawAble(msg.sender), "Funds are illiquid");
         super.withdraw(amount);
         emit Withdrawn(msg.sender, amount);
+    }
+
+    function withdrawAble(address account) public view returns(uint) {
+        uint _withdrawAble = balanceOf(account);
+        if (totalSupply == 0 || deficit == 0) {
+            return _withdrawAble;
+        }
+        uint deficitShare = _withdrawAble.mul(deficit).div(totalSupply);
+        if (deficitShare >= _withdrawAble) {
+            return 0;
+        }
+        return _withdrawAble.sub(deficitShare);
     }
 
     function exit() external {
@@ -109,7 +128,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     function getReward() public updateReward(msg.sender) {
-        uint256 reward = earned(msg.sender);
+        uint reward = earned(msg.sender);
         if (reward > 0) {
             rewards[msg.sender] = 0;
             core.mintReward(msg.sender, reward);
@@ -117,18 +136,16 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
         }
     }
 
-    function notifyProtocolIncome(uint rewardRate, uint deficit)
-        public
-    {
-        require(
-            msg.sender == address(core),
-            "Not core is authorized to notify income"
-        );
+    function notifyProtocolIncome(uint rewardRate) external onlyCore {
         timeWeightedRewardPerToken = rewardPerTokenForCurrentWindow();
         rewardPerTokenStored = rewardPerTokenStored.add(
             timeWeightedRewardPerToken.mul(rewardRate).div(1e18)
         );
         timeWeightedRewardPerToken = 0;
-        lastUpdateTime = block.timestamp;
+        lastUpdate = block.timestamp;
+    }
+
+    function notify(uint _deficit) external onlyCore {
+        deficit = _deficit;
     }
 }

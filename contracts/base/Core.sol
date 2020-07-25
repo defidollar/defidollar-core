@@ -31,13 +31,11 @@ contract Core is Initializable, Ownable {
     StakeLPToken public stakeLPToken;
     Oracle public oracle;
 
-    enum SystemHealth { GREEN, YELLOW, RED }
-    SystemHealth public health;
-
-    uint public dusdValue = PRECISION;
     uint public redeemFee;
     uint public lastIncomeUpdate;
     uint public lastOverCollateralizationAmount;
+    uint public totalAssets;
+    bool public inDeficit;
 
     // Interface contracts for third-party protocol integrations
     enum PeakState { Extinct, Active, Dormant }
@@ -94,14 +92,15 @@ contract Core is Initializable, Ownable {
             peak.state == PeakState.Active,
             "Peak is inactive"
         );
+        uint usdDelta;
         SystemCoin[] memory coins = systemCoins;
         for (uint i = 0; i < peak.systemCoinIds.length; i++) {
             SystemCoin memory coin = coins[peak.systemCoinIds[i]];
-            dusdAmount = dusdAmount.add(
+            usdDelta = usdDelta.add(
                 delta[i].mul(coin.price).div(coin.precision)
             );
         }
-        dusdAmount = getRealValue(dusdAmount);
+        dusdAmount = _usdToDusd(usdDelta, true);
         require(dusdAmount >= minDusdAmount, "They see you slippin");
         dusd.mint(account, dusdAmount);
         emit Mint(account, dusdAmount);
@@ -127,17 +126,34 @@ contract Core is Initializable, Ownable {
             peak.state != PeakState.Extinct,
             "Peak is extinct"
         );
+        uint usdDelta;
         SystemCoin[] memory coins = systemCoins;
         for (uint i = 0; i < peak.systemCoinIds.length; i++) {
             SystemCoin memory coin = coins[peak.systemCoinIds[i]];
-            dusdAmount = dusdAmount.add(
+            usdDelta = usdDelta.add(
                 delta[i].mul(coin.price).div(coin.precision)
             );
         }
-        dusdAmount = getRealValue(dusdAmount).mul(redeemFee).div(10000);
+        usdDelta = usdDelta.mul(10000).div(redeemFee);
+        dusdAmount = _usdToDusd(usdDelta, true);
         require(dusdAmount <= maxDusdAmount, "They see you slippin");
         dusd.burn(account, dusdAmount);
         emit Redeem(account, dusdAmount);
+    }
+
+    /**
+    * @notice Mint staking rewards
+    * @param account Account to mint rewards to
+    * @param usdDelta Reward amount denominated in dollars
+    */
+    function mintReward(address account, uint usdDelta)
+        external
+    {
+        require(
+            msg.sender == address(stakeLPToken),
+            "Only stakeLPToken"
+        );
+        dusd.mint(account, _usdToDusd(usdDelta, true));
     }
 
     /**
@@ -148,100 +164,38 @@ contract Core is Initializable, Ownable {
         external
     {
         _updateFeed();
-        updateSystemState();
+        calcProtocolIncome();
     }
 
     /**
-    * @notice Updates the system state parameters like health, dusdValue
+    * @notice Updates the
     *   Notifies stakeLPToken about the protocol income so that rewards become claimable.
     * @dev Anyone can call this anytime they like. For instance,
-    *   if the user thinks they have accrued a large reward, they should call updateSystemState and then claim reward.
+    *   if the user thinks they have accrued a large reward, they should call calcProtocolIncome and then claim reward.
     * @return overCollateralizationAmount
     */
-    function updateSystemState()
-        public
-        returns(uint overCollateralizationAmount)
-    {
-        uint inventory = systemNetWorth(); // denominated in dollars
-        uint supply = dusd.totalSupply();
-
-        if (supply <= inventory) {
-            // system is healthy
-            _setSystemState(SystemHealth.GREEN, PRECISION);
-            // income is what is available after accounting for DUSD at $1
-            overCollateralizationAmount = inventory.sub(supply);
-            if (overCollateralizationAmount > lastOverCollateralizationAmount &&
-                block.timestamp > lastIncomeUpdate)
-            {
-                uint rewardRate = overCollateralizationAmount
-                    .sub(lastOverCollateralizationAmount)
-                    .div(block.timestamp.sub(lastIncomeUpdate));
-                stakeLPToken.notifyProtocolIncome(rewardRate);
-                lastOverCollateralizationAmount = overCollateralizationAmount;
-                lastIncomeUpdate = block.timestamp;
-            }
-        } else {
-            uint deficit = supply.sub(inventory);
-            stakeLPToken.notify(0, deficit);
-            // check if atleast the free circulating supply is properly collateralized
-            // considering staked funds as illiquid
-            supply = supply.sub(stakeLPToken.totalSupply());
-            if (supply <= inventory) {
-                _setSystemState(SystemHealth.YELLOW, PRECISION);
-            } else {
-                // if not even the staked funds can make up for circulating supply, we devalue dusd
-                _setSystemState(SystemHealth.RED, inventory.mul(PRECISION).div(supply));
-            }
-        }
-
-        // Note that if health is non-GREEN or overCollateralizationAmount did not increase from last time,
-        // we simply ignore the update and no rewards are disbursed
-        if (health == SystemHealth.GREEN
-            // the difference is the protocol income
-            && overCollateralizationAmount > lastOverCollateralizationAmount
-            && block.timestamp > lastIncomeUpdate
-        ) {
-
-        }
-    }
-
-    function updateSystemState()
+    function calcProtocolIncome()
         public
     {
-        uint inventory = systemNetWorth(); // denominated in dollars
+        totalAssets = totalSystemAssets(); // denominated in dollars
         uint supply = dusd.totalSupply();
-        if (supply >= inventory) {
-            // system is in a deficit
-            stakeLPToken.notify(0 /* rewardRate */, supply.sub(inventory));
-            lastOverCollateralizationAmount = 0;
-        } else {
-            uint overCollateralizationAmount = inventory.sub(supply);
-            if (overCollateralizationAmount > lastOverCollateralizationAmount) {
-                // if block.timestamp == lastIncomeUpdate, that means there were multiple updates in a single block
-                // and we are ok with letting it revert
-                uint rewardRate = overCollateralizationAmount
-                    .sub(lastOverCollateralizationAmount)
-                    .div(block.timestamp.sub(lastIncomeUpdate));
-                stakeLPToken.notify(rewardRate, 0);
-                lastOverCollateralizationAmount = overCollateralizationAmount;
-            }
+        if (supply >= totalAssets) {
+            // no income
+            return;
         }
+        uint overCollateralizationAmount = totalAssets.sub(supply);
+        if (overCollateralizationAmount <= lastOverCollateralizationAmount) {
+            // no income
+            return;
+        }
+        // if block.timestamp == lastIncomeUpdate, that means there were multiple updates in a single block
+        // and we are ok with letting that revert
+        uint rewardRate = overCollateralizationAmount
+            .sub(lastOverCollateralizationAmount)
+            .div(block.timestamp.sub(lastIncomeUpdate));
+        stakeLPToken.notifyProtocolIncome(rewardRate);
+        lastOverCollateralizationAmount = overCollateralizationAmount;
         lastIncomeUpdate = block.timestamp;
-    }
-
-    /**
-    * @notice Mint staking rewards
-    * @param account Account to mint rewards to
-    * @param dollarAmount Reward amount denominated in dollars
-    */
-    function mintReward(address account, uint dollarAmount)
-        external
-    {
-        require(
-            msg.sender == address(stakeLPToken),
-            "Only stakeLPToken"
-        );
-        dusd.mint(account, dollarAmount.mul(PRECISION).div(dusdValue));
     }
 
     // View functions
@@ -250,10 +204,10 @@ contract Core is Initializable, Ownable {
     * @notice Returns the net system assets across all peaks
     * @return inventory system assets denominated in dollars
     */
-    function systemNetWorth()
+    function totalSystemAssets()
         public
         view
-        returns (uint inventory)
+        returns (uint _totalAssets)
     {
         SystemCoin[] memory coins = systemCoins;
         uint[] memory portfolio = new uint[](coins.length);
@@ -266,27 +220,13 @@ contract Core is Initializable, Ownable {
             }
         }
 
-        // multiply retrieved assets from with the price
+        // multiply retrieved asset amounts with the oracle price
         for(uint i = 0; i < coins.length; i++) {
             SystemCoin memory coin = coins[i];
-            inventory = inventory.add(
+            _totalAssets = _totalAssets.add(
                 portfolio[i].mul(coin.price).div(coin.precision)
             );
         }
-    }
-
-    /**
-    * @notice Real dollar amount based on the fact that DUSD could be under-collateralized
-    */
-    function getRealValue(uint dollarAmount)
-        public
-        view
-        returns(uint)
-    {
-        if (health == SystemHealth.RED) {
-            return dollarAmount.mul(PRECISION).div(dusdValue);
-        }
-        return dollarAmount;
     }
 
     // Admin functions
@@ -351,6 +291,47 @@ contract Core is Initializable, Ownable {
 
     // Internal functions
 
+    function _usdToDusd(uint usd, bool isMint) internal returns(uint) {
+        uint supply = dusd.totalSupply();
+        if (supply <= totalAssets) {
+            // system is healthy. Pegged at $1
+            if (inDeficit) {
+                inDeficit = false;
+                stakeLPToken.notify(0);
+            }
+            totalAssets = totalAssets.add(usd);
+            return usd;
+        }
+        return _handleDeficit(usd, supply, isMint);
+    }
+
+    function _handleDeficit(uint usd, uint supply, bool isMint) internal returns(uint dusdAmount) {
+        uint perceivedSupply = supply.sub(stakeLPToken.totalSupply());
+        if (perceivedSupply <= totalAssets) {
+            // staked funds make up for the deficit
+            dusdAmount = usd;
+        } else {
+            dusdAmount = usd.mul(perceivedSupply).div(totalAssets);
+        }
+        uint newSupply;
+        if (isMint) {
+            totalAssets = totalAssets.add(usd);
+            newSupply = supply.add(dusdAmount);
+        } else {
+            totalAssets = totalAssets.sub(usd);
+            newSupply = supply.sub(dusdAmount);
+        }
+
+        if (newSupply > totalAssets) {
+            inDeficit = true;
+            stakeLPToken.notify(newSupply.sub(totalAssets));
+        } else if (inDeficit) {
+            inDeficit = false;
+            stakeLPToken.notify(0);
+        }
+        return dusdAmount;
+    }
+
     function _updateFeed()
         internal
     {
@@ -371,12 +352,5 @@ contract Core is Initializable, Ownable {
         require(decimals > 0, "Using a 0 decimal coin can break the system");
         systemCoins.push(SystemCoin(token, 10 ** decimals, initialPrice));
         emit TokenWhiteListed(token);
-    }
-
-    function _setSystemState(SystemHealth _health, uint _dusdValue)
-        internal
-    {
-        health = _health;
-        dusdValue = _dusdValue;
     }
 }
