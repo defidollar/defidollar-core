@@ -24,21 +24,24 @@ contract MockCurveSusd is ICurve {
     }
 
     function add_liquidity(uint[] calldata uamounts, uint min_mint_amount) external {
-        uint to_mint;
+        uint toMint;
         for (uint i = 0; i < N_COINS; i++) {
             IERC20 _token = IERC20(underlyingCoins[i]);
             _token.transferFrom(msg.sender, address(this), uamounts[i]);
-            to_mint += uamounts[i] * (10 ** (uint(18) - _token.decimals()));
+            toMint += uamounts[i] * (10 ** (uint(18) - _token.decimals()));
         }
-        require(to_mint >= min_mint_amount, "Slippage");
-        token.mint(msg.sender, to_mint);
+        require(toMint >= min_mint_amount, "Slippage");
+        token.mint(msg.sender, toMint);
     }
 
     function remove_liquidity_imbalance(uint[] calldata uamounts, uint max_burn_amount) external {
+        uint toBurn;
         for (uint i = 0; i < N_COINS; i++) {
             IERC20 _token = IERC20(underlyingCoins[i]);
             _token.transfer(msg.sender, uamounts[i]);
+            toBurn += uamounts[i] * (10 ** (uint(18) - _token.decimals()));
         }
-        token.redeem(msg.sender, max_burn_amount);
+        require(toBurn <= max_burn_amount, "Slippage");
+        token.redeem(msg.sender, toBurn);
     }
 }

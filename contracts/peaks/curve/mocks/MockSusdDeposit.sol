@@ -44,5 +44,6 @@ contract MockSusdDeposit is ICurveDeposit {
             IERC20 _token = IERC20(underlyingCoins[i]);
             _token.transfer(msg.sender, _token.balanceOf(address(this)));
         }
+        token.transfer(msg.sender, token.balanceOf(address(this)));
     }
 }

@@ -129,13 +129,14 @@ contract Core is Initializable, Ownable {
         uint usdDelta;
         SystemCoin[] memory coins = systemCoins;
         for (uint i = 0; i < peak.systemCoinIds.length; i++) {
+            if (delta[i] == 0) continue;
             SystemCoin memory coin = coins[peak.systemCoinIds[i]];
             usdDelta = usdDelta.add(
                 delta[i].mul(coin.price).div(coin.precision)
             );
         }
-        usdDelta = usdDelta.mul(10000).div(redeemFee);
-        dusdAmount = _usdToDusd(usdDelta, true);
+        dusdAmount = usdDelta.mul(10000).div(redeemFee);
+        dusdAmount = _usdToDusd(usdDelta, false);
         require(dusdAmount <= maxDusdAmount, "They see you slippin");
         dusd.burn(account, dusdAmount);
         emit Redeem(account, dusdAmount);

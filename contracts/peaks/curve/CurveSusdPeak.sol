@@ -49,11 +49,11 @@ contract CurveSusdPeak is Initializable, IPeak {
 
     /**
     * @dev Mint DUSD
-    * @param in_amounts Exact in_amounts in the same order as required by the curve pool
+    * @param inAmounts Exact inAmounts in the same order as required by the curve pool
     * @param minDusdAmount Minimum DUSD to mint, used for capping slippage
     */
     function mint(
-        uint[] calldata in_amounts,
+        uint[] calldata inAmounts,
         uint minDusdAmount
     ) external
         returns (uint dusdAmount)
@@ -63,35 +63,35 @@ contract CurveSusdPeak is Initializable, IPeak {
 
         for (uint i = 0; i < N_COINS; i++) {
             pool_sizes[i] = curve.balances(i);
-            if (in_amounts[i] == 0) {
+            if (inAmounts[i] == 0) {
                 continue;
             }
-            IERC20(coins[i]).safeTransferFrom(msg.sender, address(this), in_amounts[i]);
+            IERC20(coins[i]).safeTransferFrom(msg.sender, address(this), inAmounts[i]);
         }
 
         LPShareInfo memory info;
         info.old_lp_amount = curveToken.balanceOf(address(this));
         info.old_lp_supply = curveToken.totalSupply();
 
-        curveDeposit.add_liquidity(in_amounts, 0);
+        curveDeposit.add_liquidity(inAmounts, 0);
 
         info.new_lp_amount = curveToken.balanceOf(address(this));
         info.new_lp_supply = curveToken.totalSupply();
 
         uint[] memory delta = new uint[](N_COINS);
         for (uint i = 0; i < N_COINS; i++) {
-            delta[i] = _calcDepositDelta(info, pool_sizes[i], in_amounts[i]);
+            delta[i] = _calcDepositDelta(info, pool_sizes[i], inAmounts[i]);
         }
         return core.mint(delta, minDusdAmount, msg.sender);
     }
 
     /**
     * @dev Burn DUSD
-    * @param out_amounts Exact out_amounts in the same order as required by the curve pool
+    * @param outAmounts Exact outAmounts in the same order as required by the curve pool
     * @param maxDusdAmount Max DUSD to burn, used for capping slippage
     */
     function redeem(
-        uint[] calldata out_amounts,
+        uint[] calldata outAmounts,
         uint maxDusdAmount
     )
         external
@@ -106,7 +106,7 @@ contract CurveSusdPeak is Initializable, IPeak {
         info.old_lp_amount = curveToken.balanceOf(address(this));
         info.old_lp_supply = curveToken.totalSupply();
 
-        curveDeposit.remove_liquidity_imbalance(out_amounts, MAX);
+        curveDeposit.remove_liquidity_imbalance(outAmounts, MAX);
 
         info.new_lp_amount = curveToken.balanceOf(address(this));
         info.new_lp_supply = curveToken.totalSupply();
@@ -115,8 +115,8 @@ contract CurveSusdPeak is Initializable, IPeak {
         uint[] memory delta = new uint[](N_COINS);
 
         for (uint i = 0; i < N_COINS; i++) {
-            IERC20(coins[i]).safeTransfer(msg.sender, out_amounts[i]);
-            delta[i] = _calcWithdrawDelta(info, pool_sizes[i], out_amounts[i]);
+            IERC20(coins[i]).safeTransfer(msg.sender, outAmounts[i]);
+            delta[i] = _calcWithdrawDelta(info, pool_sizes[i], outAmounts[i]);
         }
         return core.redeem(delta, maxDusdAmount, msg.sender);
     }
@@ -162,14 +162,15 @@ contract CurveSusdPeak is Initializable, IPeak {
         LPShareInfo memory info,
         uint old_pool_size,
         uint amount
-    ) internal
+    )
+        internal
         pure
         returns (uint /* delta */)
     {
         uint old_balance = old_pool_size.mul(info.old_lp_amount).div(info.old_lp_supply);
         uint new_balance;
         if (info.new_lp_supply > 0) {
-            new_balance = old_pool_size.add(amount).mul(info.new_lp_amount).div(info.new_lp_supply);
+            new_balance = old_pool_size.sub(amount).mul(info.new_lp_amount).div(info.new_lp_supply);
         }
         return old_balance.sub(new_balance);
     }

@@ -82,11 +82,27 @@ function printDebugReceipt(r) {
 	})
 }
 
+async function assertions(vals, artifacts) {
+	if (vals.totalSystemAssets) {
+		const totalSystemAssets = await artifacts.core.totalSystemAssets()
+		assert.equal(totalSystemAssets.toString(), vals.totalSystemAssets)
+	}
+	if (vals.totalAssets) {
+		const totalAssets = await artifacts.core.totalAssets()
+		assert.equal(totalAssets.toString(), vals.totalAssets)
+	}
+	if (vals.deficit) {
+		const deficit = await artifacts.stakeLPToken.deficit()
+		assert.equal(deficit.toString(), vals.deficit)
+	}
+}
+
 module.exports = {
 	getArtifacts,
 	scale,
 	increaseBlockTime,
 	mineOneBlock,
 	printDebugReceipt,
-	getBlockTime
+	getBlockTime,
+	assertions
 }
