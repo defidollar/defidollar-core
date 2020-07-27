@@ -176,11 +176,12 @@ contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) =>
         ]
         const dusdAmount = await this.curveSusdPeak.redeem.call(...args)
         assert.equal(dusdAmount.toString(), this.expectedDusdAmount.toString())
+        await utils.assertions({ deficit: toWei('20') }, _artifacts)
         await this.curveSusdPeak.redeem(...args)
         await utils.assertions({
             totalSystemAssets: toWei('60'),
             totalAssets: toWei('60'),
-            deficit: utils.scale(110, 18).sub(this.expectedDusdAmount).sub(utils.scale(60, 18)).toString()
+            deficit: utils.scale(110, 18).sub(this.expectedDusdAmount).sub(utils.scale(60, 18)).toString() // 16.66
         }, _artifacts)
     })
 

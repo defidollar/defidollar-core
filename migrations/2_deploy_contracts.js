@@ -1,5 +1,5 @@
 const Core = artifacts.require("Core");
-const StakeLPToken = artifacts.require("StakeLPToken");
+const StakeLPToken = artifacts.require("StakeLPTokenTest");
 const DUSD = artifacts.require("DUSD");
 const Aggregator = artifacts.require("MockAggregator");
 const Oracle = artifacts.require("Oracle");
@@ -55,7 +55,7 @@ module.exports = async function(deployer, network, accounts) {
             DUSD.address
         ).encodeABI()
     )
-
+    await stakeLPToken.setTime(Date.now());
     await coreProxy.updateAndCall(
         Core.address,
         core.contract.methods.initialize(

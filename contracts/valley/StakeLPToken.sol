@@ -39,6 +39,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     uint public timeWeightedRewardPerToken;
     uint public rewardPerTokenStored;
     uint public lastUpdate;
+    uint public lastIncomeUpdate;
     uint public deficit;
 
     mapping(address => uint) public userRewardPerTokenPaid;
@@ -59,17 +60,21 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     function initialize(Core _core, IERC20 _stok) public notInitialized {
         core = _core;
         stok = _stok;
-        lastUpdate = block.timestamp;
+        lastUpdate = timestamp();
     }
 
     modifier updateReward(address account) {
-        timeWeightedRewardPerToken = rewardPerTokenForCurrentWindow();
-        lastUpdate = block.timestamp;
+        updateRewardPerTokenForCurrentWindow();
         if (account != address(0)) {
             rewards[account] = earned(account);
             userRewardPerTokenPaid[account] = rewardPerTokenStored;
         }
         _;
+    }
+
+    function updateRewardPerTokenForCurrentWindow() internal {
+        timeWeightedRewardPerToken = rewardPerTokenForCurrentWindow();
+        lastUpdate = timestamp();
     }
 
     function rewardPerTokenForCurrentWindow() public view returns (uint) {
@@ -78,7 +83,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
         }
         return
             timeWeightedRewardPerToken.add(
-                block.timestamp
+                timestamp()
                     .sub(lastUpdate)
                     .mul(1e36)
                     .div(totalSupply)
@@ -97,7 +102,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     function stake(uint amount) public updateReward(msg.sender) {
         require(amount > 0, "Cannot stake 0");
         if (totalSupply == 0) {
-            lastUpdate = block.timestamp;
+            lastUpdate = timestamp();
         }
         super.stake(amount);
         emit Staked(msg.sender, amount);
@@ -136,16 +141,30 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
         }
     }
 
-    function notifyProtocolIncome(uint rewardRate) external onlyCore {
-        timeWeightedRewardPerToken = rewardPerTokenForCurrentWindow();
+    event DebugUint(uint indexed a);
+    function notifyProtocolIncome(uint reward) external onlyCore {
+        updateRewardPerTokenForCurrentWindow();
+        // if timestamp() == lastIncomeUpdate, that means there were multiple updates in a single block
+        // and we are ok with letting that revert
+        emit DebugUint(timeWeightedRewardPerToken);
+        emit DebugUint(rewardPerTokenStored);
+        emit DebugUint(timestamp().sub(lastIncomeUpdate));
         rewardPerTokenStored = rewardPerTokenStored.add(
-            timeWeightedRewardPerToken.mul(rewardRate).div(1e18)
+            timeWeightedRewardPerToken
+                .mul(reward)
+                .div(timestamp().sub(lastIncomeUpdate))
+                .div(1e18)
         );
+        emit DebugUint(rewardPerTokenStored);
         timeWeightedRewardPerToken = 0;
-        lastUpdate = block.timestamp;
+        lastIncomeUpdate = timestamp();
     }
 
     function notify(uint _deficit) external onlyCore {
         deficit = _deficit;
+    }
+
+    function timestamp() internal view returns(uint) {
+        return block.timestamp;
     }
 }
