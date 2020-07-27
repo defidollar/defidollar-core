@@ -1,5 +1,5 @@
 {
-  "name": "defidollar-curve",
+  "name": "defidollar-core",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -7,12 +7,19 @@
     "compile": "truffle compile",
     "migrate": "truffle migrate",
     "ganache": "ganache-cli",
-    "test": "truffle test"
+    "test": "truffle test",
+    "coverage": "truffle run coverage"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
     "@chainlink/contracts": "0.0.7-beta",
     "@openzeppelin/contracts": "^2.5.1"
+  },
+  "devDependencies": {
+    "eth-gas-reporter": "^0.2.17",
+    "ganache": "^6.4.4",
+    "solidity-coverage": "^0.7.9",
+    "truffle": "^5.1.36"
   }
 }
