@@ -19,20 +19,20 @@ contract('Core', async (accounts) => {
             this.amounts = [1, 2, 3, 4].map((n, i) => {
                 return toBN(n).mul(toBN(10 ** this.decimals[i])).toString()
             })
-            let dusd_balance = await this.dusd.balanceOf(this.user)
-            assert.equal(dusd_balance.toString(), '0')
+            let dusdBalance = await this.dusd.balanceOf(this.user)
+            assert.equal(dusdBalance.toString(), '0')
 
             await this.core.mint(this.amounts, toWei('10'), this.user)
 
-            dusd_balance = await this.dusd.balanceOf(this.user)
-            assert.equal(dusd_balance.toString(), toWei('10'))
+            dusdBalance = await this.dusd.balanceOf(this.user)
+            assert.equal(dusdBalance.toString(), toWei('10'))
         })
 
         it('burn', async () => {
             await this.core.redeem(this.amounts, toWei('10'), this.user)
 
-            dusd_balance = await this.dusd.balanceOf(this.user)
-            assert.equal(dusd_balance.toString(), '0')
+            dusdBalance = await this.dusd.balanceOf(this.user)
+            assert.equal(dusdBalance.toString(), '0')
         })
     })
 })

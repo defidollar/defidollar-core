@@ -1,6 +1,7 @@
 const Core = artifacts.require("Core");
 const CoreProxy = artifacts.require("CoreProxy");
 const CurveSusdPeak = artifacts.require("CurveSusdPeak");
+const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
 
 const MockSusdToken = artifacts.require("MockSusdToken");
 const MockSusdDeposit = artifacts.require("MockSusdDeposit");
@@ -32,12 +33,17 @@ module.exports = async function(deployer) {
     tokens
   )
 
-  const curveSusdPeak = await deployer.deploy(CurveSusdPeak)
-  await curveSusdPeak.initialize(
-    curveDeposit.address, curve.address, curveToken.address,
-    core.address,
-    tokens
+  await deployer.deploy(CurveSusdPeak)
+  const curveSusdPeakProxy = await deployer.deploy(CurveSusdPeakProxy)
+  const curveSusdPeak = await CurveSusdPeak.at(CurveSusdPeakProxy.address)
+  await curveSusdPeakProxy.updateAndCall(
+    CurveSusdPeak.address,
+    curveSusdPeak.contract.methods.initialize(
+      curveDeposit.address, curve.address, curveToken.address,
+      core.address,
+      tokens
+    ).encodeABI()
   )
   await curveSusdPeak.replenish_approvals()
-  await core.whitelistPeak(CurveSusdPeak.address, [0, 1, 2, 3])
+  await core.whitelistPeak(curveSusdPeakProxy.address, [0, 1, 2, 3])
 }

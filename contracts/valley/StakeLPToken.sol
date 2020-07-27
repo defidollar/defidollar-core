@@ -36,10 +36,7 @@ contract LPTokenWrapper {
 contract StakeLPToken is Initializable, LPTokenWrapper {
     Core public core;
 
-    uint public timeWeightedRewardPerToken;
     uint public rewardPerTokenStored;
-    uint public lastUpdate;
-    uint public lastIncomeUpdate;
     uint public deficit;
 
     mapping(address => uint) public userRewardPerTokenPaid;
@@ -60,59 +57,67 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     function initialize(Core _core, IERC20 _stok) public notInitialized {
         core = _core;
         stok = _stok;
-        lastUpdate = timestamp();
     }
 
     modifier updateReward(address account) {
-        updateRewardPerTokenForCurrentWindow();
+        updateProtocolIncome();
         if (account != address(0)) {
-            rewards[account] = earned(account);
+            rewards[account] = _earned(rewardPerTokenStored, account);
             userRewardPerTokenPaid[account] = rewardPerTokenStored;
         }
         _;
     }
 
-    function updateRewardPerTokenForCurrentWindow() internal {
-        timeWeightedRewardPerToken = rewardPerTokenForCurrentWindow();
-        lastUpdate = timestamp();
-    }
-
-    function rewardPerTokenForCurrentWindow() public view returns (uint) {
-        if (totalSupply == 0) {
-            return timeWeightedRewardPerToken;
-        }
-        return
-            timeWeightedRewardPerToken.add(
-                timestamp()
-                    .sub(lastUpdate)
-                    .mul(1e36)
-                    .div(totalSupply)
-            );
-    }
-
-    function earned(address account) public view returns (uint) {
-        return
-            balanceOf(account)
-                .mul(rewardPerTokenStored.sub(userRewardPerTokenPaid[account]))
-                .div(1e18)
-                .add(rewards[account]);
+    function updateProtocolIncome() public {
+        uint income = core.rewardDistributionCheckpoint();
+        rewardPerTokenStored = rewardPerToken(income);
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function
     function stake(uint amount) public updateReward(msg.sender) {
         require(amount > 0, "Cannot stake 0");
-        if (totalSupply == 0) {
-            lastUpdate = timestamp();
-        }
         super.stake(amount);
         emit Staked(msg.sender, amount);
     }
 
     function withdraw(uint amount) public updateReward(msg.sender) {
-        require(amount > 0, "Cannot withdraw 0");
         require(amount <= withdrawAble(msg.sender), "Funds are illiquid");
-        super.withdraw(amount);
-        emit Withdrawn(msg.sender, amount);
+        _withdraw(amount);
+    }
+
+    function exit() external {
+        getReward();
+        _withdraw(withdrawAble(msg.sender));
+    }
+
+    function getReward() public updateReward(msg.sender) {
+        uint reward = earned(msg.sender);
+        if (reward > 0) {
+            rewards[msg.sender] = 0;
+            core.mintReward(msg.sender, reward);
+            emit RewardPaid(msg.sender, reward);
+        }
+    }
+
+    function notify(uint _deficit) external onlyCore {
+        deficit = _deficit;
+    }
+
+    // View Functions
+    function earned(address account) public view returns (uint) {
+        uint income = core.lastPeriodIncome();
+        return _earned(rewardPerToken(income), account);
+    }
+
+    function rewardPerToken(uint income) public view returns(uint) {
+        if (totalSupply == 0) {
+            return rewardPerTokenStored;
+        }
+        return rewardPerTokenStored.add(
+            income
+            .mul(1e18)
+            .div(totalSupply)
+        );
     }
 
     function withdrawAble(address account) public view returns(uint) {
@@ -127,44 +132,17 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
         return _withdrawAble.sub(deficitShare);
     }
 
-    function exit() external {
-        withdraw(withdrawAble(msg.sender));
-        getReward();
-    }
-
-    function getReward() public updateReward(msg.sender) {
-        uint reward = earned(msg.sender);
-        if (reward > 0) {
-            rewards[msg.sender] = 0;
-            core.mintReward(msg.sender, reward);
-            emit RewardPaid(msg.sender, reward);
-        }
-    }
-
-    event DebugUint(uint indexed a);
-    function notifyProtocolIncome(uint reward) external onlyCore {
-        updateRewardPerTokenForCurrentWindow();
-        // if timestamp() == lastIncomeUpdate, that means there were multiple updates in a single block
-        // and we are ok with letting that revert
-        emit DebugUint(timeWeightedRewardPerToken);
-        emit DebugUint(rewardPerTokenStored);
-        emit DebugUint(timestamp().sub(lastIncomeUpdate));
-        rewardPerTokenStored = rewardPerTokenStored.add(
-            timeWeightedRewardPerToken
-                .mul(reward)
-                .div(timestamp().sub(lastIncomeUpdate))
+    // Internal functions
+    function _earned(uint _rewardPerTokenStored, address account) internal view returns(uint) {
+        return
+            balanceOf(account)
+                .mul(_rewardPerTokenStored.sub(userRewardPerTokenPaid[account]))
                 .div(1e18)
-        );
-        emit DebugUint(rewardPerTokenStored);
-        timeWeightedRewardPerToken = 0;
-        lastIncomeUpdate = timestamp();
+                .add(rewards[account]);
     }
 
-    function notify(uint _deficit) external onlyCore {
-        deficit = _deficit;
-    }
-
-    function timestamp() internal view returns(uint) {
-        return block.timestamp;
+    function _withdraw(uint amount) internal {
+        super.withdraw(amount);
+        emit Withdrawn(msg.sender, amount);
     }
 }

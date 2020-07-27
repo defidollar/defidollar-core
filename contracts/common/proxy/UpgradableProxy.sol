@@ -20,11 +20,14 @@ contract UpgradableProxy is Ownable, Proxy {
     }
 
     function updateAndCall(address _newProxyTo, bytes memory data) public payable {
-        // ACLed by the call to execute
+        // ACLed by the call to execute()
         updateImplementation(_newProxyTo);
         execute(address(this), data);
     }
 
+    /**
+    * Owner can execute operations such as claiming yield farmimg benefits
+    */
     function execute(address _target, bytes memory data) public payable onlyOwner {
         (bool success, bytes memory returnData) = _target.call.value(msg.value)(data);
         require(success, string(returnData));

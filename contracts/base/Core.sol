@@ -32,8 +32,9 @@ contract Core is Initializable, Ownable {
     Oracle public oracle;
 
     uint public redeemFee;
-    uint public lastOverCollateralizationAmount;
     uint public totalAssets;
+    uint public claimedRewards;
+    uint public totalRewards;
     bool public inDeficit;
 
     // Interface contracts for third-party protocol integrations
@@ -65,6 +66,14 @@ contract Core is Initializable, Ownable {
         }
     }
 
+    modifier onlyStakeLPToken() {
+        require(
+            msg.sender == address(stakeLPToken),
+            "Only stakeLPToken"
+        );
+        _;
+    }
+
     /**
     * @dev Used to initialize contract state from the proxy
     */
@@ -80,7 +89,6 @@ contract Core is Initializable, Ownable {
         stakeLPToken = _stakeLPToken;
         oracle = _oracle;
         redeemFee = _redeemFee;
-        stakeLPToken.notifyProtocolIncome(0);
     }
 
     /**
@@ -163,13 +171,11 @@ contract Core is Initializable, Ownable {
     * @param usdDelta Reward amount denominated in dollars
     */
     function mintReward(address account, uint usdDelta)
+        onlyStakeLPToken
         checkAndNotifyDeficit
         external
     {
-        require(
-            msg.sender == address(stakeLPToken),
-            "Only stakeLPToken"
-        );
+        claimedRewards = claimedRewards.add(usdDelta);
         dusd.mint(account, usdToDusd(usdDelta));
     }
 
@@ -179,39 +185,33 @@ contract Core is Initializable, Ownable {
     */
     function syncSystem()
         external
+        checkAndNotifyDeficit
     {
         _updateFeed();
-        notifyProtocolIncomeAndDeficit();
+        totalAssets = totalSystemAssets();
     }
 
-    event DebugUint(uint indexed a);
-    /**
-    * @notice Updates the
-    *   Notifies stakeLPToken about the protocol income so that rewards become claimable.
-    * @dev Anyone can call this anytime they like. For instance,
-    *   if the user thinks they have accrued a large reward, they should call notifyProtocolIncomeAndDeficit and then claim reward.
-    * @return overCollateralizationAmount
-    */
-    function notifyProtocolIncomeAndDeficit()
+    function rewardDistributionCheckpoint()
+        external
         checkAndNotifyDeficit
-        public
+        returns(uint)
     {
-        totalAssets = totalSystemAssets(); // denominated in dollars
         uint supply = dusd.totalSupply();
-        // supply >= totalAssets means no income
-        if (supply < totalAssets) {
-            uint overCollateralizationAmount = totalAssets.sub(supply);
-            if (overCollateralizationAmount > lastOverCollateralizationAmount) {
-                emit DebugUint(overCollateralizationAmount - lastOverCollateralizationAmount);
-                stakeLPToken.notifyProtocolIncome(
-                    overCollateralizationAmount.sub(lastOverCollateralizationAmount)
-                );
-                lastOverCollateralizationAmount = overCollateralizationAmount;
-            }
+        totalAssets = totalSystemAssets();
+        uint unclaimedRewards;
+        if (totalRewards > claimedRewards) {
+            unclaimedRewards = totalRewards.sub(claimedRewards);
         }
+        uint _totalAssets = totalAssets.sub(unclaimedRewards);
+        uint periodIncome;
+        if (_totalAssets > supply) {
+            periodIncome = _totalAssets.sub(supply);
+            totalRewards = totalRewards.add(periodIncome);
+        }
+        return periodIncome;
     }
 
-    // View functions
+    // ##### View functions #####
 
     /**
     * @notice Returns the net system assets across all peaks
@@ -234,7 +234,6 @@ contract Core is Initializable, Ownable {
                 }
             }
         }
-
         // multiply retrieved asset amounts with the oracle price
         for(uint i = 0; i < coins.length; i++) {
             SystemCoin memory coin = coins[i];
@@ -244,7 +243,41 @@ contract Core is Initializable, Ownable {
         }
     }
 
-    // Admin functions
+    function lastPeriodIncome() public view returns(uint) {
+        uint supply = dusd.totalSupply();
+        uint _totalAssets = totalSystemAssets();
+        uint unclaimedRewards;
+        if (totalRewards > claimedRewards) {
+            unclaimedRewards = totalRewards.sub(claimedRewards);
+        }
+        _totalAssets = _totalAssets.sub(unclaimedRewards);
+        uint periodIncome;
+        if (_totalAssets > supply) {
+            periodIncome = _totalAssets.sub(supply);
+        }
+        return periodIncome;
+    }
+
+    function usdToDusd(uint usd)
+        public
+        view
+        returns(uint)
+    {
+        // system is healthy. Pegged at $1
+        if (!inDeficit) {
+            return usd;
+        }
+        // system is in deficit, see if staked funds can make up for it
+        uint supply = dusd.totalSupply();
+        uint perceivedSupply = supply.sub(stakeLPToken.totalSupply());
+        // staked funds make up for the deficit
+        if (perceivedSupply <= totalAssets) {
+            return usd;
+        }
+        return usd.mul(perceivedSupply).div(totalAssets);
+    }
+
+    // ##### Admin functions #####
 
     /**
     * @notice Whitelist new tokens supported by the peaks.
@@ -304,22 +337,7 @@ contract Core is Initializable, Ownable {
         peaks[peak].state = state;
     }
 
-    // Internal functions
-
-    function usdToDusd(uint usd) public view returns(uint) {
-        // system is healthy. Pegged at $1
-        if (!inDeficit) {
-            return usd;
-        }
-        // system is in deficit, see if staked funds can make up for it
-        uint supply = dusd.totalSupply();
-        uint perceivedSupply = supply.sub(stakeLPToken.totalSupply());
-        // staked funds make up for the deficit
-        if (perceivedSupply <= totalAssets) {
-            return usd;
-        }
-        return usd.mul(perceivedSupply).div(totalAssets);
-    }
+    // ##### Internal functions #####
 
     function _updateFeed()
         internal

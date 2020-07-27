@@ -5,8 +5,9 @@ const Reserve = artifacts.require("Reserve");
 const Oracle = artifacts.require("Oracle");
 const Aggregator = artifacts.require("MockAggregator");
 const StakeLPTokenProxy = artifacts.require("StakeLPTokenProxy");
-const StakeLPToken = artifacts.require("StakeLPTokenTest");
+const StakeLPToken = artifacts.require("StakeLPToken");
 const CurveSusdPeak = artifacts.require("CurveSusdPeak");
+const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
 const MockSusdToken = artifacts.require("MockSusdToken");
 const MockCurveSusd = artifacts.require("MockCurveSusd");
 
@@ -27,7 +28,8 @@ async function getArtifacts() {
 		decimals.push(await reserves[i].decimals())
 		aggregators.push(await Aggregator.at(await oracle.refs(i)))
     }
-    const stakeLPTokenProxy = await StakeLPTokenProxy.deployed()
+	const stakeLPTokenProxy = await StakeLPTokenProxy.deployed()
+	const curveSusdPeakProxy = await CurveSusdPeakProxy.deployed()
     return {
         core,
         dusd,
@@ -36,7 +38,7 @@ async function getArtifacts() {
 		aggregators,
         stakeLPToken: await StakeLPToken.at(stakeLPTokenProxy.address),
 
-        curveSusdPeak: await CurveSusdPeak.deployed(),
+        curveSusdPeak: await CurveSusdPeak.at(curveSusdPeakProxy.address),
         curveToken: await MockSusdToken.deployed(),
         mockCurveSusd: await MockCurveSusd.deployed()
     }
@@ -95,6 +97,10 @@ async function assertions(vals, artifacts) {
 		const totalAssets = await artifacts.core.totalAssets()
 		assert.equal(totalAssets.toString(), vals.totalAssets)
 	}
+	if (vals.surplus) {
+		const surplus = await artifacts.core.surplus()
+		assert.equal(surplus.toString(), vals.surplus)
+	}
 	if (vals.deficit) {
 		const deficit = await artifacts.stakeLPToken.deficit()
 		assert.equal(deficit.toString(), vals.deficit)
@@ -105,11 +111,8 @@ async function assertions(vals, artifacts) {
 	if (vals.dusdStaked) {
 		assert.equal((await artifacts.dusd.balanceOf(artifacts.stakeLPToken.address)).toString(), vals.dusdStaked)
 	}
-	if (vals.stakeLPToken_supply) {
-		assert.equal((await artifacts.stakeLPToken.totalSupply()).toString(), vals.stakeLPToken_supply)
-	}
-	if (vals.timeWeightedRewardPerToken) {
-		assert.equal((await artifacts.stakeLPToken.timeWeightedRewardPerToken()).toString(), vals.timeWeightedRewardPerToken)
+	if (vals.stakeLPTokenSupply) {
+		assert.equal((await artifacts.stakeLPToken.totalSupply()).toString(), vals.stakeLPTokenSupply)
 	}
 	if (vals.rewardPerTokenStored) {
 		assert.equal((await artifacts.stakeLPToken.rewardPerTokenStored()).toString(), vals.rewardPerTokenStored)

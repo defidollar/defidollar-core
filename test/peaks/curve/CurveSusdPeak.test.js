@@ -26,8 +26,8 @@ contract('CurveSusdPeak', async (accounts) => {
             await Promise.all(tasks)
             await this.curveSusdPeak.mint(this.amounts, toWei('10'))
 
-            this.dusd_balance = await this.dusd.balanceOf(this.user)
-            assert.equal(this.dusd_balance.toString(), toWei('10'))
+            this.dusdBalance = await this.dusd.balanceOf(this.user)
+            assert.equal(this.dusdBalance.toString(), toWei('10'))
             assert.equal((await this.curveToken.balanceOf(this.curveSusdPeak.address)).toString(), toWei('10'))
         })
 
@@ -41,8 +41,8 @@ contract('CurveSusdPeak', async (accounts) => {
                 const balance = await this.reserves[i].balanceOf(this.user)
                 assert.equal(balance.toString(), this.amounts[i].toString())
             }
-            this.dusd_balance = await this.dusd.balanceOf(this.user)
-            assert.equal(this.dusd_balance.toString(), '0')
+            this.dusdBalance = await this.dusd.balanceOf(this.user)
+            assert.equal(this.dusdBalance.toString(), '0')
         })
     })
 })
