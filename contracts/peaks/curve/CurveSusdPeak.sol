@@ -86,6 +86,25 @@ contract CurveSusdPeak is Initializable, IPeak {
     }
 
     /**
+    * @notice Mint DUSD with Curve LP tokens
+    * @param inAmount Exact amount of Curve LP tokens
+    * @param minDusdAmount Minimum DUSD to mint, used for capping slippage
+    */
+    function mintWithCurvePoolTokens(uint inAmount, uint minDusdAmount)
+        external
+        returns (uint dusdAmount)
+    {
+        require(inAmount > 0, "Can't mint with 0 coins");
+        curveToken.safeTransferFrom(msg.sender, address(this), inAmount);
+        uint totalSupply = curveToken.totalSupply();
+        uint[] memory delta = new uint[](N_COINS);
+        for (uint i = 0; i < N_COINS; i++) {
+            delta[i] = curve.balances(i).mul(inAmount).div(totalSupply);
+        }
+        return core.mint(delta, minDusdAmount, msg.sender);
+    }
+
+    /**
     * @dev Burn DUSD
     * @param outAmounts Exact outAmounts in the same order as required by the curve pool
     * @param maxDusdAmount Max DUSD to burn, used for capping slippage
@@ -118,6 +137,24 @@ contract CurveSusdPeak is Initializable, IPeak {
             IERC20(coins[i]).safeTransfer(msg.sender, outAmounts[i]);
             delta[i] = _calcWithdrawDelta(info, pool_sizes[i], outAmounts[i]);
         }
+        return core.redeem(delta, maxDusdAmount, msg.sender);
+    }
+
+    /**
+    * @notice Redeem DUSD with Curve LP tokens
+    * @param outAmount Exact amount of Curve LP tokens to receive
+    * @param maxDusdAmount Maximum DUSD to redeem, used for capping slippage
+    */
+    function redeemWithCurvePoolTokens(uint outAmount, uint maxDusdAmount)
+        external
+        returns (uint dusdAmount)
+    {
+        uint totalSupply = curveToken.totalSupply();
+        uint[] memory delta = new uint[](N_COINS);
+        for (uint i = 0; i < N_COINS; i++) {
+            delta[i] = curve.balances(i).mul(outAmount).div(totalSupply);
+        }
+        curveToken.safeTransfer(msg.sender, outAmount);
         return core.redeem(delta, maxDusdAmount, msg.sender);
     }
 
