@@ -1,0 +1,52 @@
+{
+    "contracts": {
+        "tokens": {
+            "DAI": {
+                "address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "decimals": 18
+            },
+            "USDC": {
+                "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "decimals": 6
+            },
+            "USDT": {
+                "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "decimals": 6
+            },
+            "TUSD": {
+                "address": "0x0000000000085d4780B73119b644AE5ecd22b376",
+                "decimals": 18
+            },
+            "sUSD": {
+                "address": "0x57Ab1ec28D129707052df4dF418D58a2D46d5f51",
+                "decimals": 18
+            },
+            "crvPlain3andSUSD": {
+                "address": "0xC25a3A3b969415c80451098fa907EC722572917F",
+                "decimals": 18,
+                "name": "Curve.fi DAI/USDC/USDT/sUSD",
+                "peak": "curveYPool"
+            }
+        },
+        "curve": {
+            "susd": {
+                "swap": "0xA5407eAE9Ba41422680e2e00537571bcC53efBfD",
+                "deposit": "0xFCBa3E75865d2d561BE8D220616520c171F12851"
+            }
+        },
+        "chainlink": {
+            "ethUsdAggregator": "0xF79D6aFBb6dA890132F9D7c355e3015f15F3406F",
+            "daiEthAggregator": "0x037E8F2125bF532F3e228991e051c8A7253B642c",
+            "usdcEthAggregator": "0xdE54467873c3BCAA76421061036053e371721708",
+            "usdtEthAggregator": "0xa874fe207DF445ff19E7482C746C4D3fD0CB9AcE",
+            "susdEthAggregator": "0x6d626Ff97f0E89F6f983dE425dc5B24A18DE26Ea"
+        },
+        "peaks": {
+            "curveSUSDPool": {
+                "address": "",
+                "coins": ["DAI", "USDC", "USDT", "sUSD"],
+                "native": "crvPlain3andSUSD"
+            }
+        }
+    }
+}

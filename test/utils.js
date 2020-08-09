@@ -9,7 +9,8 @@ const StakeLPToken = artifacts.require("StakeLPToken");
 const CurveSusdPeak = artifacts.require("CurveSusdPeak");
 const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
 const MockSusdToken = artifacts.require("MockSusdToken");
-const MockCurveSusd = artifacts.require("MockCurveSusd");
+const ICurve = artifacts.require("ICurve");
+const ICurveDeposit = artifacts.require("ICurveDeposit");
 
 const n_coins = 4
 const toBN = web3.utils.toBN
@@ -24,13 +25,13 @@ async function getArtifacts() {
 	const decimals = []
 	const aggregators = []
     for (let i = 0; i < n_coins; i++) {
-        reserves.push(await Reserve.at((await core.systemCoins(i)).token))
+        reserves.push(await Reserve.at((await core.systemCoins(i))))
 		decimals.push(await reserves[i].decimals())
 		aggregators.push(await Aggregator.at(await oracle.refs(i)))
     }
 	const stakeLPTokenProxy = await StakeLPTokenProxy.deployed()
 	const curveSusdPeakProxy = await CurveSusdPeakProxy.deployed()
-    return {
+    const res = {
         core,
         dusd,
         reserves,
@@ -40,8 +41,21 @@ async function getArtifacts() {
 
         curveSusdPeak: await CurveSusdPeak.at(curveSusdPeakProxy.address),
         curveToken: await MockSusdToken.deployed(),
-        mockCurveSusd: await MockCurveSusd.deployed()
-    }
+        // curveDeposit: await MockSusdDeposit.deployed(),
+	}
+	// res.curveSusd = new web3.eth.Contract(
+	// 	require('../scripts/abis/susdCurve.json'),
+	// 	await res.curveSusdPeak.curve()
+	// ).methods
+	res.curveSusd = await ICurve.at(await res.curveSusdPeak.curve())
+	res.curveDeposit = await ICurveDeposit.at(await res.curveSusdPeak.curveDeposit())
+	// console.log({
+	// 	curve: await res.curveSusdPeak.curve()
+	// })
+	// console.log({
+	// 	bal: await res.curveSusd.balances(0).call()
+	// })
+	return res
 }
 
 function scale(num, decimals) {
@@ -70,12 +84,6 @@ function mineOneBlock() {
 		},
 		() => {}
 	)
-}
-
-async function getBlockTime(stakeLPToken) {
-	return stakeLPToken.time()
-	// const block = await web3.eth.getBlock(tx.receipt.blockNumber)
-	// return block.timestamp.toString()
 }
 
 function printDebugReceipt(r) {
@@ -149,7 +157,6 @@ module.exports = {
 	increaseBlockTime,
 	mineOneBlock,
 	printDebugReceipt,
-	getBlockTime,
 	assertions,
 	print
 }

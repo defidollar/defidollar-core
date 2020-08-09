@@ -83,7 +83,7 @@ contract('Deficit flow (staked funds cover deficit)', async (accounts) => {
         try {
             await this.stakeLPToken.withdraw(utils.scale(41, 17)) // 4.1
         } catch (e) {
-            assert.equal(e.reason, 'Funds are illiquid')
+            assert.equal(e.reason, 'Withdrawing more than staked or illiquid due to system deficit')
         }
     })
 
@@ -110,8 +110,22 @@ contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) =>
         Object.assign(this, _artifacts)
     })
 
-    it('bob mints 110 dusd', async () => {
-        this.amounts = [30, 30, 30, 20].map((n, i) => {
+    it('third party mints dusd', async () => {
+        const from = accounts[2]
+        this.amounts = [10, 10, 10, 10].map((n, i) => {
+            return toBN(n).mul(toBN(10 ** this.decimals[i]))
+        })
+        const tasks = []
+        for (let i = 0; i < n_coins; i++) {
+            tasks.push(this.reserves[i].mint(from, this.amounts[i]))
+            tasks.push(this.reserves[i].approve(this.curveSusd.address, this.amounts[i], { from }))
+        }
+        await Promise.all(tasks)
+        await this.curveSusd.add_liquidity(this.amounts, '0', { from })
+    })
+
+    it('bob mints 120 dusd', async () => {
+        this.amounts = [30, 30, 30, 30].map((n, i) => {
             return toBN(n).mul(toBN(10 ** this.decimals[i]))
         })
         const tasks = []
@@ -120,7 +134,7 @@ contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) =>
             tasks.push(this.reserves[i].approve(this.curveSusdPeak.address, this.amounts[i], { from: bob }))
         }
         await Promise.all(tasks)
-        await this.curveSusdPeak.mint(this.amounts, toWei('110'), { from: bob })
+        await this.curveSusdPeak.mint(this.amounts, toWei('120'), { from: bob })
     })
 
     it('bob transfers 10 to alice', async () => {
@@ -138,9 +152,9 @@ contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) =>
         assert.equal(withdrawAble.toString(), this.stakeAmount)
     })
 
-    it('drop coin price to 0', async () => {
+    it('drop coin price to 0', async() => {
         await utils.assertions(
-            { totalSystemAssets: toWei('110'), totalAssets: toWei('110'), deficit: '0' },
+            { totalSystemAssets: toWei('120'), totalAssets: toWei('120'), deficit: '0' },
             _artifacts
         )
 
@@ -148,7 +162,7 @@ contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) =>
         await this.core.syncSystem()
 
         await utils.assertions(
-            { totalSystemAssets: toWei('90'), totalAssets: toWei('90'), deficit: toWei('20') },
+            { totalSystemAssets: toWei('90'), totalAssets: toWei('90'), deficit: toWei('30') },
             _artifacts
         )
     })
@@ -162,41 +176,53 @@ contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) =>
         try {
             await this.stakeLPToken.withdraw(1) // even 1 wei should fail
         } catch (e) {
-            assert.equal(e.reason, 'Funds are illiquid')
+            assert.equal(e.reason, 'Withdrawing more than staked or illiquid due to system deficit')
         }
     })
 
-    it('dusd is devalued while redeeming', async () => {
-        // dusdAmount = usd.mul(perceivedSupply).div(totalAssets); i.e. 30 * 100 / 90
-        this.expectedDusdAmount = utils.scale(30, 18).mul(utils.scale(100, 18)).div(utils.scale(90, 18))
+    it('dusd is devalued while redeeming/minting', async () => {
+        // [40, 40, 40] * 120 / 160
+        let amount = toWei('30')
+        const nowBalace = utils.scale(40, 18).mul(toBN(120)).div(toBN(160))
+            .add(utils.scale(40, 6).mul(toBN(120)).div(toBN(160)).mul(utils.scale(1, 12)))
+            .add(utils.scale(40, 6).mul(toBN(120)).div(toBN(160)).mul(utils.scale(1, 12)))
+            // 4th coins has gone to 0
+        // [10, 40, 40] * 90 / 130
+        const balanceAfterRedeem = utils.scale(10, 18).mul(toBN(90)).div(toBN(130))
+            .add(utils.scale(40, 6).mul(toBN(90)).div(toBN(130)).mul(utils.scale(1, 12)))
+            .add(utils.scale(40, 6).mul(toBN(90)).div(toBN(130)).mul(utils.scale(1, 12)))
+        let usdDelta = nowBalace.sub(balanceAfterRedeem)
+        // dusdAmount = usd.mul(perceivedSupply).div(totalAssets); i.e. usdDelta * 110 / 90
+        let expectedDusdAmount = usdDelta.mul(toBN(110 /* 120 - 10 */)).div(toBN(90))
         const args = [
-            [toWei('30'), 0, 0, 0],
+            [amount, 0, 0, 0],
             toWei('100'),
             { from: bob }
         ]
-        const dusdAmount = await this.curveSusdPeak.redeem.call(...args)
-        assert.equal(dusdAmount.toString(), this.expectedDusdAmount.toString())
-        await utils.assertions({ deficit: toWei('20') }, _artifacts)
-        await this.curveSusdPeak.redeem(...args)
-        await utils.assertions({
-            totalSystemAssets: toWei('60'),
-            totalAssets: toWei('60'),
-            deficit: utils.scale(110, 18).sub(this.expectedDusdAmount).sub(utils.scale(60, 18)).toString() // 16.66
-        }, _artifacts)
-    })
+        let dusdAmount = await this.curveSusdPeak.redeem.call(...args)
+        // assert.equal(dusdAmount.toString(), expectedDusdAmount.toString())
 
-    it('dusd is devalued while minting', async () => {
-        // dusdAmount = usd.mul(perceivedSupply).div(totalAssets); i.e. 30 * (110 - 33.333) / 60
-        this.expectedDusdAmount = utils.scale(30, 18)
-            .mul(utils.scale(100, 18).sub(this.expectedDusdAmount))
-            .div(utils.scale(60, 18))
-        const amount = toWei('30')
-        await this.reserves[0].approve(this.curveSusdPeak.address, amount, { from: bob })
-        const dusdAmount = await this.curveSusdPeak.mint.call(
-            [amount, 0, 0, 0],
-            '0',
-            { from: bob }
-        )
-        assert.equal(dusdAmount.toString(), this.expectedDusdAmount.toString())
+        // insert 1st coin
+        amount = utils.scale(30, 6)
+        await this.reserves[1].mint(bob, amount)
+        // [40, 70, 40] * 150 / 190
+        const balanceAfterMint = utils.scale(40, 18).mul(toBN(150)).div(toBN(190))
+            .add(utils.scale(70, 6).mul(toBN(150)).div(toBN(190)).mul(utils.scale(1, 12)))
+            .add(utils.scale(40, 6).mul(toBN(150)).div(toBN(190)).mul(utils.scale(1, 12)))
+        usdDelta = balanceAfterMint.sub(nowBalace)
+        console.log({
+            usdDelta: usdDelta.toString()
+        })
+        usdDelta = utils.scale(40, 18).mul(toBN(30)).div(toBN(190))
+            .add(utils.scale(70, 6).mul(toBN(30)).div(toBN(190)).mul(utils.scale(1, 12)))
+            .add(utils.scale(40, 6).mul(toBN(30)).div(toBN(190)).mul(utils.scale(1, 12)))
+        console.log({
+            usdDelta: usdDelta.toString()
+        })
+        // dusdAmount = usd.mul(perceivedSupply).div(totalAssets); i.e. usdDelta * 110 / 90
+        expectedDusdAmount = usdDelta.mul(toBN(110 /* 120 - 10 */)).div(toBN(90))
+        await this.reserves[1].approve(this.curveSusdPeak.address, amount, { from: bob })
+        dusdAmount = await this.curveSusdPeak.mint.call([0, amount, 0, 0], '0', { from: bob })
+        assert.equal(dusdAmount.toString(), expectedDusdAmount.toString())
     })
 })

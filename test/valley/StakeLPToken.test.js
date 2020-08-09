@@ -89,7 +89,7 @@ contract('StakeLPToken', async (accounts) => {
 		})
 		const tasks = []
 		for (let i = 0; i < n_coins; i++) {
-			tasks.push(this.reserves[i].mint(this.mockCurveSusd.address, income[i]))
+			tasks.push(this.reserves[i].mint(this.curveSusd.address, income[i]))
 		}
 		await Promise.all(tasks)
 		await this.assertions({ totalSystemAssets: toWei('24') })
@@ -113,7 +113,7 @@ contract('StakeLPToken', async (accounts) => {
 		})
 		const tasks = []
 		for (let i = 0; i < n_coins; i++) {
-			tasks.push(this.reserves[i].mint(this.mockCurveSusd.address, income[i]))
+			tasks.push(this.reserves[i].mint(this.curveSusd.address, income[i]))
 		}
 		await Promise.all(tasks)
 		await this.assertions({ totalSystemAssets: toWei('26') })
@@ -157,7 +157,7 @@ contract('StakeLPToken', async (accounts) => {
 		})
 		const tasks = []
 		for (let i = 0; i < n_coins; i++) {
-			tasks.push(this.reserves[i].mint(this.mockCurveSusd.address, income[i]))
+			tasks.push(this.reserves[i].mint(this.curveSusd.address, income[i]))
 		}
 		await Promise.all(tasks)
 		await this.assertions({ totalSystemAssets: toWei('27') })
@@ -182,7 +182,7 @@ contract('StakeLPToken', async (accounts) => {
 		})
 		const tasks = []
 		for (let i = 0; i < n_coins; i++) {
-			tasks.push(this.reserves[i].mint(this.mockCurveSusd.address, income[i]))
+			tasks.push(this.reserves[i].mint(this.curveSusd.address, income[i]))
 		}
 		await Promise.all(tasks)
 	})

@@ -2,9 +2,10 @@ pragma solidity 0.5.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import {SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
+import {Math} from "@openzeppelin/contracts/math/Math.sol";
 
-import {ICurveDeposit, ICurve} from "./ICurve.sol";
+import {ICurveDeposit, ICurve, IUtil} from "./ICurve.sol";
 import {Core} from "../../base/Core.sol";
 import {IPeak} from "../IPeak.sol";
 import {Initializable} from "../../common/Initializable.sol";
@@ -13,29 +14,28 @@ import {Initializable} from "../../common/Initializable.sol";
 contract CurveSusdPeak is Initializable, IPeak {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
+    using Math for uint;
 
-    uint constant MAX = 2**256 - 1;
+    uint constant MAX = uint(-1);
     uint constant N_COINS = 4;
+    uint[N_COINS] ZEROES = [uint(0),uint(0),uint(0),uint(0)];
+    string constant ERR_SLIPPAGE = "They see you slippin";
 
     address[N_COINS] public underlyingCoins;
+    uint[N_COINS] public oraclePrices;
 
-    ICurveDeposit curveDeposit; // deposit contract
-    ICurve curve; // swap contract
-    IERC20 curveToken; // LP token contract
-    Core core;
-
-    struct LPShareInfo {
-        uint old_lp_amount;
-        uint old_lp_supply;
-        uint new_lp_amount;
-        uint new_lp_supply;
-    }
+    ICurveDeposit public curveDeposit; // deposit contract
+    ICurve public curve; // swap contract
+    IERC20 public curveToken; // LP token contract
+    Core public core;
+    IUtil public util;
 
     function initialize(
         ICurveDeposit _curveDeposit,
         ICurve _curve,
         IERC20 _curveToken,
         Core _core,
+        IUtil _util,
         address[N_COINS] memory _underlyingCoins
     )   public
         notInitialized
@@ -44,7 +44,9 @@ contract CurveSusdPeak is Initializable, IPeak {
         curve = _curve;
         curveToken = _curveToken;
         core = _core;
+        util = _util;
         underlyingCoins = _underlyingCoins;
+        replenishApprovals();
     }
 
     /**
@@ -52,37 +54,20 @@ contract CurveSusdPeak is Initializable, IPeak {
     * @param inAmounts Exact inAmounts in the same order as required by the curve pool
     * @param minDusdAmount Minimum DUSD to mint, used for capping slippage
     */
-    function mint(
-        uint[] calldata inAmounts,
-        uint minDusdAmount
-    ) external
+    function mint(uint[N_COINS] calldata inAmounts, uint minDusdAmount)
+        external
         returns (uint dusdAmount)
     {
+        uint _old = portfolioValue();
         address[N_COINS] memory coins = underlyingCoins;
-        uint[N_COINS] memory pool_sizes;
-
         for (uint i = 0; i < N_COINS; i++) {
-            pool_sizes[i] = curve.balances(i);
-            if (inAmounts[i] == 0) {
-                continue;
+            if (inAmounts[i] > 0) {
+                IERC20(coins[i]).safeTransferFrom(msg.sender, address(this), inAmounts[i]);
             }
-            IERC20(coins[i]).safeTransferFrom(msg.sender, address(this), inAmounts[i]);
         }
-
-        LPShareInfo memory info;
-        info.old_lp_amount = curveToken.balanceOf(address(this));
-        info.old_lp_supply = curveToken.totalSupply();
-
-        curveDeposit.add_liquidity(inAmounts, 0);
-
-        info.new_lp_amount = curveToken.balanceOf(address(this));
-        info.new_lp_supply = curveToken.totalSupply();
-
-        uint[] memory delta = new uint[](N_COINS);
-        for (uint i = 0; i < N_COINS; i++) {
-            delta[i] = _calcDepositDelta(info, pool_sizes[i], inAmounts[i]);
-        }
-        return core.mint(delta, minDusdAmount, msg.sender);
+        curve.add_liquidity(inAmounts, 0);
+        dusdAmount = core.mint(portfolioValue().sub(_old), msg.sender);
+        require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
     }
 
     /**
@@ -90,125 +75,147 @@ contract CurveSusdPeak is Initializable, IPeak {
     * @param inAmount Exact amount of Curve LP tokens
     * @param minDusdAmount Minimum DUSD to mint, used for capping slippage
     */
-    function mintWithCurvePoolTokens(uint inAmount, uint minDusdAmount)
+    function mintWithYcrv(uint inAmount, uint minDusdAmount)
         external
         returns (uint dusdAmount)
     {
-        require(inAmount > 0, "Can't mint with 0 coins");
         curveToken.safeTransferFrom(msg.sender, address(this), inAmount);
-        uint totalSupply = curveToken.totalSupply();
-        uint[] memory delta = new uint[](N_COINS);
-        for (uint i = 0; i < N_COINS; i++) {
-            delta[i] = curve.balances(i).mul(inAmount).div(totalSupply);
-        }
-        return core.mint(delta, minDusdAmount, msg.sender);
+        dusdAmount = core.mint(_getVirtual(inAmount), msg.sender);
+        require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
     }
 
     /**
-    * @dev Burn DUSD
-    * @param outAmounts Exact outAmounts in the same order as required by the curve pool
-    * @param maxDusdAmount Max DUSD to burn, used for capping slippage
+    * @dev Redeem DUSD
+    * @param dusdAmount Exact dusdAmount to burn
+    * @param minAmounts Min expected amounts to cap slippage
     */
-    function redeem(
-        uint[] calldata outAmounts,
-        uint maxDusdAmount
-    )
+    function redeem(uint dusdAmount, uint[N_COINS] calldata minAmounts)
         external
-        returns(uint dusdAmount)
     {
-        uint[N_COINS] memory pool_sizes;
-        for (uint i = 0; i < N_COINS; i++) {
-            pool_sizes[i] = curve.balances(i);
-        }
-
-        LPShareInfo memory info;
-        info.old_lp_amount = curveToken.balanceOf(address(this));
-        info.old_lp_supply = curveToken.totalSupply();
-
-        curveDeposit.remove_liquidity_imbalance(outAmounts, MAX);
-
-        info.new_lp_amount = curveToken.balanceOf(address(this));
-        info.new_lp_supply = curveToken.totalSupply();
-
+        uint yCrv = usdToYcrv(core.redeem(dusdAmount, msg.sender));
+        curve.remove_liquidity(yCrv, ZEROES);
         address[N_COINS] memory coins = underlyingCoins;
-        uint[] memory delta = new uint[](N_COINS);
-
+        IERC20 coin;
+        uint toTransfer;
         for (uint i = 0; i < N_COINS; i++) {
-            IERC20(coins[i]).safeTransfer(msg.sender, outAmounts[i]);
-            delta[i] = _calcWithdrawDelta(info, pool_sizes[i], outAmounts[i]);
+            coin = IERC20(coins[i]);
+            toTransfer = coin.balanceOf(address(this));
+            require(toTransfer >= minAmounts[i], ERR_SLIPPAGE);
+            coin.safeTransfer(msg.sender, toTransfer);
         }
-        return core.redeem(delta, maxDusdAmount, msg.sender);
     }
 
-    /**
-    * @notice Redeem DUSD with Curve LP tokens
-    * @param outAmount Exact amount of Curve LP tokens to receive
-    * @param maxDusdAmount Maximum DUSD to redeem, used for capping slippage
-    */
-    function redeemWithCurvePoolTokens(uint outAmount, uint maxDusdAmount)
+    function redeemInOneCoin(uint dusdAmount, uint i, uint minOut)
         external
+    {
+        uint yCrv = usdToYcrv(core.redeem(dusdAmount, msg.sender));
+        curveDeposit.remove_liquidity_one_coin(yCrv, int128(i), minOut, false);
+        IERC20 coin = IERC20(underlyingCoins[i]);
+        uint toTransfer = coin.balanceOf(address(this));
+        require(toTransfer >= minOut, ERR_SLIPPAGE);
+        coin.safeTransfer(msg.sender, toTransfer);
+    }
+
+    function redeemInYcrv(uint dusdAmount, uint minOut)
+        external
+    {
+        uint yCrv = usdToYcrv(core.redeem(dusdAmount, msg.sender));
+        require(yCrv >= minOut, ERR_SLIPPAGE);
+        curveToken.safeTransfer(msg.sender, yCrv);
+    }
+
+    function updateFeed(uint[] calldata _prices) external {
+        require(msg.sender == address(core), "ERR_NOT_AUTH");
+        require(_prices.length == N_COINS, "ERR_INVALID_UPDATE");
+        for (uint i = 0; i < N_COINS; i++) {
+            oraclePrices[i] = _prices[i];
+        }
+    }
+
+    // Think about if we need strict token approvals during the actions at the cost of higher gas.
+    function replenishApprovals() public {
+        curveToken.approve(address(curveDeposit), MAX);
+        curveToken.approve(address(curve), MAX);
+        for (uint i = 0; i < N_COINS; i++) {
+            IERC20 coin = IERC20(underlyingCoins[i]);
+            if (coin.allowance(address(this), address(curveDeposit)) > 0) {
+                coin.approve(address(curveDeposit), 0);
+            }
+            if (coin.allowance(address(this), address(curve)) > 0) {
+                coin.approve(address(curve), 0);
+            }
+            coin.approve(address(curveDeposit), MAX);
+            coin.approve(address(curve), MAX);
+        }
+    }
+
+    /* ##### View Functions ##### */
+
+    function calcMint(uint[N_COINS] memory inAmounts)
+        public view
         returns (uint dusdAmount)
     {
+        uint yCrvBal = curveToken.balanceOf(address(this));
+        uint _old = _getVirtual(yCrvBal);
+        uint _new = _getVirtual(yCrvBal.add(curve.calc_token_amount(inAmounts, true /* deposit */)));
+        return core.usdToDusd(_new.sub(_old));
+    }
+
+    function calcMintWithYcrv(uint inAmount)
+        public view
+        returns (uint dusdAmount)
+    {
+        return core.usdToDusd(_getVirtual(inAmount));
+    }
+
+    function calcRedeem(uint dusdAmount)
+        public view
+        returns(uint[N_COINS] memory amounts)
+    {
+        uint usd = core.dusdToUsd(dusdAmount, true);
+        uint exchangeRate = _getVirtual(1e18);
+        uint yCrv = usd.mul(1e18).div(exchangeRate);
         uint totalSupply = curveToken.totalSupply();
-        uint[] memory delta = new uint[](N_COINS);
-        for (uint i = 0; i < N_COINS; i++) {
-            delta[i] = curve.balances(i).mul(outAmount).div(totalSupply);
-        }
-        curveToken.safeTransfer(msg.sender, outAmount);
-        return core.redeem(delta, maxDusdAmount, msg.sender);
-    }
-
-    // This is risky (Bancor Hack scenario).
-    // Think about if we need strict token approvals during the actions at the cost of higher gas.
-    function replenish_approvals() external {
-        curveToken.approve(address(curveDeposit), MAX);
-        for (uint i = 0; i < N_COINS; i++) {
-            IERC20(underlyingCoins[i]).approve(address(curveDeposit), MAX);
+        for(uint i = 0; i < N_COINS; i++) {
+            amounts[i] = curve.balances(int128(i)).mul(yCrv).div(totalSupply);
         }
     }
 
-    function portfolio() public view returns(uint[] memory _portfolio) {
-        uint lp_amount = curveToken.balanceOf(address(this));
-        uint lp_supply = curveToken.totalSupply();
-        _portfolio = new uint[](N_COINS);
-        if (lp_supply > 0) {
-            for (uint i = 0; i < N_COINS; i++) {
-                _portfolio[i] = curve.balances(i).mul(lp_amount).div(lp_supply);
+    function calcRedeemWithYcrv(uint dusdAmount)
+        public view
+        returns(uint amount)
+    {
+        uint usd = core.dusdToUsd(dusdAmount, true);
+        uint exchangeRate = _getVirtual(1e18);
+        amount = usd.mul(1e18).div(exchangeRate);
+    }
+
+    function portfolioValue() public view returns(uint) {
+        return _getVirtual(curveToken.balanceOf(address(this)));
+    }
+
+    function usdToYcrv(uint usd) public view returns(uint) {
+        uint exchangeRate = _getVirtual(1e18);
+        return usd.mul(1e18).div(exchangeRate);
+    }
+
+    /* ##### Internal Functions ##### */
+
+    function _getVirtual(uint yCrvBal) internal view returns(uint) {
+        uint yCrvTotalSupply = curveToken.totalSupply();
+        if (yCrvTotalSupply == 0 || yCrvBal == 0) {
+            return 0;
+        }
+        uint[N_COINS] memory balances;
+        uint[N_COINS] memory prices = oraclePrices;
+        for (uint i = 0; i < N_COINS; i++) {
+            balances[i] = curve.balances(int128(i)).mul(prices[i]);
+            if (i == 0 || i == 3) {
+                balances[i] = balances[i].div(1e18);
+            } else {
+                balances[i] = balances[i].div(1e6);
             }
         }
-    }
-
-    function _calcDepositDelta(
-        LPShareInfo memory info,
-        uint old_pool_size,
-        uint amount
-    )
-        internal
-        pure
-        returns (uint /* delta */)
-    {
-        uint old_balance;
-        if (info.old_lp_supply > 0) {
-            old_balance = old_pool_size.mul(info.old_lp_amount).div(info.old_lp_supply);
-        }
-        uint new_balance = old_pool_size.add(amount).mul(info.new_lp_amount).div(info.new_lp_supply);
-        return new_balance.sub(old_balance);
-    }
-
-    function _calcWithdrawDelta(
-        LPShareInfo memory info,
-        uint old_pool_size,
-        uint amount
-    )
-        internal
-        pure
-        returns (uint /* delta */)
-    {
-        uint old_balance = old_pool_size.mul(info.old_lp_amount).div(info.old_lp_supply);
-        uint new_balance;
-        if (info.new_lp_supply > 0) {
-            new_balance = old_pool_size.sub(amount).mul(info.new_lp_amount).div(info.new_lp_supply);
-        }
-        return old_balance.sub(new_balance);
+        return util.get_D(balances).mul(yCrvBal).div(yCrvTotalSupply);
     }
 }
