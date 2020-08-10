@@ -11,36 +11,82 @@ contract('Core', async (accounts) => {
         const artifacts = await utils.getArtifacts()
         Object.assign(this, artifacts)
         this.user = accounts[1]
-        await this.core.whitelistPeak(accounts[0], [0, 1, 2, 3])
+        await this.core.whitelistPeak(accounts[0], [0, 1, 2, 3], false)
     })
 
-    describe('mint/burn', async () => {
-        it('mint', async () => {
-            this.amounts = [1, 2, 3, 4].map((n, i) => {
-                return toBN(n).mul(toBN(10 ** this.decimals[i])).toString()
-            })
-            let dusdBalance = await this.dusd.balanceOf(this.user)
-            assert.equal(dusdBalance.toString(), '0')
+    it('mint', async () => {
+        await this.core.mint(toWei('10'), this.user)
+        const dusdBalance = await this.dusd.balanceOf(this.user)
+        assert.equal(dusdBalance.toString(), toWei('10'))
+    })
 
-            await this.core.mint(this.amounts, toWei('10'), this.user)
+    it('redeem', async () => {
+        await this.core.redeem(toWei('3'), this.user)
+        const dusdBalance = await this.dusd.balanceOf(this.user)
+        assert.equal(dusdBalance.toString(), toWei('7'))
+    })
 
-            dusdBalance = await this.dusd.balanceOf(this.user)
-            assert.equal(dusdBalance.toString(), toWei('10'))
+    it('set peak as dormant', async () => {
+        await this.core.setPeakStatus(accounts[0], 2) // dormant
+    })
+
+    it('redeem is possible from dormant peak', async () => {
+        await this.core.redeem(toWei('7'), this.user)
+        const dusdBalance = await this.dusd.balanceOf(this.user)
+        assert.equal(dusdBalance.toString(), '0')
+    })
+
+    it('mint fails for dormant peak', async () => {
+        try {
+            await this.core.mint(toWei('10'), this.user, { from: accounts[1] })
+        } catch(e) {
+            assert.equal(e.reason, 'Peak is inactive')
+        }
+    })
+
+    it('set peak as extinct', async () => {
+        await this.core.setPeakStatus(accounts[0], 0)
+    })
+
+    it('mint fails for dormant peak', async () => {
+        try {
+            await this.core.mint(toWei('10'), this.user, { from: accounts[1] })
+        } catch(e) {
+            assert.equal(e.reason, 'Peak is inactive')
+        }
+    })
+
+    it('redeem fails from extinct peak', async () => {
+        try {
+            await this.core.redeem(toWei('10'), this.user, { from: accounts[1] })
+        } catch(e) {
+            assert.equal(e.reason, 'Peak is extinct')
+        }
+    })
+
+    it('adding a duplicate token fails', async () => {
+        try {
+            await this.core.whitelistTokens([this.reserves[3].address])
+        } catch(e) {
+            assert.equal(e.reason, 'Adding a duplicate token')
+        }
+    })
+
+    describe('Only Owner', async () => {
+        it('whitelistTokens fails', async () => {
+            try {
+                await this.core.whitelistTokens([this.reserves[3].address], { from: accounts[1]})
+            } catch(e) {
+                assert.equal(e.reason, 'NOT_OWNER')
+            }
         })
 
-        it('burn', async () => {
-            await this.core.redeem(this.amounts, toWei('10'), this.user)
-
-            dusdBalance = await this.dusd.balanceOf(this.user)
-            assert.equal(dusdBalance.toString(), '0')
+        it('setPeakStatus fails', async () => {
+            try {
+                await this.core.setPeakStatus(accounts[0], '1', { from: accounts[1]})
+            } catch(e) {
+                assert.equal(e.reason, 'NOT_OWNER')
+            }
         })
     })
 })
-
-function printReceipt(r) {
-    r.receipt.logs.forEach(l => {
-        if (l.event === 'DebugUint') {
-            console.log(l.args.a.toString())
-        }
-    })
-}

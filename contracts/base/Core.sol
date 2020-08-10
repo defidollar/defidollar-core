@@ -19,17 +19,10 @@ contract Core is Initializable, Ownable {
     uint constant MAX = uint(-1);
     uint constant PRECISION = 1e18;
 
-    // All coins supported by the DefiDollar system
-    struct SystemCoin {
-        address token;
-        uint precision;
-        uint price; // feed from oracle
-    }
-    SystemCoin[] public systemCoins;
-
     DUSD public dusd;
     StakeLPToken public stakeLPToken;
     Oracle public oracle;
+    address[] public systemCoins;
 
     uint public redeemFee;
     uint public totalAssets;
@@ -94,16 +87,12 @@ contract Core is Initializable, Ownable {
     /**
     * @notice Mint DUSD
     * @dev Only whitelisted peaks can call this function
-    * @param delta Delta of system coins added to the system through a peak
-    * @param minDusdAmount Min DUSD amount to mint. Used to cap slippage
+    * @param usdDelta Delta of system coins added to the system through a peak
     * @param account Account to mint DUSD to
-    * @return dusdAmount DUSD amount actually minted
+    * @return dusdAmount DUSD amount minted
     */
-    function mint(
-        uint[] calldata delta,
-        uint minDusdAmount,
-        address account
-    )   external
+    function mint(uint usdDelta, address account)
+        external
         checkAndNotifyDeficit
         returns (uint dusdAmount)
     {
@@ -112,16 +101,7 @@ contract Core is Initializable, Ownable {
             peak.state == PeakState.Active,
             "Peak is inactive"
         );
-        uint usdDelta;
-        SystemCoin[] memory coins = systemCoins;
-        for (uint i = 0; i < peak.systemCoinIds.length; i++) {
-            SystemCoin memory coin = coins[peak.systemCoinIds[i]];
-            usdDelta = usdDelta.add(
-                delta[i].mul(coin.price).div(coin.precision)
-            );
-        }
         dusdAmount = usdToDusd(usdDelta);
-        require(dusdAmount >= minDusdAmount, "They see you slippin");
         dusd.mint(account, dusdAmount);
         totalAssets = totalAssets.add(usdDelta);
         emit Mint(account, dusdAmount);
@@ -130,38 +110,22 @@ contract Core is Initializable, Ownable {
     /**
     * @notice Redeem DUSD
     * @dev Only whitelisted peaks can call this function
-    * @param delta Delta of system coins removed from the system through a peak
-    * @param maxDusdAmount Max DUSD amount to burn. Used to cap slippage
-    * @param account Account to mint DUSD to
-    * @return dusdAmount DUSD amount actually redeemed
+    * @param dusdAmount DUSD amount to redeem.
+    * @param account Account to burn DUSD from
     */
-    function redeem(
-        uint[] calldata delta,
-        uint maxDusdAmount,
-        address account
-    )   external
+    function redeem(uint dusdAmount, address account)
+        external
         checkAndNotifyDeficit
-        returns(uint dusdAmount)
+        returns(uint usd)
     {
         Peak memory peak = peaks[msg.sender];
         require(
             peak.state != PeakState.Extinct,
             "Peak is extinct"
         );
-        uint usdDelta;
-        SystemCoin[] memory coins = systemCoins;
-        for (uint i = 0; i < peak.systemCoinIds.length; i++) {
-            if (delta[i] == 0) continue;
-            SystemCoin memory coin = coins[peak.systemCoinIds[i]];
-            usdDelta = usdDelta.add(
-                delta[i].mul(coin.price).div(coin.precision)
-            );
-        }
-        // burn a little more dusd
-        dusdAmount = usdToDusd(usdDelta).mul(redeemFee).div(10000);
-        require(dusdAmount <= maxDusdAmount, "They see you slippin");
+        usd = dusdToUsd(dusdAmount, true);
         dusd.burn(account, dusdAmount);
-        totalAssets = totalAssets.sub(usdDelta);
+        totalAssets = totalAssets.sub(usd);
         emit Redeem(account, dusdAmount);
     }
 
@@ -193,6 +157,7 @@ contract Core is Initializable, Ownable {
 
     function rewardDistributionCheckpoint()
         external
+        onlyStakeLPToken
         checkAndNotifyDeficit
         returns(uint)
     {
@@ -211,35 +176,23 @@ contract Core is Initializable, Ownable {
         return periodIncome;
     }
 
-    // ##### View functions #####
+    /* ##### View functions ##### */
 
     /**
     * @notice Returns the net system assets across all peaks
-    * @return inventory system assets denominated in dollars
+    * @return _totalAssets system assets denominated in dollars
     */
     function totalSystemAssets()
         public
         view
         returns (uint _totalAssets)
     {
-        SystemCoin[] memory coins = systemCoins;
-        uint[] memory portfolio = new uint[](coins.length);
-        // retrieve assets accross all peaks
-        for(uint i = 0; i < peaksAddresses.length; i++) {
-            uint[] memory peakPortfolio = IPeak(peaksAddresses[i]).portfolio();
+        for (uint i = 0; i < peaksAddresses.length; i++) {
             Peak memory peak = peaks[peaksAddresses[i]];
-            for (uint j = 0; j < peak.systemCoinIds.length; j++) {
-                if (peak.state != PeakState.Extinct) {
-                    portfolio[peak.systemCoinIds[j]] = portfolio[peak.systemCoinIds[j]].add(peakPortfolio[j]);
-                }
+            if (peak.state == PeakState.Extinct) {
+                continue;
             }
-        }
-        // multiply retrieved asset amounts with the oracle price
-        for(uint i = 0; i < coins.length; i++) {
-            SystemCoin memory coin = coins[i];
-            _totalAssets = _totalAssets.add(
-                portfolio[i].mul(coin.price).div(coin.precision)
-            );
+            _totalAssets = _totalAssets.add(IPeak(peaksAddresses[i]).portfolioValue());
         }
     }
 
@@ -277,25 +230,45 @@ contract Core is Initializable, Ownable {
         return usd.mul(perceivedSupply).div(totalAssets);
     }
 
-    // ##### Admin functions #####
+    function dusdToUsd(uint _dusd, bool fee)
+        public
+        view
+        returns(uint usd)
+    {
+        // system is healthy. Pegged at $1
+        if (!inDeficit) {
+            usd = _dusd;
+        } else {
+        // system is in deficit, see if staked funds can make up for it
+            uint supply = dusd.totalSupply();
+            uint perceivedSupply = supply.sub(stakeLPToken.totalSupply());
+            // staked funds make up for the deficit
+            if (perceivedSupply <= totalAssets) {
+                usd = _dusd;
+            } else {
+                usd = _dusd.mul(totalAssets).div(perceivedSupply);
+            }
+        }
+        if (fee) {
+            usd = usd.mul(10000).div(redeemFee);
+        }
+        return usd;
+    }
+
+    /* ##### Admin functions ##### */
 
     /**
     * @notice Whitelist new tokens supported by the peaks.
     * These are vanilla coins like DAI, USDC, USDT etc.
     * @dev onlyOwner ACL is provided by the whitelistToken call
     * @param tokens Token addresses to whitelist
-    * @param decimals Token Precision
-    * @param initialPrices Intialize prices akin to retieving from an oracle
     */
-    function whitelistTokens(
-        address[] calldata tokens,
-        uint[] calldata decimals,
-        uint[] calldata initialPrices
-    )   external
+    function whitelistTokens(address[] calldata tokens)
+        external
         onlyOwner
     {
         for (uint i = 0; i < tokens.length; i++) {
-            _whitelistToken(tokens[i], decimals[i], initialPrices[i]);
+            _whitelistToken(tokens[i]);
         }
     }
 
@@ -306,7 +279,8 @@ contract Core is Initializable, Ownable {
     */
     function whitelistPeak(
         address peak,
-        uint[] calldata _systemCoins
+        uint[] calldata _systemCoins,
+        bool shouldUpdateFeed
     )   external
         onlyOwner
     {
@@ -320,6 +294,9 @@ contract Core is Initializable, Ownable {
         );
         peaksAddresses.push(peak);
         peaks[peak] = Peak(_systemCoins, PeakState.Active);
+        if (shouldUpdateFeed) {
+            _updateFeed();
+        }
         emit PeakWhitelisted(peak);
     }
 
@@ -337,27 +314,36 @@ contract Core is Initializable, Ownable {
         peaks[peak].state = state;
     }
 
-    // ##### Internal functions #####
+    /* ##### Internal functions ##### */
 
     function _updateFeed()
         internal
     {
         uint[] memory feed = oracle.getPriceFeed();
-        require(
-            feed.length == systemCoins.length,
-            "Invalid system state"
-        );
-        for (uint i = 0; i < feed.length; i++) {
-            systemCoins[i].price = feed[i];
+        require(feed.length == systemCoins.length, "Invalid system state");
+        uint[] memory prices;
+        Peak memory peak;
+        for (uint i = 0; i < peaksAddresses.length; i++) {
+            peak = peaks[peaksAddresses[i]];
+            prices = new uint[](peak.systemCoinIds.length);
+            if (peak.state == PeakState.Extinct) {
+                continue;
+            }
+            for (uint j = 0; j < prices.length; j++) {
+                prices[j] = feed[peak.systemCoinIds[j]];
+            }
+            IPeak(peaksAddresses[i]).updateFeed(prices);
         }
         emit FeedUpdated(feed);
     }
 
-    function _whitelistToken(address token, uint decimals, uint initialPrice)
+    function _whitelistToken(address token)
         internal
     {
-        require(decimals > 0, "Using a 0 decimal coin can break the system");
-        systemCoins.push(SystemCoin(token, 10 ** decimals, initialPrice));
+        for (uint i = 0; i < systemCoins.length; i++) {
+            require(systemCoins[i] != token, "Adding a duplicate token");
+        }
+        systemCoins.push(token);
         emit TokenWhiteListed(token);
     }
 }

@@ -14,12 +14,12 @@ contract('StakeLPToken', async (accounts) => {
 	before(async () => {
 		_artifacts = await utils.getArtifacts()
         Object.assign(this, _artifacts)
-		this.amounts = [1, 2, 3, 4].map((n, i) => {
+		this.amounts = [10, 10, 10, 10].map((n, i) => {
 			return toBN(n).mul(toBN(10 ** this.decimals[i]))
 		})
 	})
 
-	it('alice mints 10 (CurveSusdPeak)', async () => {
+	it('alice mints 40 (CurveSusdPeak)', async () => {
 		await utils.assertions({ dusdTotalSupply: '0' }, _artifacts)
 
 		const tasks = []
@@ -31,30 +31,30 @@ contract('StakeLPToken', async (accounts) => {
 		await this.curveSusdPeak.mint(this.amounts, toWei('10'))
 
 		const dusdBalance = await this.dusd.balanceOf(alice)
-		assert.equal(dusdBalance.toString(), toWei('10'))
-		assert.equal((await this.curveToken.balanceOf(this.curveSusdPeak.address)).toString(), toWei('10'))
-		await utils.assertions({ dusdTotalSupply: toWei('10') }, _artifacts)
+		assert.equal(dusdBalance.toString(), toWei('40'))
+		assert.equal((await this.curveToken.balanceOf(this.curveSusdPeak.address)).toString(), toWei('40'))
+		await utils.assertions({ dusdTotalSupply: toWei('40') }, _artifacts)
 	})
 
-	it('bob mints 10 (CurveSusdPeak)', async () => {
+	it('bob mints 20 (CurveSusdPeak)', async () => {
+		this.amounts = this.amounts.map(b => b.div(toBN(2))) // 5 of each coin
 		const tasks = []
-		const from = bob
 		for (let i = 0; i < n_coins; i++) {
-			tasks.push(this.reserves[i].mint(from, this.amounts[i]))
-			tasks.push(this.reserves[i].approve(this.curveSusdPeak.address, this.amounts[i], { from }))
+			tasks.push(this.reserves[i].mint(bob, this.amounts[i]))
+			tasks.push(this.reserves[i].approve(this.curveSusdPeak.address, this.amounts[i], { from: bob }))
 		}
 		await Promise.all(tasks)
-		await this.curveSusdPeak.mint(this.amounts, toWei('10'), { from })
+		await this.curveSusdPeak.mint(this.amounts, toWei('20'), { from: bob })
 
 		this.dusdBalance = await this.dusd.balanceOf(bob)
-		assert.equal(this.dusdBalance.toString(), toWei('10'))
-		assert.equal((await this.curveToken.balanceOf(this.curveSusdPeak.address)).toString(), toWei('20'))
-		await this.assertions({ dusdTotalSupply: toWei('20') })
+		assert.equal(this.dusdBalance.toString(), toWei('20'))
+		assert.equal((await this.curveToken.balanceOf(this.curveSusdPeak.address)).toString(), toWei('60'))
+		await this.assertions({ dusdTotalSupply: toWei('60') })
 	})
 
 	it('alice stakes=4', async () => {
 		await this.assertions({
-			dusdTotalSupply: toWei('20'),
+			dusdTotalSupply: toWei('60'),
 			dusdStaked: '0',
 			stakeLPTokenSupply: '0',
 			rewardPerTokenStored: '0'
@@ -66,7 +66,7 @@ contract('StakeLPToken', async (accounts) => {
 		await this.stakeLPToken.stake(stakeAmount)
 
 		const dusdBal = await this.dusd.balanceOf(alice)
-		assert.equal(dusdBal.toString(), toWei('6')) // 10 - 4
+		assert.equal(dusdBal.toString(), toWei('36')) // 40 - 4
 
 		const bal = await this.stakeLPToken.balanceOf(alice)
 		assert.equal(bal.toString(), stakeAmount)
@@ -75,132 +75,130 @@ contract('StakeLPToken', async (accounts) => {
 		assert.equal(earned.toString(), '0')
 
 		await this.assertions({
-			dusdTotalSupply: toWei('20'),
+			dusdTotalSupply: toWei('60'),
 			dusdStaked: stakeAmount,
+			totalSystemAssets: toWei('60'),
 			stakeLPTokenSupply: stakeAmount,
 			rewardPerTokenStored: '0'
 		})
 	})
 
 	it('CurveSusdPeak accrues income=4', async () => {
-		this.protocolIncome = utils.scale(4, 18)
 		const income = [1, 1, 1, 1].map((n, i) => {
 			return toBN(n).mul(toBN(10 ** this.decimals[i]))
 		})
-		const tasks = []
-		for (let i = 0; i < n_coins; i++) {
-			tasks.push(this.reserves[i].mint(this.mockCurveSusd.address, income[i]))
-		}
-		await Promise.all(tasks)
-		await this.assertions({ totalSystemAssets: toWei('24') })
+		await this.curveSusd.mock_add_to_balance(income)
+		await this.assertions({ totalSystemAssets: toWei('64') })
 	})
 
-	// claimed reward should not get considered twice
 	it('alice gets reward', async () => {
-		const earned = await this.stakeLPToken.earned(alice)
+		let earned = await this.stakeLPToken.earned(alice)
 		assert.equal(earned.toString(), toWei('4')) // entire income
 
 		await this.stakeLPToken.getReward()
 		// reward was minted as dusd
 		const dusdBal = await this.dusd.balanceOf(alice)
-		assert.equal(dusdBal.toString(), toWei('10')) // 6 + 4 (entire reward goes to alice)
-		await this.assertions({ dusdTotalSupply: toWei('24') })
+		assert.equal(dusdBal.toString(), toWei('40')) // 36 + 4 (entire reward goes to alice)
+		await this.assertions({ dusdTotalSupply: toWei('64') })
+
+		// claimed reward should not get considered twice
+		earned = await this.stakeLPToken.earned(alice)
+		assert.equal(earned.toString(), '0')
 	})
 
-	it('CurveSusdPeak accrues income=2', async () => {
-		const income = [0, 1, 1, 0].map((n, i) => {
+	it('CurveSusdPeak accrues income=8', async () => {
+		const income = [2, 2, 2, 2].map((n, i) => {
 			return toBN(n).mul(toBN(10 ** this.decimals[i]))
 		})
-		const tasks = []
-		for (let i = 0; i < n_coins; i++) {
-			tasks.push(this.reserves[i].mint(this.mockCurveSusd.address, income[i]))
-		}
-		await Promise.all(tasks)
-		await this.assertions({ totalSystemAssets: toWei('26') })
+		await this.curveSusd.mock_add_to_balance(income)
+		await this.assertions({ totalSystemAssets: toWei('72') })
 
 		const lastPeriodIncome = await this.core.lastPeriodIncome()
-		assert.equal(lastPeriodIncome.toString(), toWei('2'))
+		assert.equal(lastPeriodIncome.toString(), toWei('8'))
 
 		const earned = await this.stakeLPToken.earned(alice)
-		assert.equal(earned.toString(), toWei('2')) // entire income shuold go to alice, but not claiming
+		assert.equal(earned.toString(), toWei('8')) // entire income shuold go to alice, but not claiming
 	})
 
-	it('bob redeems=5', async () => {
-		await this.curveSusdPeak.redeem([0, 0, utils.scale(5, 6), 0], toWei('5'), { from: bob })
+	it('bob redeems=4', async () => {
+		await this.curveSusdPeak.redeem(toWei('4'), [0,0,0,0], { from: bob })
+		if (process.env.DEBUG == 'true') {
+			for (let i = 0; i < n_coins; i++) {
+				console.log(fromWei(await this.reserves[i].balanceOf(bob)))
+			}
+		}
 	})
 
 	it('should not affect lastPeriodIncome', async () => {
-		const lastPeriodIncome = await this.core.lastPeriodIncome()
-		assert.equal(lastPeriodIncome.toString(), toWei('2'))
+		const lastPeriodIncome = parseInt(fromWei(await this.core.lastPeriodIncome()))
+		assert.equal(lastPeriodIncome, 8)
 
-		const earned = await this.stakeLPToken.earned(alice)
-		assert.equal(earned.toString(), toWei('2')) // entire income shuold go to alice, but not claiming
+		const earned = parseInt(fromWei(await this.stakeLPToken.earned(alice)))
+		assert.equal(earned, 8) // entire income shuold go to alice, but not claiming
 	})
 
 	it('bob stakes=2', async () => {
 		const stakeAmount = toWei('2')
-		const from = bob
 
-		await this.dusd.approve(this.stakeLPToken.address, stakeAmount, { from })
-		await this.stakeLPToken.stake(stakeAmount, { from })
+		await this.dusd.approve(this.stakeLPToken.address, stakeAmount, { from: bob })
+		await this.stakeLPToken.stake(stakeAmount, { from: bob })
 
 		const dusdBal = await this.dusd.balanceOf(bob)
-		assert.equal(dusdBal.toString(), toWei('3')) // 5 - 2
+		assert.equal(dusdBal.toString(), toWei('14')) // 20 - 4 - 2
 
 		const bal = await this.stakeLPToken.balanceOf(bob)
 		assert.equal(bal.toString(), stakeAmount)
 	})
 
 	it('CurveSusdPeak accrues income=6', async () => {
-		const income = [2, 1, 1, 2].map((n, i) => {
-			return toBN(n).mul(toBN(10 ** this.decimals[i]))
+		const income = [15, 15, 15, 15].map((n, i) => {
+			return toBN(n).mul(toBN(10 ** (this.decimals[i]-1))) // 1.5 each
 		})
-		const tasks = []
-		for (let i = 0; i < n_coins; i++) {
-			tasks.push(this.reserves[i].mint(this.mockCurveSusd.address, income[i]))
-		}
-		await Promise.all(tasks)
-		await this.assertions({ totalSystemAssets: toWei('27') })
+		await this.curveSusd.mock_add_to_balance(income)
+		assert.equal(
+			parseInt(fromWei(await this.core.totalSystemAssets())),
+			74
+		)
 	})
 
 	it('bob exits', async () => {
-		// 6 * 2/6 = 2
-		let earned = await this.stakeLPToken.earned(bob)
-		assert.equal(earned.toString(), toWei('2')) // entire income should go to alice, but not claiming
+		// stakedShare * balance = 2/6 * 6 = 2
+		let earned = parseInt(fromWei(await this.stakeLPToken.earned(bob)))
+		assert.equal(earned, 2)
 
 		await this.stakeLPToken.exit({ from: bob })
-		const dusdBal = await this.dusd.balanceOf(bob)
-		assert.equal(dusdBal.toString(), toWei('7')) // 5 + 2
+		const dusdBal = parseInt(fromWei(await this.dusd.balanceOf(bob)))
+		assert.equal(dusdBal, 18) // 20 - 4 (redemed) + 2 (income)
 
 		earned = await this.stakeLPToken.earned(bob)
 		assert.equal(earned.toString(), '0')
 	})
 
 	it('CurveSusdPeak accrues income=3', async () => {
-		const income = [1, 0, 2, 0].map((n, i) => {
-			return toBN(n).mul(toBN(10 ** this.decimals[i]))
+		const income = [75, 75, 75, 75].map((n, i) => {
+			return toBN(n).mul(toBN(10 ** (this.decimals[i]-2))) // .75 each
 		})
-		const tasks = []
-		for (let i = 0; i < n_coins; i++) {
-			tasks.push(this.reserves[i].mint(this.mockCurveSusd.address, income[i]))
-		}
-		await Promise.all(tasks)
+		await this.curveSusd.mock_add_to_balance(income)
+		assert.equal(
+			parseInt(fromWei(await this.core.totalSystemAssets())),
+			77
+		)
 	})
 
 	it('alice withdraws stake', async () => {
 		await this.stakeLPToken.withdraw(toWei('4')) // staked=4
 		const dusdBal = await this.dusd.balanceOf(alice)
-		assert.equal(dusdBal.toString(), toWei('14')) // (original) 10 + 4 (reward)
+		assert.equal(dusdBal.toString(), toWei('44')) // (original) 40 + 4 (previous reward)
 	})
 
 	it('alice exits', async () => {
-		// 2 + 6 * 4/6 + 3 = 9
-		let earned = await this.stakeLPToken.earned(alice)
-		assert.equal(earned.toString(), toWei('9')) // entire income should go to alice, but not claiming
+		// 8 + 6 * 4/6 + 3 = 15
+		let earned = parseInt(fromWei(await this.stakeLPToken.earned(alice)))
+		assert.equal(earned, 15)
 
 		await this.stakeLPToken.exit()
-		const dusdBal = await this.dusd.balanceOf(alice)
-		assert.equal(dusdBal.toString(), toWei('23')) // 14 + 9
+		const dusdBal = parseInt(fromWei(await this.dusd.balanceOf(alice)))
+		assert.equal(dusdBal, 59) // 44 + 15
 
 		earned = await this.stakeLPToken.earned(alice)
 		assert.equal(earned.toString(), '0')

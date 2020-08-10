@@ -4,9 +4,10 @@ const DUSD = artifacts.require("DUSD");
 const Aggregator = artifacts.require("MockAggregator");
 const Oracle = artifacts.require("Oracle");
 const Reserve = artifacts.require("Reserve");
-
 const StakeLPTokenProxy = artifacts.require("StakeLPTokenProxy");
 const CoreProxy = artifacts.require("CoreProxy");
+
+const utils = require('./utils')
 
 const toBN = web3.utils.toBN
 const toWei = web3.utils.toWei
@@ -17,15 +18,22 @@ module.exports = async function(deployer, network, accounts) {
     const core = await Core.at(CoreProxy.address)
 
     await deployer.deploy(DUSD, CoreProxy.address)
+    const config = { contracts: { tokens: { DUSD: { address: DUSD.address, decimals: 18 } } } }
 
     // initialize system with 4 coins
-    const reserves = [
-        await Reserve.new(18), // dai
-        await Reserve.new(6), // usdc
-        await Reserve.new(6), // usdt
-        await Reserve.new(18) // susd
-    ]
-    const tokens = reserves.map(a => a.address)
+    const tickerSymbols = ['DAI', 'USDC', 'USDT', 'sUSD']
+    const decimals = [18, 6, 6, 18]
+    const reserves = []
+    const tokens = []
+    for(let i = 0; i < tickerSymbols.length; i++) {
+        const reserve = await Reserve.new(decimals[i])
+        reserves.push(reserve)
+        tokens.push(reserve.address)
+        config.contracts.tokens[tickerSymbols[i]] = {
+            address: reserve.address,
+            decimals: decimals[i]
+        }
+    }
 
     // Oracles
     const ethPrice = toBN(200)
@@ -64,7 +72,10 @@ module.exports = async function(deployer, network, accounts) {
             10000, // 0 redeem fee, 0.05% would be 10005
         ).encodeABI()
     )
-    const initial_price = toWei('1')
-    await core.whitelistTokens(tokens, [18, 6, 6, 18], new Array(4).fill(initial_price))
+    await core.whitelistTokens(tokens)
     await core.syncSystem()
+
+    config.contracts.base = CoreProxy.address
+    config.contracts.valley = StakeLPTokenProxy.address
+    utils.writeContractAddresses(config)
 };

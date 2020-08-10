@@ -42,9 +42,10 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     mapping(address => uint) public userRewardPerTokenPaid;
     mapping(address => uint) public rewards;
 
-    event Staked(address indexed user, uint amount);
-    event Withdrawn(address indexed user, uint amount);
-    event RewardPaid(address indexed user, uint reward);
+    event Staked(address indexed user, uint indexed amount);
+    event Withdrawn(address indexed user, uint indexed amount);
+    event RewardPaid(address indexed user, uint indexed reward);
+    event RewardPerTokenUpdated(uint indexed rewardPerToken, uint indexed when);
 
     modifier onlyCore() {
         require(
@@ -68,9 +69,11 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
         _;
     }
 
-    function updateProtocolIncome() public {
+    function updateProtocolIncome() public returns(uint) {
         uint income = core.rewardDistributionCheckpoint();
         rewardPerTokenStored = rewardPerToken(income);
+        emit RewardPerTokenUpdated(rewardPerTokenStored, block.timestamp);
+        return rewardPerTokenStored;
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function
@@ -81,7 +84,10 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     function withdraw(uint amount) public updateReward(msg.sender) {
-        require(amount <= withdrawAble(msg.sender), "Funds are illiquid");
+        require(
+            amount <= withdrawAble(msg.sender),
+            "Withdrawing more than staked or illiquid due to system deficit"
+        );
         _withdraw(amount);
     }
 
@@ -91,7 +97,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     function getReward() public updateReward(msg.sender) {
-        uint reward = earned(msg.sender);
+        uint reward = rewards[msg.sender];
         if (reward > 0) {
             rewards[msg.sender] = 0;
             core.mintReward(msg.sender, reward);
@@ -110,7 +116,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     function rewardPerToken(uint income) public view returns(uint) {
-        if (totalSupply == 0) {
+        if (totalSupply == 0 || income == 0) {
             return rewardPerTokenStored;
         }
         return rewardPerTokenStored.add(

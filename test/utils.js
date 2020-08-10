@@ -9,7 +9,8 @@ const StakeLPToken = artifacts.require("StakeLPToken");
 const CurveSusdPeak = artifacts.require("CurveSusdPeak");
 const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
 const MockSusdToken = artifacts.require("MockSusdToken");
-const MockCurveSusd = artifacts.require("MockCurveSusd");
+const ICurve = artifacts.require("ICurve");
+const ICurveDeposit = artifacts.require("ICurveDeposit");
 
 const n_coins = 4
 const toBN = web3.utils.toBN
@@ -22,26 +23,31 @@ async function getArtifacts() {
     const oracle = await Oracle.deployed()
     const reserves = []
 	const decimals = []
+	const scaleFactor = []
 	const aggregators = []
     for (let i = 0; i < n_coins; i++) {
-        reserves.push(await Reserve.at((await core.systemCoins(i)).token))
+        reserves.push(await Reserve.at((await core.systemCoins(i))))
 		decimals.push(await reserves[i].decimals())
+		scaleFactor.push(toBN(10 ** decimals[i]))
 		aggregators.push(await Aggregator.at(await oracle.refs(i)))
     }
 	const stakeLPTokenProxy = await StakeLPTokenProxy.deployed()
 	const curveSusdPeakProxy = await CurveSusdPeakProxy.deployed()
-    return {
+    const res = {
         core,
         dusd,
         reserves,
 		decimals,
+		scaleFactor,
 		aggregators,
         stakeLPToken: await StakeLPToken.at(stakeLPTokenProxy.address),
 
         curveSusdPeak: await CurveSusdPeak.at(curveSusdPeakProxy.address),
         curveToken: await MockSusdToken.deployed(),
-        mockCurveSusd: await MockCurveSusd.deployed()
-    }
+	}
+	res.curveSusd = await ICurve.at(await res.curveSusdPeak.curve())
+	res.curveDeposit = await ICurveDeposit.at(await res.curveSusdPeak.curveDeposit())
+	return res
 }
 
 function scale(num, decimals) {
@@ -70,12 +76,6 @@ function mineOneBlock() {
 		},
 		() => {}
 	)
-}
-
-async function getBlockTime(stakeLPToken) {
-	return stakeLPToken.time()
-	// const block = await web3.eth.getBlock(tx.receipt.blockNumber)
-	// return block.timestamp.toString()
 }
 
 function printDebugReceipt(r) {
@@ -149,7 +149,6 @@ module.exports = {
 	increaseBlockTime,
 	mineOneBlock,
 	printDebugReceipt,
-	getBlockTime,
 	assertions,
 	print
 }

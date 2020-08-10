@@ -1,2 +1,5 @@
 node_modules
 build
+migrations/config.json
+venv
+deployments/development.json

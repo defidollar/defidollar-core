@@ -10,4 +10,8 @@ contract MockSusdToken is ERC20 {
     function redeem(address _from, uint _value) public {
         _burn(_from, _value);
     }
+
+    function burnFrom(address account, uint amount) public {
+        _burn(account, amount);
+    }
 }
