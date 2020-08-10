@@ -6,10 +6,6 @@ const CurveSusdPeak = artifacts.require("CurveSusdPeak");
 const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
 
 const MockSusdToken = artifacts.require("MockSusdToken");
-const MockSusdDeposit = artifacts.require("MockSusdDeposit");
-const MockCurveSusd = artifacts.require("MockCurveSusd");
-const ICurve = artifacts.require("ICurve");
-const IUtil = artifacts.require("IUtil");
 
 const utils = require('./utils')
 const susdCurveABI = require('../scripts/abis/susdCurve.json')

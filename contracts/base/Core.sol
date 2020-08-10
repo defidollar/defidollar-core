@@ -16,9 +16,6 @@ contract Core is Initializable, Ownable {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
 
-    uint constant MAX = uint(-1);
-    uint constant PRECISION = 1e18;
-
     DUSD public dusd;
     StakeLPToken public stakeLPToken;
     Oracle public oracle;
@@ -159,21 +156,18 @@ contract Core is Initializable, Ownable {
         external
         onlyStakeLPToken
         checkAndNotifyDeficit
-        returns(uint)
+        returns(uint periodIncome)
     {
-        uint supply = dusd.totalSupply();
         totalAssets = totalSystemAssets();
-        uint unclaimedRewards;
+        uint _totalAssets = totalAssets;
         if (totalRewards > claimedRewards) {
-            unclaimedRewards = totalRewards.sub(claimedRewards);
+            _totalAssets = _totalAssets.sub(totalRewards.sub(claimedRewards));
         }
-        uint _totalAssets = totalAssets.sub(unclaimedRewards);
-        uint periodIncome;
+        uint supply = dusd.totalSupply();
         if (_totalAssets > supply) {
             periodIncome = _totalAssets.sub(supply);
             totalRewards = totalRewards.add(periodIncome);
         }
-        return periodIncome;
     }
 
     /* ##### View functions ##### */
