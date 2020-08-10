@@ -218,6 +218,7 @@ contract CurveSusdPeak is Initializable, IPeak {
                 balances[i] = balances[i].div(1e6);
             }
         }
+        // https://github.com/curvefi/curve-contract/blob/pool_susd_plain/vyper/stableswap.vy#L149
         return util.get_D(balances).mul(yCrvBal).div(yCrvTotalSupply);
     }
 }
