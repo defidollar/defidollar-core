@@ -13,7 +13,7 @@ const daiABI = require('./abi/dai.json');
 const userAddress = '0x07bb41df8c1d275c4259cdd0dbf0189d6a9a5f32'
 const daiAddress = '0x6B175474E89094C44Da98b954EedeAC495271d0F'
 
-contract.skip('Deficit flow (staked funds cover deficit)', async (accounts) => {
+contract.skip('Mainnet fork', async (accounts) => {
 	const alice = accounts[0]
     const bob = accounts[1]
     const dai = new web3.eth.Contract(daiABI, daiAddress);

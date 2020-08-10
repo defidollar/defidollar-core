@@ -23,10 +23,12 @@ async function getArtifacts() {
     const oracle = await Oracle.deployed()
     const reserves = []
 	const decimals = []
+	const scaleFactor = []
 	const aggregators = []
     for (let i = 0; i < n_coins; i++) {
         reserves.push(await Reserve.at((await core.systemCoins(i))))
 		decimals.push(await reserves[i].decimals())
+		scaleFactor.push(toBN(10 ** decimals[i]))
 		aggregators.push(await Aggregator.at(await oracle.refs(i)))
     }
 	const stakeLPTokenProxy = await StakeLPTokenProxy.deployed()
@@ -36,25 +38,15 @@ async function getArtifacts() {
         dusd,
         reserves,
 		decimals,
+		scaleFactor,
 		aggregators,
         stakeLPToken: await StakeLPToken.at(stakeLPTokenProxy.address),
 
         curveSusdPeak: await CurveSusdPeak.at(curveSusdPeakProxy.address),
         curveToken: await MockSusdToken.deployed(),
-        // curveDeposit: await MockSusdDeposit.deployed(),
 	}
-	// res.curveSusd = new web3.eth.Contract(
-	// 	require('../scripts/abis/susdCurve.json'),
-	// 	await res.curveSusdPeak.curve()
-	// ).methods
 	res.curveSusd = await ICurve.at(await res.curveSusdPeak.curve())
 	res.curveDeposit = await ICurveDeposit.at(await res.curveSusdPeak.curveDeposit())
-	// console.log({
-	// 	curve: await res.curveSusdPeak.curve()
-	// })
-	// console.log({
-	// 	bal: await res.curveSusd.balances(0).call()
-	// })
 	return res
 }
 

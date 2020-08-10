@@ -157,6 +157,7 @@ contract Core is Initializable, Ownable {
 
     function rewardDistributionCheckpoint()
         external
+        onlyStakeLPToken
         checkAndNotifyDeficit
         returns(uint)
     {
@@ -244,8 +245,9 @@ contract Core is Initializable, Ownable {
             // staked funds make up for the deficit
             if (perceivedSupply <= totalAssets) {
                 usd = _dusd;
+            } else {
+                usd = _dusd.mul(totalAssets).div(perceivedSupply);
             }
-            usd = _dusd.mul(totalAssets).div(perceivedSupply);
         }
         if (fee) {
             usd = usd.mul(10000).div(redeemFee);
@@ -338,6 +340,9 @@ contract Core is Initializable, Ownable {
     function _whitelistToken(address token)
         internal
     {
+        for (uint i = 0; i < systemCoins.length; i++) {
+            require(systemCoins[i] != token, "Adding a duplicate token");
+        }
         systemCoins.push(token);
         emit TokenWhiteListed(token);
     }

@@ -8,4 +8,7 @@ contract Initializable {
         initialized = true;
         _;
     }
+
+    // Reserved storage space to allow for layout changes in the future.
+    uint256[50] private _gap;
 }

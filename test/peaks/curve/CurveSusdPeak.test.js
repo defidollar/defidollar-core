@@ -1,15 +1,13 @@
 const assert = require('assert')
 const utils = require('../../utils.js')
 
-const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
-
 const toWei = web3.utils.toWei
 const fromWei = web3.utils.fromWei
 const toBN = web3.utils.toBN
 const MAX = web3.utils.toTwosComplement(-1);
 const n_coins = 4
 
-contract.only('CurveSusdPeak', async (accounts) => {
+contract('CurveSusdPeak', async (accounts) => {
     let alice = accounts[0]
 
     before(async () => {
@@ -45,12 +43,16 @@ contract.only('CurveSusdPeak', async (accounts) => {
         }
         await Promise.all(tasks)
         await this.curveSusd.add_liquidity(this.amounts, '0')
+        assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '400')
     })
 
     it('peak.mintWithYcrv', async () => {
         const inAmount = toBN(await this.curveToken.balanceOf(alice)).div(toBN(2)).toString()
         await this.curveToken.approve(this.curveSusdPeak.address, inAmount)
         await this.curveSusdPeak.mintWithYcrv(inAmount, '0')
+        assert.equal(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address)), '200')
+        assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '200')
+        assert.equal(fromWei(await this.dusd.balanceOf(alice)), '200')
     })
 
     it('curveSusdPeak.mint', async () => {
@@ -62,6 +64,8 @@ contract.only('CurveSusdPeak', async (accounts) => {
         }
         await Promise.all(tasks)
         await this.curveSusdPeak.mint(this.amounts, '0')
+        assert.equal(parseInt(fromWei(await this.dusd.balanceOf(alice))), 217) // 200 + ~(10 + 8)
+        assert.equal(parseInt(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address))), 217)
     })
 
     it('peak.redeem: Alice redeems 1/2 her dusd', async () => {
@@ -76,11 +80,14 @@ contract.only('CurveSusdPeak', async (accounts) => {
 
     it('peak.redeemInYcrv', async () => {
         await this.curveSusdPeak.redeemInYcrv(await this.dusd.balanceOf(alice), 0)
+        assert.equal((await this.dusd.balanceOf(alice)).toString(), '0')
+        assert.ok(toBN((await this.curveToken.balanceOf(alice))).gt(toBN(utils.scale(200, 18))), 'Didnt get Ycrv')
     })
 
     it('curveSusd.remove_liquidity', async () => {
         const inAmount = await this.curveToken.balanceOf(alice)
         await this.curveSusd.remove_liquidity(inAmount, [0,0,0,0])
+        assert.equal((await this.curveToken.balanceOf(alice)).toString(), '0')
     })
 
     this.printStats = async () => {

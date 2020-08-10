@@ -14,6 +14,9 @@ interface ICurve {
     function calc_token_amount(uint[4] calldata inAmounts, bool deposit) external view returns(uint);
     function balances(int128 i) external view returns(uint);
     function get_virtual_price() external view returns(uint);
+
+    // for tests
+    function mock_add_to_balance(uint[4] calldata amounts) external;
 }
 
 interface IUtil {

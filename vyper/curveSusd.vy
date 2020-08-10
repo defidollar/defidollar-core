@@ -418,7 +418,6 @@ def _exchange(i: int128, j: int128, dx: uint256, rates: uint256[N_COINS]) -> uin
 
     return _dy
 
-
 @public
 @nonreentrant('lock')
 def exchange(i: int128, j: int128, dx: uint256, min_dy: uint256):
@@ -655,3 +654,8 @@ def kill_me():
 def unkill_me():
     assert msg.sender == self.owner
     self.is_killed = False
+
+@public
+def mock_add_to_balance(amounts: uint256[N_COINS]):
+    for i in range(N_COINS):
+        self.balances[i] += amounts[i]
