@@ -104,7 +104,7 @@ contract CurveSusdPeak is Initializable, IPeak {
         }
     }
 
-    function redeemInOneCoin(uint dusdAmount, uint i, uint minOut)
+    function redeemInSingleCoin(uint dusdAmount, uint i, uint minOut)
         external
     {
         uint sCrv = usdToScrv(core.redeem(dusdAmount, msg.sender));

@@ -77,9 +77,9 @@ contract('CurveSusdPeak', async (accounts) => {
         // await this.curveSusd.remove_liquidity(inAmount, [0,0,0,0])
     })
 
-    it('curveSusdPeak.redeemInOneCoin(usdc): alice', async () => {
+    it('curveSusdPeak.redeemInSingleCoin(usdc): alice', async () => {
         const inAmount = await this.dusd.balanceOf(alice)
-        await this.curveSusdPeak.redeemInOneCoin(inAmount, 1, 0)
+        await this.curveSusdPeak.redeemInSingleCoin(inAmount, 1, 0)
     })
 
     it('alice did not make a profit', async () => {
