@@ -9,7 +9,6 @@ import {ICurveDeposit, ICurve, IUtil} from "./ICurve.sol";
 import {Core} from "../../base/Core.sol";
 import {IPeak} from "../IPeak.sol";
 import {Initializable} from "../../common/Initializable.sol";
-import {Initializable} from "../../common/Initializable.sol";
 
 contract CurveSusdPeak is Initializable, IPeak {
     using SafeERC20 for IERC20;
@@ -80,7 +79,7 @@ contract CurveSusdPeak is Initializable, IPeak {
         returns (uint dusdAmount)
     {
         curveToken.safeTransferFrom(msg.sender, address(this), inAmount);
-        dusdAmount = core.mint(get_dollar_virtual_price(inAmount), msg.sender);
+        dusdAmount = core.mint(yCrvToUsd(inAmount), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
     }
 
@@ -157,8 +156,8 @@ contract CurveSusdPeak is Initializable, IPeak {
         returns (uint dusdAmount)
     {
         uint yCrvBal = curveToken.balanceOf(address(this));
-        uint _old = get_dollar_virtual_price(yCrvBal);
-        uint _new = get_dollar_virtual_price(yCrvBal.add(curve.calc_token_amount(inAmounts, true /* deposit */)));
+        uint _old = yCrvToUsd(yCrvBal);
+        uint _new = yCrvToUsd(yCrvBal.add(curve.calc_token_amount(inAmounts, true /* deposit */)));
         return core.usdToDusd(_new.sub(_old));
     }
 
@@ -166,7 +165,7 @@ contract CurveSusdPeak is Initializable, IPeak {
         public view
         returns (uint dusdAmount)
     {
-        return core.usdToDusd(get_dollar_virtual_price(inAmount));
+        return core.usdToDusd(yCrvToUsd(inAmount));
     }
 
     function calcRedeem(uint dusdAmount)
@@ -174,7 +173,7 @@ contract CurveSusdPeak is Initializable, IPeak {
         returns(uint[N_COINS] memory amounts)
     {
         uint usd = core.dusdToUsd(dusdAmount, true);
-        uint exchangeRate = get_dollar_virtual_price(1e18);
+        uint exchangeRate = yCrvToUsd(1e18);
         uint yCrv = usd.mul(1e18).div(exchangeRate);
         uint totalSupply = curveToken.totalSupply();
         for(uint i = 0; i < N_COINS; i++) {
@@ -187,23 +186,23 @@ contract CurveSusdPeak is Initializable, IPeak {
         returns(uint amount)
     {
         uint usd = core.dusdToUsd(dusdAmount, true);
-        uint exchangeRate = get_dollar_virtual_price(1e18);
+        uint exchangeRate = yCrvToUsd(1e18);
         amount = usd.mul(1e18).div(exchangeRate);
     }
 
     function portfolioValue() public view returns(uint) {
-        return get_dollar_virtual_price(curveToken.balanceOf(address(this)));
+        return yCrvToUsd(curveToken.balanceOf(address(this)));
     }
 
     function usdToYcrv(uint usd) public view returns(uint yCrv) {
         yCrv = curveToken.balanceOf(address(this));
-        uint exchangeRate = get_dollar_virtual_price(1e18);
+        uint exchangeRate = yCrvToUsd(1e18);
         if (exchangeRate > 0) {
             yCrv = yCrv.min(usd.mul(1e18).div(exchangeRate));
         }
     }
 
-    function get_dollar_virtual_price(uint yCrvBal) public view returns(uint) {
+    function yCrvToUsd(uint yCrvBal) public view returns(uint) {
         uint yCrvTotalSupply = curveToken.totalSupply();
         if (yCrvTotalSupply == 0 || yCrvBal == 0) {
             return 0;
