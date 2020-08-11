@@ -46,10 +46,10 @@ contract('CurveSusdPeak', async (accounts) => {
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '400')
     })
 
-    it('peak.mintWithYcrv', async () => {
+    it('peak.mintWithScrv', async () => {
         const inAmount = toBN(await this.curveToken.balanceOf(alice)).div(toBN(2)).toString()
         await this.curveToken.approve(this.curveSusdPeak.address, inAmount)
-        await this.curveSusdPeak.mintWithYcrv(inAmount, '0')
+        await this.curveSusdPeak.mintWithScrv(inAmount, '0')
         assert.equal(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address)), '200')
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '200')
         assert.equal(fromWei(await this.dusd.balanceOf(alice)), '200')
@@ -78,10 +78,10 @@ contract('CurveSusdPeak', async (accounts) => {
         await this.curveSusdPeak.redeemInOneCoin(dusdAmount, 3, 0)
     })
 
-    it('peak.redeemInYcrv', async () => {
-        await this.curveSusdPeak.redeemInYcrv(await this.dusd.balanceOf(alice), 0)
+    it('peak.redeemInScrv', async () => {
+        await this.curveSusdPeak.redeemInScrv(await this.dusd.balanceOf(alice), 0)
         assert.equal((await this.dusd.balanceOf(alice)).toString(), '0')
-        assert.ok(toBN((await this.curveToken.balanceOf(alice))).gt(toBN(utils.scale(200, 18))), 'Didnt get Ycrv')
+        assert.ok(toBN((await this.curveToken.balanceOf(alice))).gt(toBN(utils.scale(200, 18))), 'Didnt get Scrv')
     })
 
     it('curveSusd.remove_liquidity', async () => {
@@ -93,23 +93,23 @@ contract('CurveSusdPeak', async (accounts) => {
     this.printStats = async () => {
         const res = {
             alice: {
-                yCrv: fromWei(await this.curveToken.balanceOf(alice)),
+                sCrv: fromWei(await this.curveToken.balanceOf(alice)),
                 dusd: fromWei(await this.dusd.balanceOf(alice)),
                 balances: []
             },
-            yCrv: {
+            sCrv: {
                 totalSupply: fromWei(await this.curveToken.totalSupply()),
                 balances: []
             },
             dusd: {
-                yCrv: fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address)),
+                sCrv: fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address)),
                 totalSupply: fromWei(await this.dusd.totalSupply()),
                 totalAssets: fromWei(await this.core.totalSystemAssets()),
             }
         }
         for (let i = 0; i < n_coins; i++) {
             const divisor = toBN(10 ** this.decimals[i])
-            res.yCrv.balances.push(
+            res.sCrv.balances.push(
                 (await this.curveSusd.balances(i)).div(divisor).toString()
             )
             res.alice.balances.push(

@@ -42,10 +42,10 @@ contract('CurveSusdPeak', async (accounts) => {
         console.log(`bob got ${fromWei(await this.curveToken.balanceOf(bob))} yCRV`)
     })
 
-    it('curveSusdPeak.mintWithYcrv: bob minted dusd with 1/10 of their Ycrv', async () => {
+    it('curveSusdPeak.mintWithScrv: bob minted dusd with 1/10 of their Scrv', async () => {
         const inAmount = toBN(await this.curveToken.balanceOf(bob)).div(toBN(10)).toString()
         await this.curveToken.approve(this.curveSusdPeak.address, inAmount, { from: bob })
-        await this.curveSusdPeak.mintWithYcrv(inAmount, '0', { from: bob })
+        await this.curveSusdPeak.mintWithScrv(inAmount, '0', { from: bob })
         console.log(`bob got ${fromWei(await this.dusd.balanceOf(bob))} DUSD`)
     })
 
@@ -91,27 +91,27 @@ contract('CurveSusdPeak', async (accounts) => {
     this.printStats = async () => {
         const res = {
             alice: {
-                yCrv: fromWei(await this.curveToken.balanceOf(alice)),
+                sCrv: fromWei(await this.curveToken.balanceOf(alice)),
                 dusd: fromWei(await this.dusd.balanceOf(alice)),
                 balances: []
             },
             bob: {
-                yCrv: fromWei(await this.curveToken.balanceOf(bob)),
+                sCrv: fromWei(await this.curveToken.balanceOf(bob)),
                 dusd: fromWei(await this.dusd.balanceOf(bob)),
             },
-            yCrv: {
+            sCrv: {
                 totalSupply: fromWei(await this.curveToken.totalSupply()),
                 balances: []
             },
             dusd: {
-                yCrv: fromWei(await this.curveToken.balanceOf(this.dusd.address)),
+                sCrv: fromWei(await this.curveToken.balanceOf(this.dusd.address)),
                 totalSupply: fromWei(await this.dusd.totalSupply()),
                 totalAssets: fromWei(await this.core.totalSystemAssets()),
             }
         }
         for (let i = 0; i < n_coins; i++) {
             const divisor = toBN(10 ** this.decimals[i])
-            res.yCrv.balances.push(
+            res.sCrv.balances.push(
                 (await this.curveSusd.balances(i)).div(divisor).toString()
             )
             res.alice.balances.push(

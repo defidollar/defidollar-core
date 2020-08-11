@@ -74,12 +74,12 @@ contract CurveSusdPeak is Initializable, IPeak {
     * @param inAmount Exact amount of Curve LP tokens
     * @param minDusdAmount Minimum DUSD to mint, used for capping slippage
     */
-    function mintWithYcrv(uint inAmount, uint minDusdAmount)
+    function mintWithScrv(uint inAmount, uint minDusdAmount)
         external
         returns (uint dusdAmount)
     {
         curveToken.safeTransferFrom(msg.sender, address(this), inAmount);
-        dusdAmount = core.mint(yCrvToUsd(inAmount), msg.sender);
+        dusdAmount = core.mint(sCrvToUsd(inAmount), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
     }
 
@@ -91,8 +91,8 @@ contract CurveSusdPeak is Initializable, IPeak {
     function redeem(uint dusdAmount, uint[N_COINS] calldata minAmounts)
         external
     {
-        uint yCrv = usdToYcrv(core.redeem(dusdAmount, msg.sender));
-        curve.remove_liquidity(yCrv, ZEROES);
+        uint sCrv = usdToScrv(core.redeem(dusdAmount, msg.sender));
+        curve.remove_liquidity(sCrv, ZEROES);
         address[N_COINS] memory coins = underlyingCoins;
         IERC20 coin;
         uint toTransfer;
@@ -107,20 +107,20 @@ contract CurveSusdPeak is Initializable, IPeak {
     function redeemInOneCoin(uint dusdAmount, uint i, uint minOut)
         external
     {
-        uint yCrv = usdToYcrv(core.redeem(dusdAmount, msg.sender));
-        curveDeposit.remove_liquidity_one_coin(yCrv, int128(i), minOut, false);
+        uint sCrv = usdToScrv(core.redeem(dusdAmount, msg.sender));
+        curveDeposit.remove_liquidity_one_coin(sCrv, int128(i), minOut, false);
         IERC20 coin = IERC20(underlyingCoins[i]);
         uint toTransfer = coin.balanceOf(address(this));
         require(toTransfer >= minOut, ERR_SLIPPAGE);
         coin.safeTransfer(msg.sender, toTransfer);
     }
 
-    function redeemInYcrv(uint dusdAmount, uint minOut)
+    function redeemInScrv(uint dusdAmount, uint minOut)
         external
     {
-        uint yCrv = usdToYcrv(core.redeem(dusdAmount, msg.sender));
-        require(yCrv >= minOut, ERR_SLIPPAGE);
-        curveToken.safeTransfer(msg.sender, yCrv);
+        uint sCrv = usdToScrv(core.redeem(dusdAmount, msg.sender));
+        require(sCrv >= minOut, ERR_SLIPPAGE);
+        curveToken.safeTransfer(msg.sender, sCrv);
     }
 
     function updateFeed(uint[] calldata _prices) external {
@@ -155,17 +155,17 @@ contract CurveSusdPeak is Initializable, IPeak {
         public view
         returns (uint dusdAmount)
     {
-        uint yCrvBal = curveToken.balanceOf(address(this));
-        uint _old = yCrvToUsd(yCrvBal);
-        uint _new = yCrvToUsd(yCrvBal.add(curve.calc_token_amount(inAmounts, true /* deposit */)));
+        uint sCrvBal = curveToken.balanceOf(address(this));
+        uint _old = sCrvToUsd(sCrvBal);
+        uint _new = sCrvToUsd(sCrvBal.add(curve.calc_token_amount(inAmounts, true /* deposit */)));
         return core.usdToDusd(_new.sub(_old));
     }
 
-    function calcMintWithYcrv(uint inAmount)
+    function calcMintWithScrv(uint inAmount)
         public view
         returns (uint dusdAmount)
     {
-        return core.usdToDusd(yCrvToUsd(inAmount));
+        return core.usdToDusd(sCrvToUsd(inAmount));
     }
 
     function calcRedeem(uint dusdAmount)
@@ -173,38 +173,38 @@ contract CurveSusdPeak is Initializable, IPeak {
         returns(uint[N_COINS] memory amounts)
     {
         uint usd = core.dusdToUsd(dusdAmount, true);
-        uint exchangeRate = yCrvToUsd(1e18);
-        uint yCrv = usd.mul(1e18).div(exchangeRate);
+        uint exchangeRate = sCrvToUsd(1e18);
+        uint sCrv = usd.mul(1e18).div(exchangeRate);
         uint totalSupply = curveToken.totalSupply();
         for(uint i = 0; i < N_COINS; i++) {
-            amounts[i] = curve.balances(int128(i)).mul(yCrv).div(totalSupply);
+            amounts[i] = curve.balances(int128(i)).mul(sCrv).div(totalSupply);
         }
     }
 
-    function calcRedeemWithYcrv(uint dusdAmount)
+    function calcRedeemWithScrv(uint dusdAmount)
         public view
         returns(uint amount)
     {
         uint usd = core.dusdToUsd(dusdAmount, true);
-        uint exchangeRate = yCrvToUsd(1e18);
+        uint exchangeRate = sCrvToUsd(1e18);
         amount = usd.mul(1e18).div(exchangeRate);
     }
 
     function portfolioValue() public view returns(uint) {
-        return yCrvToUsd(curveToken.balanceOf(address(this)));
+        return sCrvToUsd(curveToken.balanceOf(address(this)));
     }
 
-    function usdToYcrv(uint usd) public view returns(uint yCrv) {
-        yCrv = curveToken.balanceOf(address(this));
-        uint exchangeRate = yCrvToUsd(1e18);
+    function usdToScrv(uint usd) public view returns(uint sCrv) {
+        sCrv = curveToken.balanceOf(address(this));
+        uint exchangeRate = sCrvToUsd(1e18);
         if (exchangeRate > 0) {
-            yCrv = yCrv.min(usd.mul(1e18).div(exchangeRate));
+            sCrv = sCrv.min(usd.mul(1e18).div(exchangeRate));
         }
     }
 
-    function yCrvToUsd(uint yCrvBal) public view returns(uint) {
-        uint yCrvTotalSupply = curveToken.totalSupply();
-        if (yCrvTotalSupply == 0 || yCrvBal == 0) {
+    function sCrvToUsd(uint sCrvBal) public view returns(uint) {
+        uint sCrvTotalSupply = curveToken.totalSupply();
+        if (sCrvTotalSupply == 0 || sCrvBal == 0) {
             return 0;
         }
         uint[N_COINS] memory balances;
@@ -218,6 +218,6 @@ contract CurveSusdPeak is Initializable, IPeak {
             }
         }
         // https://github.com/curvefi/curve-contract/blob/pool_susd_plain/vyper/stableswap.vy#L149
-        return util.get_D(balances).mul(yCrvBal).div(yCrvTotalSupply);
+        return util.get_D(balances).mul(sCrvBal).div(sCrvTotalSupply);
     }
 }
