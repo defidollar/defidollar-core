@@ -40,12 +40,13 @@ contract('core-client-lib: CurveSusdPeak', async (accounts) => {
 
     it('curveSusd.add_liquidity', async () => {
         this.amounts = [100, 100, 100, 100]
-        const tasks = []
         for (let i = 0; i < n_coins; i++) {
             this.amounts[i] = toBN(this.amounts[i]).mul(toBN(10 ** this.decimals[i]))
-            tasks.push(this.reserves[i].approve(this.curveSusd.address, this.amounts[i]))
+            await this.client.approve(
+                this.reserves[i].address,
+                this.curveSusd.address, MAX, null, { from: alice }
+            )
         }
-        await Promise.all(tasks)
         await this.curveSusd.add_liquidity(this.amounts, '0')
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '400')
     })
@@ -80,18 +81,21 @@ contract('core-client-lib: CurveSusdPeak', async (accounts) => {
 
     it('peak.redeem: Alice redeems 1/2 her dusd', async () => {
         const dusdAmount = fromWei(toBN(await this.dusd.balanceOf(alice)).div(toBN(2)))
-        console.log(await this.client.calcExpectedRedeemAmount(dusdAmount))
+        await this.client.calcExpectedRedeemAmount(dusdAmount)
         await this.client.redeem(dusdAmount, [0,0,0,0], 0, { from: alice })
     })
 
     it('peak.redeemInSingleCoin(3): Alice redeems 1/2 her leftover dusd', async () => {
         const dusdAmount = fromWei(toBN(await this.dusd.balanceOf(alice)).div(toBN(2)))
-        await this.client.redeem(dusdAmount, { DAI: 10 /* minOut */ }, 0, { from: alice })
+        await this.client.calcExpectedRedeemAmount(dusdAmount, 'sUSD')
+        await this.client.redeem(dusdAmount, { sUSD: 10 /* minOut */ }, 0, { from: alice })
     })
 
     it('peak.redeemInScrv', async () => {
+        const dusdAmount = fromWei(await this.dusd.balanceOf(alice),)
+        await this.client.calcExpectedRedeemAmount(dusdAmount, 'crvPlain3andSUSD')
         await this.client.redeem(
-            fromWei(await this.dusd.balanceOf(alice)),
+            dusdAmount,
             { crvPlain3andSUSD: 10 /* minOut */ }, 0,
             { from: alice }
         )
