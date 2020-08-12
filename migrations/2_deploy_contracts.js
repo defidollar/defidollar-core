@@ -29,6 +29,10 @@ module.exports = async function(deployer, network, accounts) {
         const reserve = await Reserve.new(decimals[i])
         reserves.push(reserve)
         tokens.push(reserve.address)
+        console.log('process.env.INITIALIZE', process.env.INITIALIZE)
+        if (process.env.INITIALIZE === 'true') {
+            await reserves[i].mint(accounts[0], toBN(100).mul(toBN(10 ** decimals[i])))
+        }
         config.contracts.tokens[tickerSymbols[i]] = {
             address: reserve.address,
             decimals: decimals[i]
