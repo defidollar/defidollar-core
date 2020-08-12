@@ -82,13 +82,19 @@ contract Core is Initializable, Ownable {
     )   public
         notInitialized
     {
-        dusd = _dusd;
-        stakeLPToken = _stakeLPToken;
-        oracle = _oracle;
+        require(
+            address(_dusd) != address(0) &&
+            address(_stakeLPToken) != address(0) &&
+            address(_oracle) != address(0),
+            "0 address during initialization"
+        );
         require(
             _redeemFactor <= REDEEM_FACTOR_PRECISION,
             "Contract will end up giving a premium"
         );
+        dusd = _dusd;
+        stakeLPToken = _stakeLPToken;
+        oracle = _oracle;
         redeemFactor = _redeemFactor;
     }
 

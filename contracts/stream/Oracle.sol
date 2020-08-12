@@ -35,7 +35,6 @@ contract Oracle is Ownable {
         for(uint8 i = 0; i < refs.length; i++) {
             feed[i] = uint(refs[i].latestAnswer() * ethUsdRate).div(1e8);
         }
-        return feed;
     }
 
     function addAggregator(AggregatorInterface _aggregator) external onlyOwner {

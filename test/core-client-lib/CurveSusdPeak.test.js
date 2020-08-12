@@ -53,9 +53,12 @@ contract('core-client-lib: CurveSusdPeak', async (accounts) => {
     it('peak.mintWithScrv', async () => {
         const inAmount = toBN(await this.curveToken.balanceOf(alice)).div(toBN(2)).toString()
         await this.curveToken.approve(this.curveSusdPeak.address, inAmount)
-        await this.client.mint({ crvPlain3andSUSD: 200 }, '200', '.05', { from: alice })
-        assert.equal(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address)), '200')
+        const tokens = { crvPlain3andSUSD: 200 }
+        const { expectedAmount } = await this.client.calcExpectedMintAmount(tokens)
+        await this.client.mint(tokens, '200', '.05', { from: alice })
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '200')
+        assert.equal(fromWei(expectedAmount), '200')
+        assert.equal(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address)), '200')
         assert.equal(fromWei(await this.dusd.balanceOf(alice)), '200')
     })
 
@@ -67,13 +70,17 @@ contract('core-client-lib: CurveSusdPeak', async (accounts) => {
             tasks.push(this.reserves[i].approve(this.curveSusdPeak.address, this.amounts[i]))
         }
         await Promise.all(tasks)
-        await this.client.mint({ DAI: 10, USDT: 8 }, '17', '.01', { from: alice })
+        const tokens = { DAI: 10, USDT: 8 }
+        const { expectedAmount } = await this.client.calcExpectedMintAmount(tokens)
+        await this.client.mint(tokens, '17', '.01', { from: alice })
+        assert.equal(parseInt(fromWei(expectedAmount)), 17)
         assert.equal(parseInt(fromWei(await this.dusd.balanceOf(alice))), 217) // 200 + ~(10 + 8)
         assert.equal(parseInt(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address))), 217)
     })
 
     it('peak.redeem: Alice redeems 1/2 her dusd', async () => {
         const dusdAmount = fromWei(toBN(await this.dusd.balanceOf(alice)).div(toBN(2)))
+        console.log(await this.client.calcExpectedRedeemAmount(dusdAmount))
         await this.client.redeem(dusdAmount, [0,0,0,0], 0, { from: alice })
     })
 

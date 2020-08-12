@@ -48,6 +48,7 @@ contract('core-client-lib: StakeLPToken', async (accounts) => {
 	})
 
 	it('apy', async () => {
+		await new Promise(r => setTimeout(r, 2000));
 		console.log(await this.client.getAPY(1))
 	})
 

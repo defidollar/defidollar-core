@@ -17,9 +17,9 @@ contract CurveSusdPeak is Initializable, IPeak {
 
     uint constant MAX = uint(-1);
     uint constant N_COINS = 4;
-    uint[N_COINS] ZEROES = [uint(0),uint(0),uint(0),uint(0)];
     string constant ERR_SLIPPAGE = "They see you slippin";
 
+    uint[N_COINS] ZEROES = [uint(0),uint(0),uint(0),uint(0)];
     address[N_COINS] public underlyingCoins;
     uint[N_COINS] public oraclePrices;
 
@@ -45,7 +45,7 @@ contract CurveSusdPeak is Initializable, IPeak {
         core = _core;
         util = _util;
         underlyingCoins = _underlyingCoins;
-        replenishApprovals();
+        replenishApprovals(MAX);
     }
 
     /**
@@ -133,19 +133,10 @@ contract CurveSusdPeak is Initializable, IPeak {
 
     // This is risky (Bancor Hack Scenario).
     // Think about if we need strict token approvals during the actions at the cost of higher gas.
-    function replenishApprovals() public {
-        curveToken.approve(address(curveDeposit), MAX);
-        curveToken.approve(address(curve), MAX);
+    function replenishApprovals(uint value) public {
+        curveToken.safeIncreaseAllowance(address(curveDeposit), value);
         for (uint i = 0; i < N_COINS; i++) {
-            IERC20 coin = IERC20(underlyingCoins[i]);
-            if (coin.allowance(address(this), address(curveDeposit)) > 0) {
-                coin.approve(address(curveDeposit), 0);
-            }
-            if (coin.allowance(address(this), address(curve)) > 0) {
-                coin.approve(address(curve), 0);
-            }
-            coin.approve(address(curveDeposit), MAX);
-            coin.approve(address(curve), MAX);
+            IERC20(underlyingCoins[i]).safeIncreaseAllowance(address(curve), value);
         }
     }
 

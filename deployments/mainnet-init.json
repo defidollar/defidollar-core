@@ -35,11 +35,11 @@
             }
         },
         "chainlink": {
-            "ethUsdAggregator": "0xF79D6aFBb6dA890132F9D7c355e3015f15F3406F",
-            "daiEthAggregator": "0x037E8F2125bF532F3e228991e051c8A7253B642c",
-            "usdcEthAggregator": "0xdE54467873c3BCAA76421061036053e371721708",
-            "usdtEthAggregator": "0xa874fe207DF445ff19E7482C746C4D3fD0CB9AcE",
-            "susdEthAggregator": "0x6d626Ff97f0E89F6f983dE425dc5B24A18DE26Ea"
+            "ethUsdAggregator": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+            "daiEthAggregator": "0x773616E4d11A78F511299002da57A0a94577F1f4",
+            "usdcEthAggregator": "0x986b5E1e1755e3C2440e960477f25201B0a8bbD4",
+            "usdtEthAggregator": "0xEe9F2375b4bdF6387aa8265dD4FB8F16512A1d46",
+            "susdEthAggregator": "0x8e0b7e6062272B5eF4524250bFFF8e5Bd3497757"
         },
         "peaks": {
             "curveSUSDPool": {
