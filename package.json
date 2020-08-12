@@ -6,8 +6,9 @@
   "scripts": {
     "compile": "truffle compile",
     "migrate": "truffle migrate --reset",
-    "ganache": "ganache-cli -i 137 -m 'mosquito lizard cloth enhance armed month twice machine decline post toy float'",
+    "ganache": "ganache-cli -i 420 -l 10000000 -m 'mosquito lizard cloth enhance armed month twice machine decline post toy float'",
     "test": "truffle test",
+    "test:debug": "DEBUG=true npm test",
     "coverage": "truffle run coverage"
   },
   "author": "",
@@ -17,10 +18,11 @@
     "@openzeppelin/contracts": "^2.5.1"
   },
   "devDependencies": {
-    "@defidollar/core-client-lib": "github:defidollar/core-client-lib#35a336146e7b07a37a18d9354d93fd15b8e1a000",
+    "@defidollar/core-client-lib": "github:defidollar/core-client-lib#e4406ad97b90bfe4b3582f34007f1ff2d5e84824",
     "eth-gas-reporter": "^0.2.17",
     "ganache": "^6.4.4",
     "solidity-coverage": "^0.7.9",
-    "truffle": "^5.1.36"
+    "truffle": "^5.1.36",
+    "truffle-plugin-verify": "^0.3.11"
   }
 }

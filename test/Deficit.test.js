@@ -124,7 +124,7 @@ contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) =>
         Object.assign(this, _artifacts)
     })
 
-    it('charlie party mints dusd', async () => {
+    it('charlie mints dusd', async () => {
         this.amounts = [10, 10, 10, 10].map((n, i) => {
             return toBN(n).mul(toBN(10 ** this.decimals[i]))
         })
@@ -229,7 +229,9 @@ contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) =>
 
     it('all except staked dusd was redeemed', async () => {
         assert.equal((await this.curveToken.balanceOf(this.core.address)), '0')
-        assert.equal((await this.stakeLPToken.deficit()).toString(), toWei('10'))
+        // after accounting for the redeem fee, deficit (9.999..) just a lil bit less than 10.
+        const deficit = fromWei(await this.stakeLPToken.deficit())
+        assert.equal(parseFloat(deficit).toFixed(3), 9.999)
         assert.equal(fromWei(await this.dusd.totalSupply()), 10) // staked funds
         assert.equal(fromWei(await this.dusd.balanceOf(this.stakeLPToken.address)), 10)
     })

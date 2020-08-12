@@ -17,7 +17,7 @@ module.exports = async function(deployer, network, accounts) {
     const coreProxy = await deployer.deploy(CoreProxy)
     const core = await Core.at(CoreProxy.address)
 
-    await deployer.deploy(DUSD, CoreProxy.address)
+    await deployer.deploy(DUSD, CoreProxy.address, 18)
     const config = { contracts: { tokens: { DUSD: { address: DUSD.address, decimals: 18 } } } }
 
     // initialize system with 4 coins
@@ -69,7 +69,7 @@ module.exports = async function(deployer, network, accounts) {
             DUSD.address,
             StakeLPTokenProxy.address,
             Oracle.address,
-            10000, // 0 redeem fee, 0.05% would be 10005
+            9999, // .01% redeem fee, 0.05% fee would be 9995
         ).encodeABI()
     )
     await core.whitelistTokens(tokens)

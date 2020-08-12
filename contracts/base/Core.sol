@@ -16,12 +16,14 @@ contract Core is Initializable, Ownable {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
 
+    uint constant REDEEM_FACTOR_PRECISION = 10000;
+
     DUSD public dusd;
     StakeLPToken public stakeLPToken;
     Oracle public oracle;
     address[] public systemCoins;
 
-    uint public redeemFee;
+    uint public redeemFactor;
     uint public totalAssets;
     uint public claimedRewards;
     uint public totalRewards;
@@ -43,15 +45,20 @@ contract Core is Initializable, Ownable {
     event FeedUpdated(uint[] feed);
     event TokenWhiteListed(address token);
     event PeakWhitelisted(address peak);
+    event UpdateDeficitState(bool indexed inDeficit);
 
     modifier checkAndNotifyDeficit() {
         _;
         uint supply = dusd.totalSupply();
         if (supply > totalAssets) {
-            inDeficit = true;
+            if (!inDeficit) {
+                emit UpdateDeficitState(true);
+                inDeficit = true;
+            }
             stakeLPToken.notify(supply.sub(totalAssets));
         } else if (inDeficit) {
             inDeficit = false;
+            emit UpdateDeficitState(false);
             stakeLPToken.notify(0);
         }
     }
@@ -71,14 +78,24 @@ contract Core is Initializable, Ownable {
         DUSD _dusd,
         StakeLPToken _stakeLPToken,
         Oracle _oracle,
-        uint _redeemFee
+        uint _redeemFactor
     )   public
         notInitialized
     {
+        require(
+            address(_dusd) != address(0) &&
+            address(_stakeLPToken) != address(0) &&
+            address(_oracle) != address(0),
+            "0 address during initialization"
+        );
+        require(
+            _redeemFactor <= REDEEM_FACTOR_PRECISION,
+            "Contract will end up giving a premium"
+        );
         dusd = _dusd;
         stakeLPToken = _stakeLPToken;
         oracle = _oracle;
-        redeemFee = _redeemFee;
+        redeemFactor = _redeemFactor;
     }
 
     /**
@@ -244,7 +261,7 @@ contract Core is Initializable, Ownable {
             }
         }
         if (fee) {
-            usd = usd.mul(10000).div(redeemFee);
+            usd = usd.mul(redeemFactor).div(REDEEM_FACTOR_PRECISION);
         }
         return usd;
     }

@@ -1,5 +1,8 @@
 const assert = require('assert')
+const DefiDollarClient = require('@defidollar/core-client-lib')
+
 const utils = require('../utils.js')
+const config = require('../../deployments/development.json')
 
 const toWei = web3.utils.toWei
 const fromWei = web3.utils.fromWei
@@ -7,13 +10,14 @@ const toBN = web3.utils.toBN
 const n_coins = 4
 let _artifacts
 
-contract('StakeLPToken', async (accounts) => {
+contract('core-client-lib: StakeLPToken', async (accounts) => {
 	const alice = accounts[0]
 	const bob = accounts[1]
 
 	before(async () => {
 		_artifacts = await utils.getArtifacts()
-        Object.assign(this, _artifacts)
+		Object.assign(this, _artifacts)
+		this.client = new DefiDollarClient(web3, config)
 		this.amounts = [10, 10, 10, 10].map((n, i) => {
 			return toBN(n).mul(toBN(10 ** this.decimals[i]))
 		})
@@ -28,7 +32,9 @@ contract('StakeLPToken', async (accounts) => {
 			tasks.push(this.reserves[i].approve(this.curveSusdPeak.address, this.amounts[i]))
 		}
 		await Promise.all(tasks)
-		await this.curveSusdPeak.mint(this.amounts, toWei('40'))
+
+		// expecting 40 tokens, so providing 50 with 20% slippage
+		await this.client.mint({ DAI: 10, USDC: 10, USDT: 10, sUSD: 10 }, '50', '20', { from: alice })
 
 		const dusdBalance = await this.dusd.balanceOf(alice)
 		assert.equal(dusdBalance.toString(), toWei('40'))
@@ -44,7 +50,9 @@ contract('StakeLPToken', async (accounts) => {
 			tasks.push(this.reserves[i].approve(this.curveSusdPeak.address, this.amounts[i], { from: bob }))
 		}
 		await Promise.all(tasks)
-		await this.curveSusdPeak.mint(this.amounts, toWei('20'), { from: bob })
+
+		// expecting 20 tokens, so providing 40 with 50% slippage
+		await this.client.mint({ DAI: 5, USDC: 5, USDT: 5, sUSD: 5 }, '40', '50', { from: bob })
 
 		this.dusdBalance = await this.dusd.balanceOf(bob)
 		assert.equal(this.dusdBalance.toString(), toWei('20'))
@@ -63,7 +71,7 @@ contract('StakeLPToken', async (accounts) => {
 		const stakeAmount = toWei('4')
 
 		await this.dusd.approve(this.stakeLPToken.address, stakeAmount)
-		await this.stakeLPToken.stake(stakeAmount)
+		await this.client.stake(4, { from: alice })
 
 		const dusdBal = await this.dusd.balanceOf(alice)
 		assert.equal(dusdBal.toString(), toWei('36')) // 40 - 4
@@ -71,7 +79,7 @@ contract('StakeLPToken', async (accounts) => {
 		const bal = await this.stakeLPToken.balanceOf(alice)
 		assert.equal(bal.toString(), stakeAmount)
 
-		const earned = await this.stakeLPToken.earned(alice)
+		const earned = await this.client.earned(alice)
 		assert.equal(earned.toString(), '0')
 
 		await this.assertions({
@@ -95,14 +103,14 @@ contract('StakeLPToken', async (accounts) => {
 		let earned = await this.stakeLPToken.earned(alice)
 		assert.equal(earned.toString(), toWei('4')) // entire income
 
-		await this.stakeLPToken.getReward()
+		await this.client.getReward({ from: alice })
 		// reward was minted as dusd
 		const dusdBal = await this.dusd.balanceOf(alice)
 		assert.equal(dusdBal.toString(), toWei('40')) // 36 + 4 (entire reward goes to alice)
 		await this.assertions({ dusdTotalSupply: toWei('64') })
 
 		// claimed reward should not get considered twice
-		earned = await this.stakeLPToken.earned(alice)
+		earned = await this.client.earned(alice)
 		assert.equal(earned.toString(), '0')
 	})
 
@@ -121,7 +129,7 @@ contract('StakeLPToken', async (accounts) => {
 	})
 
 	it('bob redeems=4', async () => {
-		await this.curveSusdPeak.redeem(toWei('4'), [0,0,0,0], { from: bob })
+		await this.client.redeem('4', { DAI: 0, USDC: 0, USDT: 0, sUSD: 0 }, 0, { from: bob })
 		for (let i = 0; i < n_coins; i++) {
 			const bal = parseFloat(fromWei(utils.scale(toBN(await this.reserves[i].balanceOf(bob)), 18)
 				.div(this.scaleFactor[i])))
@@ -141,7 +149,7 @@ contract('StakeLPToken', async (accounts) => {
 		const stakeAmount = toWei('2')
 
 		await this.dusd.approve(this.stakeLPToken.address, stakeAmount, { from: bob })
-		await this.stakeLPToken.stake(stakeAmount, { from: bob })
+		await this.client.stake(2, { from: bob })
 
 		const dusdBal = await this.dusd.balanceOf(bob)
 		assert.equal(dusdBal.toString(), toWei('14')) // 20 - 4 - 2
@@ -166,7 +174,7 @@ contract('StakeLPToken', async (accounts) => {
 		let earned = parseInt(fromWei(await this.stakeLPToken.earned(bob)))
 		assert.equal(earned, 2)
 
-		await this.stakeLPToken.exit({ from: bob })
+		await this.client.exit({ from: bob })
 		const dusdBal = parseInt(fromWei(await this.dusd.balanceOf(bob)))
 		assert.equal(dusdBal, 18) // 20 - 4 (redemed) + 2 (income)
 
@@ -186,7 +194,7 @@ contract('StakeLPToken', async (accounts) => {
 	})
 
 	it('alice withdraws stake', async () => {
-		await this.stakeLPToken.withdraw(toWei('4')) // staked=4
+		await this.client.withdraw(4, { from: alice }) // staked=4
 		const dusdBal = await this.dusd.balanceOf(alice)
 		assert.equal(dusdBal.toString(), toWei('44')) // (original) 40 + 4 (previous reward)
 	})
@@ -196,7 +204,7 @@ contract('StakeLPToken', async (accounts) => {
 		let earned = parseInt(fromWei(await this.stakeLPToken.earned(alice)))
 		assert.equal(earned, 15)
 
-		await this.stakeLPToken.exit()
+		await this.stakeLPToken.exit({ from: alice })
 		const dusdBal = parseInt(fromWei(await this.dusd.balanceOf(alice)))
 		assert.equal(dusdBal, 59) // 44 + 15
 

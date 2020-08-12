@@ -76,7 +76,6 @@ module.exports = async function(deployer, network, accounts) {
             tokens
         ).encodeABI()
     )
-    // await curveSusdPeak.replenishApprovals()
     await core.whitelistPeak(curveSusdPeakProxy.address, [0, 1, 2, 3], true)
 
     peak.address = CurveSusdPeakProxy.address,

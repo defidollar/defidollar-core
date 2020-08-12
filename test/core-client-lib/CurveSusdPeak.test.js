@@ -1,5 +1,8 @@
 const assert = require('assert')
-const utils = require('../../utils.js')
+const DefiDollarClient = require('@defidollar/core-client-lib')
+
+const utils = require('../utils.js')
+const config = require('../../deployments/development.json')
 
 const toWei = web3.utils.toWei
 const fromWei = web3.utils.fromWei
@@ -7,13 +10,14 @@ const toBN = web3.utils.toBN
 const MAX = web3.utils.toTwosComplement(-1);
 const n_coins = 4
 
-contract('CurveSusdPeak', async (accounts) => {
+contract('core-client-lib: CurveSusdPeak', async (accounts) => {
     let alice = accounts[0]
 
     before(async () => {
         const artifacts = await utils.getArtifacts()
         Object.assign(this, artifacts)
         alice = accounts[0]
+        this.client = new DefiDollarClient(web3, config)
 
         this.amounts = [200, 200, 200, 200]
         const tasks = []
@@ -49,9 +53,12 @@ contract('CurveSusdPeak', async (accounts) => {
     it('peak.mintWithScrv', async () => {
         const inAmount = toBN(await this.curveToken.balanceOf(alice)).div(toBN(2)).toString()
         await this.curveToken.approve(this.curveSusdPeak.address, inAmount)
-        await this.curveSusdPeak.mintWithScrv(inAmount, '0')
-        assert.equal(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address)), '200')
+        const tokens = { crvPlain3andSUSD: 200 }
+        const { expectedAmount } = await this.client.calcExpectedMintAmount(tokens)
+        await this.client.mint(tokens, '200', '.05', { from: alice })
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '200')
+        assert.equal(fromWei(expectedAmount), '200')
+        assert.equal(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address)), '200')
         assert.equal(fromWei(await this.dusd.balanceOf(alice)), '200')
     })
 
@@ -63,23 +70,31 @@ contract('CurveSusdPeak', async (accounts) => {
             tasks.push(this.reserves[i].approve(this.curveSusdPeak.address, this.amounts[i]))
         }
         await Promise.all(tasks)
-        await this.curveSusdPeak.mint(this.amounts, '0')
+        const tokens = { DAI: 10, USDT: 8 }
+        const { expectedAmount } = await this.client.calcExpectedMintAmount(tokens)
+        await this.client.mint(tokens, '17', '.01', { from: alice })
+        assert.equal(parseInt(fromWei(expectedAmount)), 17)
         assert.equal(parseInt(fromWei(await this.dusd.balanceOf(alice))), 217) // 200 + ~(10 + 8)
         assert.equal(parseInt(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address))), 217)
     })
 
     it('peak.redeem: Alice redeems 1/2 her dusd', async () => {
-        const dusdAmount = toBN(await this.dusd.balanceOf(alice)).div(toBN(2))
-        await this.curveSusdPeak.redeem(dusdAmount, [0,0,0,0])
+        const dusdAmount = fromWei(toBN(await this.dusd.balanceOf(alice)).div(toBN(2)))
+        console.log(await this.client.calcExpectedRedeemAmount(dusdAmount))
+        await this.client.redeem(dusdAmount, [0,0,0,0], 0, { from: alice })
     })
 
     it('peak.redeemInSingleCoin(3): Alice redeems 1/2 her leftover dusd', async () => {
-        const dusdAmount = toBN(await this.dusd.balanceOf(alice)).div(toBN(2))
-        await this.curveSusdPeak.redeemInSingleCoin(dusdAmount, 3, 0)
+        const dusdAmount = fromWei(toBN(await this.dusd.balanceOf(alice)).div(toBN(2)))
+        await this.client.redeem(dusdAmount, { DAI: 10 /* minOut */ }, 0, { from: alice })
     })
 
     it('peak.redeemInScrv', async () => {
-        await this.curveSusdPeak.redeemInScrv(await this.dusd.balanceOf(alice), 0)
+        await this.client.redeem(
+            fromWei(await this.dusd.balanceOf(alice)),
+            { crvPlain3andSUSD: 10 /* minOut */ }, 0,
+            { from: alice }
+        )
         assert.equal((await this.dusd.balanceOf(alice)).toString(), '0')
         assert.ok(toBN((await this.curveToken.balanceOf(alice))).gt(toBN(utils.scale(200, 18))), 'Didnt get Scrv')
     })
