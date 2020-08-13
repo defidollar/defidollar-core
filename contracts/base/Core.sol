@@ -4,10 +4,11 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
-import {Oracle} from "../stream/Oracle.sol";
-import {StakeLPToken} from "../valley/StakeLPToken.sol";
-import {IPeak} from "../peaks/IPeak.sol";
-import {DUSD} from "./DUSD.sol";
+import {IOracle} from "../interfaces/IOracle.sol";
+import {IStakeLPToken} from "../interfaces/IStakeLPToken.sol";
+import {IPeak} from "../interfaces/IPeak.sol";
+import {IDUSD} from "../interfaces/IDUSD.sol";
+
 import {Initializable} from "../common/Initializable.sol";
 import {Ownable} from "../common/Ownable.sol";
 
@@ -18,9 +19,9 @@ contract Core is Initializable, Ownable {
 
     uint constant REDEEM_FACTOR_PRECISION = 10000;
 
-    DUSD public dusd;
-    StakeLPToken public stakeLPToken;
-    Oracle public oracle;
+    IDUSD public dusd;
+    IStakeLPToken public stakeLPToken;
+    IOracle public oracle;
     address[] public systemCoins;
 
     uint public redeemFactor;
@@ -75,9 +76,9 @@ contract Core is Initializable, Ownable {
     * @dev Used to initialize contract state from the proxy
     */
     function initialize(
-        DUSD _dusd,
-        StakeLPToken _stakeLPToken,
-        Oracle _oracle,
+        IDUSD _dusd,
+        IStakeLPToken _stakeLPToken,
+        IOracle _oracle,
         uint _redeemFactor
     )   public
         notInitialized
