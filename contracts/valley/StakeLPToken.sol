@@ -111,7 +111,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
 
     // View Functions
     function earned(address account) public view returns (uint) {
-        uint income = core.lastPeriodIncome();
+        (,uint income) = core.lastPeriodIncome();
         return _earned(rewardPerToken(income), account);
     }
 

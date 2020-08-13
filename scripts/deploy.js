@@ -12,11 +12,12 @@ const AggregatorInterface = artifacts.require("AggregatorInterface");
 
 async function execute() {
     const config = JSON.parse(
-        fs.readFileSync(`${process.cwd()}/deployments/mainnet-init.json`).toString()
+        fs.readFileSync(`${process.cwd()}/deployments/mainnet-init-chain.json`).toString()
     )
     let core = await Core.new()
     const coreProxy = await CoreProxy.new()
     let dusd = await DUSD.new(coreProxy.address, 18)
+    config.contracts.tokens.DUSD = { address: dusd.address, decimals: 18 }
 
     // Oracles
     const aggregators = config.contracts.chainlink
@@ -29,6 +30,7 @@ async function execute() {
         ],
         aggregators.ethUsdAggregator
     )
+    config.contracts.oracle = oracle.address
 
     // StakeLPToken
     const stakeLPToken = await StakeLPToken.new()

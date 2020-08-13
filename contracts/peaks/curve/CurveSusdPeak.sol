@@ -181,6 +181,14 @@ contract CurveSusdPeak is Initializable, IPeak {
         amount = usd.mul(1e18).div(exchangeRate);
     }
 
+    function calcRedeemInSingleCoin(uint dusdAmount, uint i)
+        public view
+        returns(uint amount)
+    {
+        uint sCrv = usdToScrv(core.dusdToUsd(dusdAmount, true));
+        amount = curveDeposit.calc_withdraw_one_coin(sCrv, int128(i));
+    }
+
     function portfolioValue() public view returns(uint) {
         return sCrvToUsd(curveToken.balanceOf(address(this)));
     }
