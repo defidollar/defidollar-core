@@ -91,7 +91,7 @@ module.exports = async function(deployer, network, accounts) {
         const charlie = accounts[3]
         const amounts = [100, 100, 100, 100]
         const decimals = [18,6,6,18]
-        const tasks = []
+        tasks = []
         for (let i = 0; i < 4; i++) {
             amounts[i] = toBN(amounts[i]).mul(toBN(10 ** decimals[i])).toString()
             tasks.push(reserves[i].mint(charlie, amounts[i]))
