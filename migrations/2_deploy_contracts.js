@@ -17,7 +17,7 @@ module.exports = async function(deployer, network, accounts) {
     const coreProxy = await deployer.deploy(CoreProxy)
     const core = await Core.at(CoreProxy.address)
 
-    await deployer.deploy(DUSD, CoreProxy.address, 18)
+    await deployer.deploy(DUSD, CoreProxy.address, "tDUSD", "tDUSD", 18)
     const config = { contracts: { tokens: { DUSD: { address: DUSD.address, decimals: 18 } } } }
 
     // initialize system with 4 coins
@@ -26,7 +26,7 @@ module.exports = async function(deployer, network, accounts) {
     const reserves = []
     const tokens = []
     for(let i = 0; i < tickerSymbols.length; i++) {
-        const reserve = await Reserve.new(decimals[i])
+        const reserve = await Reserve.new(tickerSymbols[i],tickerSymbols[i],decimals[i])
         reserves.push(reserve)
         tokens.push(reserve.address)
         if (process.env.INITIALIZE === 'true') {
