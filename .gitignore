@@ -2,6 +2,7 @@ node_modules
 build
 venv
 deployments
+*.env
 
 !.gitignore
 deployments/mainnet-init.json

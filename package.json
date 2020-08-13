@@ -19,6 +19,7 @@
   },
   "devDependencies": {
     "@defidollar/core-client-lib": "github:defidollar/core-client-lib#c6693b79c70ef38ad197ee0027ae065f34fe125b",
+    "@truffle/hdwallet-provider": "^1.0.42",
     "eth-gas-reporter": "^0.2.17",
     "ganache": "^6.4.4",
     "solidity-coverage": "^0.7.9",

@@ -4,7 +4,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
-import {Core} from "../base/Core.sol";
+import {ICore} from "../interfaces/ICore.sol";
 import {Initializable} from "../common/Initializable.sol";
 
 contract LPTokenWrapper {
@@ -34,7 +34,7 @@ contract LPTokenWrapper {
 }
 
 contract StakeLPToken is Initializable, LPTokenWrapper {
-    Core public core;
+    ICore public core;
 
     uint public rewardPerTokenStored;
     uint public deficit;
@@ -55,7 +55,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
         _;
     }
 
-    function initialize(Core _core, IERC20 _stok) public notInitialized {
+    function initialize(ICore _core, IERC20 _stok) public notInitialized {
         core = _core;
         stok = _stok;
     }
