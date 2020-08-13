@@ -40,12 +40,12 @@ contract Core is Initializable, Ownable {
 
     // END OF STORAGE VARIABLES
 
-    event Mint(address account, uint amount);
-    event Redeem(address account, uint amount);
+    event Mint(address indexed account, uint amount);
+    event Redeem(address indexed account, uint amount);
     event FeedUpdated(uint[] feed);
-    event TokenWhiteListed(address token);
-    event PeakWhitelisted(address peak);
-    event UpdateDeficitState(bool indexed inDeficit);
+    event TokenWhiteListed(address indexed token);
+    event PeakWhitelisted(address indexed peak);
+    event UpdateDeficitState(bool inDeficit);
 
     modifier checkAndNotifyDeficit() {
         _;
@@ -173,21 +173,30 @@ contract Core is Initializable, Ownable {
         external
         onlyStakeLPToken
         checkAndNotifyDeficit
-        returns(uint periodIncome)
+        returns(uint /* periodIncome */)
     {
-        totalAssets = totalSystemAssets();
-        uint _totalAssets = totalAssets;
+        (uint _totalAssets, uint periodIncome) = lastPeriodIncome();
+        totalAssets = _totalAssets;
+        totalRewards = totalRewards.add(periodIncome);
+        return periodIncome;
+    }
+
+    /* ##### View functions ##### */
+
+    function lastPeriodIncome()
+        public
+        view
+        returns(uint _totalAssets, uint periodIncome)
+    {
+        _totalAssets = totalSystemAssets();
         if (totalRewards > claimedRewards) {
             _totalAssets = _totalAssets.sub(totalRewards.sub(claimedRewards));
         }
         uint supply = dusd.totalSupply();
         if (_totalAssets > supply) {
             periodIncome = _totalAssets.sub(supply);
-            totalRewards = totalRewards.add(periodIncome);
         }
     }
-
-    /* ##### View functions ##### */
 
     /**
     * @notice Returns the net system assets across all peaks
@@ -205,21 +214,6 @@ contract Core is Initializable, Ownable {
             }
             _totalAssets = _totalAssets.add(IPeak(peaksAddresses[i]).portfolioValue());
         }
-    }
-
-    function lastPeriodIncome() public view returns(uint) {
-        uint supply = dusd.totalSupply();
-        uint _totalAssets = totalSystemAssets();
-        uint unclaimedRewards;
-        if (totalRewards > claimedRewards) {
-            unclaimedRewards = totalRewards.sub(claimedRewards);
-        }
-        _totalAssets = _totalAssets.sub(unclaimedRewards);
-        uint periodIncome;
-        if (_totalAssets > supply) {
-            periodIncome = _totalAssets.sub(supply);
-        }
-        return periodIncome;
     }
 
     function usdToDusd(uint usd)
