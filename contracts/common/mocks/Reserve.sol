@@ -4,9 +4,9 @@ import { ERC20Mintable } from "@openzeppelin/contracts/token/ERC20/ERC20Mintable
 import { ERC20Detailed } from "@openzeppelin/contracts/token/ERC20/ERC20Detailed.sol";
 
 contract Reserve is ERC20Detailed, ERC20Mintable {
-    constructor (uint8 _decimals)
+    constructor (string memory _name, string memory _symbol, uint8 _decimals)
         public
-        ERC20Detailed("Reserve", "UN", _decimals)
+        ERC20Detailed(_name, _symbol, _decimals)
     {
     }
 

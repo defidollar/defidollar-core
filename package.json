@@ -18,7 +18,8 @@
     "@openzeppelin/contracts": "^2.5.1"
   },
   "devDependencies": {
-    "@defidollar/core-client-lib": "github:defidollar/core-client-lib#c6693b79c70ef38ad197ee0027ae065f34fe125b",
+    "@defidollar/core-client-lib": "github:defidollar/core-client-lib#39c0b8cb26794b65b6a2bfad67b40b3a2e116ab5",
+    "@truffle/hdwallet-provider": "^1.0.42",
     "eth-gas-reporter": "^0.2.17",
     "ganache": "^6.4.4",
     "solidity-coverage": "^0.7.9",

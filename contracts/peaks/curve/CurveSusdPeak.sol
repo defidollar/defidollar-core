@@ -6,8 +6,9 @@ import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
 import {Math} from "@openzeppelin/contracts/math/Math.sol";
 
 import {ICurveDeposit, ICurve, IUtil} from "./ICurve.sol";
-import {Core} from "../../base/Core.sol";
-import {IPeak} from "../IPeak.sol";
+import {ICore} from "../../interfaces/ICore.sol";
+import {IPeak} from "../../interfaces/IPeak.sol";
+
 import {Initializable} from "../../common/Initializable.sol";
 
 contract CurveSusdPeak is Initializable, IPeak {
@@ -26,14 +27,14 @@ contract CurveSusdPeak is Initializable, IPeak {
     ICurveDeposit public curveDeposit; // deposit contract
     ICurve public curve; // swap contract
     IERC20 public curveToken; // LP token contract
-    Core public core;
+    ICore public core;
     IUtil public util;
 
     function initialize(
         ICurveDeposit _curveDeposit,
         ICurve _curve,
         IERC20 _curveToken,
-        Core _core,
+        ICore _core,
         IUtil _util,
         address[N_COINS] memory _underlyingCoins
     )   public

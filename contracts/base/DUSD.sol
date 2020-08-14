@@ -6,9 +6,9 @@ import {ERC20Detailed} from "@openzeppelin/contracts/token/ERC20/ERC20Detailed.s
 contract DUSD is ERC20, ERC20Detailed {
     address public core;
 
-    constructor(address _core, uint8 _decimals)
+    constructor(address _core, string memory _name, string memory _symbol, uint8 _decimals)
         public
-        ERC20Detailed("DefiDollar", "DUSD", _decimals)
+        ERC20Detailed(_name, _symbol, _decimals)
     {
         core = _core;
     }
