@@ -6,3 +6,4 @@ deployments
 
 !.gitignore
 deployments/mainnet-init.json
+deployments/ropsten.json
