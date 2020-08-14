@@ -238,7 +238,8 @@ contract CurveSusdPeak is Initializable, Ownable, IPeak {
     }
 
     function usdToScrv(uint usd) public view returns(uint sCrv) {
-        sCrv = curveToken.balanceOf(address(this));
+        sCrv = curveToken.balanceOf(address(this))
+            .add(gauge.balanceOf(address(this)));
         uint exchangeRate = sCrvToUsd(1e18);
         if (exchangeRate > 0) {
             sCrv = sCrv.min(usd.mul(1e18).div(exchangeRate));
@@ -269,7 +270,7 @@ contract CurveSusdPeak is Initializable, Ownable, IPeak {
     function _withdraw(uint sCrv) internal {
         uint bal = curveToken.balanceOf(address(this));
         if (sCrv > bal) {
-            gauge.withdraw(sCrv.sub(bal));
+            gauge.withdraw(sCrv.sub(bal), false);
         }
     }
 }

@@ -38,7 +38,7 @@ async function execute() {
     const accounts = await web3.eth.getAccounts()
     from = accounts[0]
 
-    let amount = toWei('10000')
+    let amount = toWei('10001')
     let res, tx
     const {
         dai, susdPeak, curveToken
@@ -48,11 +48,9 @@ async function execute() {
     tx = await dai.methods
         .transfer(from, amount)
         .send({ from: userAddress, gasLimit: 800000 });
-    console.log({ gasUsed: tx.gasUsed })
     await printTokenBalances(_artifacts)
 
     // Mint DUSD
-    amount = toWei('10001')
     console.log(`approving ${fromWei(amount)} dai...`)
     await dai.methods.approve(susdPeak.options.address, amount).send({ from })
 
@@ -79,7 +77,7 @@ async function execute() {
     res = await printTokenBalances(_artifacts)
 
     amount = toBN(toWei(res.dusd)).div(toBN(2)).toString()
-    console.log(`redeemInSingleCoin with ${fromWei(amount)} dusd...`)
+    console.log(`redeemInSingleCoin (usdt) with ${fromWei(amount)} dusd...`)
     tx = await susdPeak.methods.redeemInSingleCoin(amount,2/* usdt */,0).send({ from, gas: 1000000 })
     console.log({ gasUsed: tx.gasUsed })
     res = await printTokenBalances(_artifacts)
