@@ -10,8 +10,10 @@ import {ICore} from "../../interfaces/ICore.sol";
 import {IPeak} from "../../interfaces/IPeak.sol";
 
 import {Initializable} from "../../common/Initializable.sol";
+import {Ownable} from "../../common/Ownable.sol";
+import {IGauge, IMintr} from "./IGauge.sol";
 
-contract CurveSusdPeak is Initializable, IPeak {
+contract CurveSusdPeak is Initializable, Ownable, IPeak {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
     using Math for uint;
@@ -27,8 +29,11 @@ contract CurveSusdPeak is Initializable, IPeak {
     ICurveDeposit public curveDeposit; // deposit contract
     ICurve public curve; // swap contract
     IERC20 public curveToken; // LP token contract
-    ICore public core;
     IUtil public util;
+    IGauge public gauge;
+    IMintr public mintr;
+
+    ICore public core;
 
     function initialize(
         ICurveDeposit _curveDeposit,
@@ -36,6 +41,8 @@ contract CurveSusdPeak is Initializable, IPeak {
         IERC20 _curveToken,
         ICore _core,
         IUtil _util,
+        IGauge _gauge,
+        IMintr _mintr,
         address[N_COINS] memory _underlyingCoins
     )   public
         notInitialized
@@ -45,6 +52,8 @@ contract CurveSusdPeak is Initializable, IPeak {
         curveToken = _curveToken;
         core = _core;
         util = _util;
+        gauge = _gauge;
+        mintr = _mintr;
         underlyingCoins = _underlyingCoins;
         replenishApprovals(MAX);
     }
@@ -68,6 +77,9 @@ contract CurveSusdPeak is Initializable, IPeak {
         curve.add_liquidity(inAmounts, 0);
         dusdAmount = core.mint(portfolioValue().sub(_old), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
+        if (dusdAmount >= 1e22) { // whale
+            stake();
+        }
     }
 
     /**
@@ -82,6 +94,9 @@ contract CurveSusdPeak is Initializable, IPeak {
         curveToken.safeTransferFrom(msg.sender, address(this), inAmount);
         dusdAmount = core.mint(sCrvToUsd(inAmount), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
+        if (dusdAmount >= 1e22) { // whale
+            stake();
+        }
     }
 
     /**
@@ -93,6 +108,7 @@ contract CurveSusdPeak is Initializable, IPeak {
         external
     {
         uint sCrv = usdToScrv(core.redeem(dusdAmount, msg.sender));
+        _withdraw(sCrv);
         curve.remove_liquidity(sCrv, ZEROES);
         address[N_COINS] memory coins = underlyingCoins;
         IERC20 coin;
@@ -109,6 +125,7 @@ contract CurveSusdPeak is Initializable, IPeak {
         external
     {
         uint sCrv = usdToScrv(core.redeem(dusdAmount, msg.sender));
+        _withdraw(sCrv);
         curveDeposit.remove_liquidity_one_coin(sCrv, int128(i), minOut, false);
         IERC20 coin = IERC20(underlyingCoins[i]);
         uint toTransfer = coin.balanceOf(address(this));
@@ -120,8 +137,16 @@ contract CurveSusdPeak is Initializable, IPeak {
         external
     {
         uint sCrv = usdToScrv(core.redeem(dusdAmount, msg.sender));
+        _withdraw(sCrv);
         require(sCrv >= minOut, ERR_SLIPPAGE);
         curveToken.safeTransfer(msg.sender, sCrv);
+    }
+
+    /**
+    * @notice Stake in sCrv Gauge
+    */
+    function stake() public {
+        gauge.deposit(curveToken.balanceOf(address(this)));
     }
 
     function updateFeed(uint[] calldata _prices) external {
@@ -136,9 +161,27 @@ contract CurveSusdPeak is Initializable, IPeak {
     // Think about if we need strict token approvals during the actions at the cost of higher gas.
     function replenishApprovals(uint value) public {
         curveToken.safeIncreaseAllowance(address(curveDeposit), value);
+        curveToken.safeIncreaseAllowance(address(gauge), value);
         for (uint i = 0; i < N_COINS; i++) {
             IERC20(underlyingCoins[i]).safeIncreaseAllowance(address(curve), value);
         }
+    }
+
+    function getRewards(address[] calldata tokens, address destination) external onlyOwner {
+        harvest();
+        for (uint i = 0; i < tokens.length; i++) {
+            IERC20 token = IERC20(tokens[i]);
+            require(
+                address(token) != address(curveToken),
+                "Admin can't withdraw curve lp tokens"
+            );
+            token.safeTransfer(destination, token.balanceOf(address(this)));
+        }
+    }
+
+    function harvest() public {
+        mintr.mint(address(gauge));
+        gauge.claim_rewards();
     }
 
     /* ##### View Functions ##### */
@@ -219,5 +262,14 @@ contract CurveSusdPeak is Initializable, IPeak {
         }
         // https://github.com/curvefi/curve-contract/blob/pool_susd_plain/vyper/stableswap.vy#L149
         return util.get_D(balances).mul(sCrvBal).div(sCrvTotalSupply);
+    }
+
+    /* ##### Internal Functions ##### */
+
+    function _withdraw(uint sCrv) internal {
+        uint bal = curveToken.balanceOf(address(this));
+        if (sCrv > bal) {
+            gauge.withdraw(sCrv.sub(bal));
+        }
     }
 }
