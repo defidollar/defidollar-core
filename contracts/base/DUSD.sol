@@ -25,4 +25,8 @@ contract DUSD is ERC20, ERC20Detailed {
     function burn(address account, uint amount) public onlyCore {
         _burn(account, amount);
     }
+
+    function burnForSelf(uint amount) external {
+        _burn(msg.sender, amount);
+    }
 }

@@ -11,7 +11,7 @@ const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
 
 async function execute() {
     const config = JSON.parse(
-        fs.readFileSync(`${process.cwd()}/deployments/ropsten-init.json`).toString()
+        fs.readFileSync(`${process.cwd()}/deployments/mainnet-init.json`).toString()
     )
     let core = await Core.new()
     console.log({ Core: core.address })
@@ -59,7 +59,7 @@ async function execute() {
             dusd.address,
             stakeLPTokenProxy.address,
             oracle.address,
-            9996, // .04% redeem fee
+            9998, // .02% redeem fee
         ).encodeABI()
     )
     core = await Core.at(coreProxy.address)
@@ -95,6 +95,8 @@ async function execute() {
             config.contracts.tokens.crvPlain3andSUSD.address,
             core.address,
             iUtil.options.address,
+            config.contracts.curve.susd.gauge,
+            config.contracts.curve.minter,
             tokens.map(t => t.address)
         ).encodeABI()
     )
@@ -102,7 +104,7 @@ async function execute() {
 
     config.contracts.peaks.curveSUSDPool.address = curveSusdPeakProxy.address,
     fs.writeFileSync(
-        `${process.cwd()}/deployments/ropsten.json`,
+        `${process.cwd()}/deployments/mainnet.json`,
         JSON.stringify(config, null, 4) // Indent 4 spaces
     )
 }

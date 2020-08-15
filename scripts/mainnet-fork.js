@@ -1,6 +1,5 @@
 const fs = require('fs')
 const assert = require('assert')
-// const utils = require('../test/utils.js');
 
 const toWei = web3.utils.toWei
 const fromWei = web3.utils.fromWei
@@ -13,7 +12,7 @@ const Core = artifacts.require("Core");
 const DUSD = artifacts.require("DUSD");
 
 const daiABI = require('../test/abi/dai.json');
-const { contracts } = JSON.parse(fs.readFileSync(`../deployments/mainnet-fork.json`).toString())
+const { contracts } = JSON.parse(fs.readFileSync(`../deployments/mainnet.json`).toString())
 
 // userAddress must be unlocked using --unlock ADDRESS
 const userAddress = '0x07bb41df8c1d275c4259cdd0dbf0189d6a9a5f32'
@@ -39,21 +38,19 @@ async function execute() {
     const accounts = await web3.eth.getAccounts()
     from = accounts[0]
 
-    let amount = toWei('10000')
+    let amount = toWei('10001')
     let res, tx
     const {
-        dai, susdPeak, curveSusd
+        dai, susdPeak, curveToken
     } = _artifacts
 
     // get Dai
     tx = await dai.methods
         .transfer(from, amount)
         .send({ from: userAddress, gasLimit: 800000 });
-    console.log({ gasUsed: tx.gasUsed })
     await printTokenBalances(_artifacts)
 
     // Mint DUSD
-    amount = toWei('100')
     console.log(`approving ${fromWei(amount)} dai...`)
     await dai.methods.approve(susdPeak.options.address, amount).send({ from })
 
@@ -80,20 +77,28 @@ async function execute() {
     res = await printTokenBalances(_artifacts)
 
     amount = toBN(toWei(res.dusd)).div(toBN(2)).toString()
-    console.log(`redeemInSingleCoin with ${fromWei(amount)} dusd...`)
+    console.log(`redeemInSingleCoin (usdt) with ${fromWei(amount)} dusd...`)
     tx = await susdPeak.methods.redeemInSingleCoin(amount,2/* usdt */,0).send({ from, gas: 1000000 })
     console.log({ gasUsed: tx.gasUsed })
     res = await printTokenBalances(_artifacts)
 
+    // getRewards
+    await susdPeak.methods.getRewards(
+        // snx, crv
+        ['0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F', '0xD533a949740bb3306d119CC777fa900bA034cd52'],
+        from
+    ).send({ from, gas: 2000000 })
+    const snx = new web3.eth.Contract(daiABI, '0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F')
+    console.log({ snx: fromWei(await snx.methods.balanceOf(from).call()) })
+    const crv = new web3.eth.Contract(daiABI, '0xD533a949740bb3306d119CC777fa900bA034cd52')
+    console.log({ crv: fromWei(await crv.methods.balanceOf(from).call()) })
+
     amount = toWei(res.dusd)
     console.log(`redeem with ${fromWei(amount)} dusd...`)
     console.log(await susdPeak.methods.calcRedeem(amount).call({ from, gas: 2000000 }))
-    // reverts on forked ganacha
-    tx = await susdPeak.methods.redeem(amount,[0,0,0,0]).call({ from, gas: 9000000 })
-    console.log(tx)
-    // tx = await susdPeak.methods.redeem(amount,[0,0,0,0]).send({ from, gas: 9000000 })
-    // console.log({ gasUsed: tx.gasUsed })
-    // await printTokenBalances(_artifacts)
+    tx = await susdPeak.methods.redeem(amount,[0,0,0,0]).send({ from, gas: 1000000 })
+    console.log({ gasUsed: tx.gasUsed })
+    await printTokenBalances(_artifacts)
 }
 
 async function printTokenBalances(_artifacts) {

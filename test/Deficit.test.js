@@ -89,30 +89,27 @@ contract('Deficit flow (staked funds cover deficit)', async (accounts) => {
     })
 
     it('alice exits', async () => {
+        const bal = await this.dusd.balanceOf(alice)
+        const aliceWillGet = toBN(await this.stakeLPToken.balanceOf(alice)).sub(await this.stakeLPToken.deficit())
+        // console.log({
+        //     deficit: fromWei(await this.stakeLPToken.deficit()),
+        //     totalSupply: fromWei(await this.stakeLPToken.totalSupply()),
+        //     dusdTotalSupply: fromWei(await this.dusd.totalSupply()),
+        //     StakeLPTokenDusd: fromWei(await this.dusd.balanceOf(this.stakeLPToken.address)),
+        //     aliceStakeLPToken: fromWei(await this.stakeLPToken.balanceOf(alice)),
+        //     aliceDusd: fromWei(await this.dusd.balanceOf(alice)),
+        //     aliceEarned: fromWei(await this.stakeLPToken.earned(alice)),
+        //     totalSystemAssets: fromWei(await this.core.totalSystemAssets())
+        // })
         await this.stakeLPToken.exit()
         assert.equal(
-            parseInt(fromWei(await this.dusd.balanceOf(alice))),
-            2 + 3 // existing balance + staked funds (no rewards)
+            (await this.dusd.balanceOf(alice)).toString(),
+            bal.add(aliceWillGet).toString()
         )
         const withdrawAble = await this.stakeLPToken.withdrawAble(alice)
         assert.equal(withdrawAble.toString(), '0')
-    })
-
-    it('peg returns', async () => {
-        const ethPrice = toBN(200) // from migrations
-        await this.aggregators[3].setLatestAnswer(utils.scale(1, 18).div(ethPrice))
-        await this.core.syncSystem()
-
-        let withdrawAble = await this.stakeLPToken.withdrawAble(alice)
-        assert.equal(parseInt(fromWei(withdrawAble)), 4) // 3.x + 4.x = alice's original stake
-
-        await this.stakeLPToken.exit()
-        assert.equal(fromWei(await this.dusd.balanceOf(alice)), '10')
-
-        withdrawAble = await this.stakeLPToken.withdrawAble(alice)
-        const earned = await this.stakeLPToken.earned(alice)
-        assert.equal(withdrawAble.toString(), '0')
-        assert.equal(earned.toString(), '0')
+        const deficit = (await this.stakeLPToken.deficit()).toString()
+        assert.equal(deficit.toString(), '0')
     })
 })
 

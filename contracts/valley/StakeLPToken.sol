@@ -5,13 +5,14 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import {ICore} from "../interfaces/ICore.sol";
+import {IDUSD} from "../interfaces/IDUSD.sol";
 import {Initializable} from "../common/Initializable.sol";
 
 contract LPTokenWrapper {
     using SafeMath for uint;
     using SafeERC20 for IERC20;
 
-    IERC20 public stok;
+    IERC20 public dusd;
 
     uint public totalSupply;
     mapping(address => uint) private _balances;
@@ -23,13 +24,12 @@ contract LPTokenWrapper {
     function stake(uint amount) public {
         totalSupply = totalSupply.add(amount);
         _balances[msg.sender] = _balances[msg.sender].add(amount);
-        stok.safeTransferFrom(msg.sender, address(this), amount);
+        dusd.safeTransferFrom(msg.sender, address(this), amount);
     }
 
     function withdraw(uint amount) public {
         totalSupply = totalSupply.sub(amount);
         _balances[msg.sender] = _balances[msg.sender].sub(amount);
-        stok.safeTransfer(msg.sender, amount);
     }
 }
 
@@ -55,9 +55,9 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
         _;
     }
 
-    function initialize(ICore _core, IERC20 _stok) public notInitialized {
+    function initialize(ICore _core, IERC20 _dusd) public notInitialized {
         core = _core;
-        stok = _stok;
+        dusd = _dusd;
     }
 
     modifier updateReward(address account) {
@@ -71,7 +71,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
 
     function updateProtocolIncome() public returns(uint) {
         uint income = core.rewardDistributionCheckpoint();
-        rewardPerTokenStored = rewardPerToken(income);
+        rewardPerTokenStored = _rewardPerToken(income);
         emit RewardPerTokenUpdated(rewardPerTokenStored, block.timestamp);
         return rewardPerTokenStored;
     }
@@ -84,23 +84,20 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     function withdraw(uint amount) public updateReward(msg.sender) {
-        require(
-            amount <= withdrawAble(msg.sender),
-            "Withdrawing more than staked or illiquid due to system deficit"
-        );
         _withdraw(amount);
     }
 
     function exit() external {
         getReward();
-        _withdraw(withdrawAble(msg.sender));
+        _withdraw(balanceOf(msg.sender));
     }
 
     function getReward() public updateReward(msg.sender) {
         uint reward = rewards[msg.sender];
         if (reward > 0) {
             rewards[msg.sender] = 0;
-            core.mintReward(msg.sender, reward);
+            // this contract had received the reward tokens during the call to core.rewardDistributionCheckpoint()
+            dusd.safeTransfer(msg.sender, reward);
             emit RewardPaid(msg.sender, reward);
         }
     }
@@ -112,30 +109,19 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     // View Functions
     function earned(address account) public view returns (uint) {
         (,uint income) = core.lastPeriodIncome();
-        return _earned(rewardPerToken(income), account);
-    }
-
-    function rewardPerToken(uint income) public view returns(uint) {
-        if (totalSupply == 0 || income == 0) {
-            return rewardPerTokenStored;
-        }
-        return rewardPerTokenStored.add(
-            income
-            .mul(1e18)
-            .div(totalSupply)
-        );
+        return _earned(_rewardPerToken(income), account);
     }
 
     function withdrawAble(address account) public view returns(uint) {
-        uint _withdrawAble = balanceOf(account);
+        uint balance = balanceOf(account);
         if (totalSupply == 0 || deficit == 0) {
-            return _withdrawAble;
+            return balance;
         }
-        uint deficitShare = _withdrawAble.mul(deficit).div(totalSupply);
-        if (deficitShare >= _withdrawAble) {
+        uint deficitShare = balance.mul(deficit).div(totalSupply);
+        if (deficitShare >= balance) {
             return 0;
         }
-        return _withdrawAble.sub(deficitShare);
+        return balance.sub(deficitShare);
     }
 
     // Internal functions
@@ -147,8 +133,36 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
                 .add(rewards[account]);
     }
 
+    function _rewardPerToken(uint income) internal view returns(uint) {
+        if (totalSupply == 0 || income == 0) {
+            return rewardPerTokenStored;
+        }
+        return rewardPerTokenStored.add(
+            income
+            .mul(1e18)
+            .div(totalSupply)
+        );
+    }
+
     function _withdraw(uint amount) internal {
+        if (amount == 0) {
+            // there might be case where user has 0 staked funds, but called getReward()
+            return;
+        }
+        uint deficitShare = amount.mul(deficit).div(totalSupply);
         super.withdraw(amount);
-        emit Withdrawn(msg.sender, amount);
+        if (deficitShare > 0) {
+            if (deficitShare < amount) {
+                amount = amount.sub(deficitShare);
+            } else {
+                deficitShare = amount;
+                amount = 0;
+            }
+            IDUSD(address(dusd)).burnForSelf(deficitShare);
+            deficit = deficit.sub(deficitShare);
+        }
+        if (amount > 0) {
+            dusd.safeTransfer(msg.sender, amount);
+        }
     }
 }

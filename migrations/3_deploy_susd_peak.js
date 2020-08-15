@@ -4,6 +4,8 @@ const Core = artifacts.require("Core");
 const CoreProxy = artifacts.require("CoreProxy");
 const CurveSusdPeak = artifacts.require("CurveSusdPeak");
 const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
+const Gauge = artifacts.require("Gauge");
+const Mintr = artifacts.require("Mintr");
 
 const MockSusdToken = artifacts.require("MockSusdToken");
 const Reserve = artifacts.require("Reserve");
@@ -77,6 +79,8 @@ module.exports = async function(deployer, network, accounts) {
             curveToken.address,
             core.address,
             iUtil.options.address,
+            (await Gauge.new(curveToken.address)).address,
+            (await Mintr.new()).address,
             tokens
         ).encodeABI()
     )

@@ -116,7 +116,7 @@ contract Core is Initializable, Ownable {
             peak.state == PeakState.Active,
             "Peak is inactive"
         );
-        dusdAmount = usdToDusd(usdDelta);
+        dusdAmount = usdDelta; // always
         dusd.mint(account, dusdAmount);
         totalAssets = totalAssets.add(usdDelta);
         emit Mint(account, dusdAmount);
@@ -145,20 +145,6 @@ contract Core is Initializable, Ownable {
     }
 
     /**
-    * @notice Mint staking rewards
-    * @param account Account to mint rewards to
-    * @param usdDelta Reward amount denominated in dollars
-    */
-    function mintReward(address account, uint usdDelta)
-        onlyStakeLPToken
-        checkAndNotifyDeficit
-        external
-    {
-        claimedRewards = claimedRewards.add(usdDelta);
-        dusd.mint(account, usdToDusd(usdDelta));
-    }
-
-    /**
     * @notice Pull prices from the oracle and update system stats
     * @dev Anyone can call this
     */
@@ -174,12 +160,12 @@ contract Core is Initializable, Ownable {
         external
         onlyStakeLPToken
         checkAndNotifyDeficit
-        returns(uint /* periodIncome */)
+        returns(uint periodIncome)
     {
-        (uint _totalAssets, uint periodIncome) = lastPeriodIncome();
-        totalAssets = _totalAssets;
-        totalRewards = totalRewards.add(periodIncome);
-        return periodIncome;
+        (totalAssets, periodIncome) = lastPeriodIncome();
+        if (periodIncome > 0) {
+            dusd.mint(address(stakeLPToken), periodIncome);
+        }
     }
 
     /* ##### View functions ##### */
@@ -190,9 +176,6 @@ contract Core is Initializable, Ownable {
         returns(uint _totalAssets, uint periodIncome)
     {
         _totalAssets = totalSystemAssets();
-        if (totalRewards > claimedRewards) {
-            _totalAssets = _totalAssets.sub(totalRewards.sub(claimedRewards));
-        }
         uint supply = dusd.totalSupply();
         if (_totalAssets > supply) {
             periodIncome = _totalAssets.sub(supply);
@@ -217,25 +200,6 @@ contract Core is Initializable, Ownable {
         }
     }
 
-    function usdToDusd(uint usd)
-        public
-        view
-        returns(uint)
-    {
-        // system is healthy. Pegged at $1
-        if (!inDeficit) {
-            return usd;
-        }
-        // system is in deficit, see if staked funds can make up for it
-        uint supply = dusd.totalSupply();
-        uint perceivedSupply = supply.sub(stakeLPToken.totalSupply());
-        // staked funds make up for the deficit
-        if (perceivedSupply <= totalAssets) {
-            return usd;
-        }
-        return usd.mul(perceivedSupply).div(totalAssets);
-    }
-
     function dusdToUsd(uint _dusd, bool fee)
         public
         view
@@ -247,6 +211,7 @@ contract Core is Initializable, Ownable {
         } else {
         // system is in deficit, see if staked funds can make up for it
             uint supply = dusd.totalSupply();
+            // do not perform a dusd.balanceOf(stakeLPToken) because that includes the reward tokens
             uint perceivedSupply = supply.sub(stakeLPToken.totalSupply());
             // staked funds make up for the deficit
             if (perceivedSupply <= totalAssets) {

@@ -31,6 +31,7 @@ contract('core-client-lib: StakeLPToken', async (accounts) => {
 		}
 		await Promise.all(tasks)
 		await this.client.mint({ DAI: 250000, USDC: 250000, USDT: 250000, sUSD: 250000 }, '100', '0', { from: alice })
+		await this.assertions({ dusdTotalSupply: toWei('1000000'), totalSystemAssets: toWei('1000000'), totalAssets: toWei('1000000') })
 	})
 
 	it('alice stakes=500k', async () => {
@@ -44,7 +45,7 @@ contract('core-client-lib: StakeLPToken', async (accounts) => {
 			return toBN(n).mul(toBN(10 ** this.decimals[i]))
 		})
 		await this.curveSusd.mock_add_to_balance(income)
-		await this.assertions({ totalSystemAssets: toWei('1000004') })
+		await this.assertions({ dusdTotalSupply: toWei('1000000'), totalSystemAssets: toWei('1000004'), totalAssets: toWei('1000000') })
 	})
 
 	it('apy', async () => {
