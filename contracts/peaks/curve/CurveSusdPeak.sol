@@ -186,21 +186,26 @@ contract CurveSusdPeak is Initializable, Ownable, IPeak {
 
     /* ##### View Functions ##### */
 
+    function sCrvBalance() public view returns(uint) {
+        return curveToken.balanceOf(address(this))
+            .add(gauge.balanceOf(address(this)));
+    }
+
     function calcMint(uint[N_COINS] memory inAmounts)
         public view
         returns (uint dusdAmount)
     {
-        uint sCrvBal = curveToken.balanceOf(address(this));
+        uint sCrvBal = sCrvBalance();
         uint _old = sCrvToUsd(sCrvBal);
         uint _new = sCrvToUsd(sCrvBal.add(curve.calc_token_amount(inAmounts, true /* deposit */)));
-        return core.usdToDusd(_new.sub(_old));
+        return _new.sub(_old);
     }
 
     function calcMintWithScrv(uint inAmount)
         public view
         returns (uint dusdAmount)
     {
-        return core.usdToDusd(sCrvToUsd(inAmount));
+        return sCrvToUsd(inAmount);
     }
 
     function calcRedeem(uint dusdAmount)
@@ -234,12 +239,11 @@ contract CurveSusdPeak is Initializable, Ownable, IPeak {
     }
 
     function portfolioValue() public view returns(uint) {
-        return sCrvToUsd(curveToken.balanceOf(address(this)));
+        return sCrvToUsd(sCrvBalance());
     }
 
     function usdToScrv(uint usd) public view returns(uint sCrv) {
-        sCrv = curveToken.balanceOf(address(this))
-            .add(gauge.balanceOf(address(this)));
+        sCrv = sCrvBalance();
         uint exchangeRate = sCrvToUsd(1e18);
         if (exchangeRate > 0) {
             sCrv = sCrv.min(usd.mul(1e18).div(exchangeRate));
