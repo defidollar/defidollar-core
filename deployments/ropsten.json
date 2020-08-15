@@ -24,14 +24,16 @@
                 "peak": "curveYPool"
             },
             "DUSD": {
-                "address": "0x0A532c518E6E3AdB103D4a7c60b1a7B327f56759",
+                "address": "0xDb501E63fa7ce2733c4a7967Ee293C406942C568",
                 "decimals": 18
             }
         },
         "curve": {
+            "minter": "0x78b38e9f8586d8fbfa6b8646f5b3a1cab1de8c06",
             "susd": {
                 "swap": "0x5B19FC3C844C857c33678ffc26F267797d94a3fb",
-                "deposit": "0x0b9dA1Cf12C53d75092adCB52D8b2497465006f2"
+                "deposit": "0x0b9dA1Cf12C53d75092adCB52D8b2497465006f2",
+                "gauge": "0x4f780ded7ebc724f9b71b1e6afab7c89e2dab7ce"
             }
         },
         "chainlink": {
@@ -41,11 +43,9 @@
             "usdtEthAggregator": "0xC08fe0C4D97ccda6B40649c6dA621761b628c288",
             "susdEthAggregator": "0xe054B4AeE7AC7645642DD52f1C892Ff0128c98f0"
         },
-        "base": "0xA1Dde9d727080Ea7AC6957876E9b7f4A16862c02",
-        "valley": "0x3e971E11A9330549E9b02f3fe8fea7bfA2aB092C",
         "peaks": {
             "curveSUSDPool": {
-                "address": "0x0bED558A1B3969A1c0A7cDA37D9dcb50Bc5e6691",
+                "address": "0x2fE87f3E83ae54136BbA34AE6A799ffa0E9f9481",
                 "coins": [
                     "DAI",
                     "USDC",
@@ -54,6 +54,9 @@
                 ],
                 "native": "crvPlain3andSUSD"
             }
-        }
+        },
+        "oracle": "0xDEeeCa8cB337df4A0d36d0436Be8D2116d118Ac8",
+        "base": "0x0A1d9AF609BDe7B39EdD3F0004a434EF39dBf4b9",
+        "valley": "0x85F713c623AccCF61029638cEEEBB5407cf3C04d"
     }
 }
