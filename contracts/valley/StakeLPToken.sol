@@ -127,15 +127,15 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     function withdrawAble(address account) public view returns(uint) {
-        uint _withdrawAble = balanceOf(account);
+        uint balance = balanceOf(account);
         if (totalSupply == 0 || deficit == 0) {
-            return _withdrawAble;
+            return balance;
         }
-        uint deficitShare = _withdrawAble.mul(deficit).div(totalSupply);
-        if (deficitShare >= _withdrawAble) {
+        uint deficitShare = balance.mul(deficit).div(totalSupply);
+        if (deficitShare >= balance) {
             return 0;
         }
-        return _withdrawAble.sub(deficitShare);
+        return balance.sub(deficitShare);
     }
 
     // Internal functions
