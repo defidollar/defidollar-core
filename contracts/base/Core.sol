@@ -8,12 +8,13 @@ import {IOracle} from "../interfaces/IOracle.sol";
 import {IStakeLPToken} from "../interfaces/IStakeLPToken.sol";
 import {IPeak} from "../interfaces/IPeak.sol";
 import {IDUSD} from "../interfaces/IDUSD.sol";
+import {ICore} from "../interfaces/ICore.sol";
 
 import {Initializable} from "../common/Initializable.sol";
 import {Ownable} from "../common/Ownable.sol";
 
 
-contract Core is Initializable, Ownable {
+contract Core is Initializable, Ownable, ICore {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
 
@@ -26,8 +27,7 @@ contract Core is Initializable, Ownable {
 
     uint public redeemFactor;
     uint public totalAssets;
-    uint public claimedRewards;
-    uint public totalRewards;
+    uint public unclaimedRewards;
     bool public inDeficit;
 
     // Interface contracts for third-party protocol integrations
@@ -108,7 +108,7 @@ contract Core is Initializable, Ownable {
     */
     function mint(uint usdDelta, address account)
         external
-        checkAndNotifyDeficit
+        // doesn't need checkAndNotifyDeficit because supply and assets increase by the same amount
         returns (uint dusdAmount)
     {
         Peak memory peak = peaks[msg.sender];
@@ -156,7 +156,7 @@ contract Core is Initializable, Ownable {
         totalAssets = totalSystemAssets();
     }
 
-    function rewardDistributionCheckpoint()
+    function rewardDistributionCheckpoint(bool shouldDistribute)
         external
         onlyStakeLPToken
         checkAndNotifyDeficit
@@ -164,7 +164,12 @@ contract Core is Initializable, Ownable {
     {
         (totalAssets, periodIncome) = lastPeriodIncome();
         if (periodIncome > 0) {
-            dusd.mint(address(stakeLPToken), periodIncome);
+            if (shouldDistribute) {
+                dusd.mint(address(stakeLPToken), periodIncome);
+            } else {
+                // stakers didnt get these, will act as extra volatility cushion
+                unclaimedRewards = unclaimedRewards.add(periodIncome);
+            }
         }
     }
 
@@ -176,7 +181,7 @@ contract Core is Initializable, Ownable {
         returns(uint _totalAssets, uint periodIncome)
     {
         _totalAssets = totalSystemAssets();
-        uint supply = dusd.totalSupply();
+        uint supply = dusd.totalSupply().add(unclaimedRewards);
         if (_totalAssets > supply) {
             periodIncome = _totalAssets.sub(supply);
         }

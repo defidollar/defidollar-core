@@ -63,7 +63,8 @@ contract('CurveSusdPeak', async (accounts) => {
             tasks.push(this.reserves[i].approve(this.curveSusdPeak.address, this.amounts[i]))
         }
         await Promise.all(tasks)
-        await this.curveSusdPeak.mint(this.amounts, '0')
+        const tx = await this.curveSusdPeak.mint(this.amounts, '0')
+        console.log({ gasUsed: tx.receipt.gasUsed })
         assert.equal(parseInt(fromWei(await this.dusd.balanceOf(alice))), 217) // 200 + ~(10 + 8)
         assert.equal(parseInt(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address))), 217)
     })

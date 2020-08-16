@@ -70,7 +70,11 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     function updateProtocolIncome() public returns(uint) {
-        uint income = core.rewardDistributionCheckpoint();
+        bool shouldDistribute;
+        if (totalSupply > 0) {
+            shouldDistribute = true;
+        }
+        uint income = core.rewardDistributionCheckpoint(shouldDistribute);
         rewardPerTokenStored = _rewardPerToken(income);
         emit RewardPerTokenUpdated(rewardPerTokenStored, block.timestamp);
         return rewardPerTokenStored;

@@ -26,14 +26,13 @@ contract CurveSusdPeak is Initializable, Ownable, IPeak {
     address[N_COINS] public underlyingCoins;
     uint[N_COINS] public oraclePrices;
 
-    ICurveDeposit public curveDeposit; // deposit contract
-    ICurve public curve; // swap contract
-    IERC20 public curveToken; // LP token contract
-    IUtil public util;
-    IGauge public gauge;
-    IMintr public mintr;
-
-    ICore public core;
+    ICurveDeposit curveDeposit; // deposit contract
+    ICurve curve; // swap contract
+    IERC20 curveToken; // LP token contract
+    IUtil util;
+    IGauge gauge;
+    IMintr mintr;
+    ICore core;
 
     function initialize(
         ICurveDeposit _curveDeposit,
@@ -67,7 +66,7 @@ contract CurveSusdPeak is Initializable, Ownable, IPeak {
         external
         returns (uint dusdAmount)
     {
-        uint _old = portfolioValue();
+        uint _old = curveToken.balanceOf(address(this));
         address[N_COINS] memory coins = underlyingCoins;
         for (uint i = 0; i < N_COINS; i++) {
             if (inAmounts[i] > 0) {
@@ -75,7 +74,8 @@ contract CurveSusdPeak is Initializable, Ownable, IPeak {
             }
         }
         curve.add_liquidity(inAmounts, 0);
-        dusdAmount = core.mint(portfolioValue().sub(_old), msg.sender);
+        uint _new = curveToken.balanceOf(address(this));
+        dusdAmount = core.mint(sCrvToUsd(_new.sub(_old)), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
         if (dusdAmount >= 1e22) { // whale
             stake();
@@ -267,6 +267,26 @@ contract CurveSusdPeak is Initializable, Ownable, IPeak {
         }
         // https://github.com/curvefi/curve-contract/blob/pool_susd_plain/vyper/stableswap.vy#L149
         return util.get_D(balances).mul(sCrvBal).div(sCrvTotalSupply);
+    }
+
+    function deps() public view returns(
+        address _curveDeposit,
+        address _curve,
+        address _curveToken,
+        address _util,
+        address _gauge,
+        address _mintr,
+        address _core
+    ) {
+        return(
+            address(curveDeposit),
+            address(curve),
+            address(curveToken),
+            address(util),
+            address(gauge),
+            address(mintr),
+            address(core)
+        );
     }
 
     /* ##### Internal Functions ##### */
