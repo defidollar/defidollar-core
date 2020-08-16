@@ -150,6 +150,11 @@ contract('StakeLPToken', async (accounts) => {
 		assert.equal(bal.toString(), stakeAmount)
 	})
 
+	it('period income was transferred to stakeLPToken for rewards', async () => {
+		const bal = await this.dusd.balanceOf(this.stakeLPToken.address)
+		assert.equal(parseInt(fromWei(bal)), 14) // alice' stake + 8 income + bob's stake = 14 (+ dust from bob's redeem)
+	})
+
 	it('CurveSusdPeak accrues income=6', async () => {
 		const income = [15, 15, 15, 15].map((n, i) => {
 			return toBN(n).mul(toBN(10 ** (this.decimals[i]-1))) // 1.5 each
