@@ -14,7 +14,7 @@ import {Initializable} from "../common/Initializable.sol";
 import {Ownable} from "../common/Ownable.sol";
 
 
-contract Core is Initializable, Ownable, ICore {
+contract Core is Ownable, Initializable, ICore {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
 
@@ -102,23 +102,24 @@ contract Core is Initializable, Ownable, ICore {
     /**
     * @notice Mint DUSD
     * @dev Only whitelisted peaks can call this function
-    * @param usdDelta Delta of system coins added to the system through a peak
+    * @param dusdAmount DUSD amount to mint
     * @param account Account to mint DUSD to
     * @return dusdAmount DUSD amount minted
     */
-    function mint(uint usdDelta, address account)
+    function mint(uint dusdAmount, address account)
         external
         // doesn't need checkAndNotifyDeficit because supply and assets increase by the same amount
-        returns (uint dusdAmount)
     {
+        require(dusdAmount > 0, "Minting 0");
         Peak memory peak = peaks[msg.sender];
         require(
             peak.state == PeakState.Active,
             "Peak is inactive"
         );
-        dusdAmount = usdDelta; // always
+        // always assumed pegged while minting, even if dusd is devalued
+        // this is required to avoid creating additional deficit
         dusd.mint(account, dusdAmount);
-        totalAssets = totalAssets.add(usdDelta);
+        totalAssets = totalAssets.add(dusdAmount);
         emit Mint(account, dusdAmount);
     }
 
@@ -133,6 +134,7 @@ contract Core is Initializable, Ownable, ICore {
         checkAndNotifyDeficit
         returns(uint usd)
     {
+        require(dusdAmount > 0, "Redeeming 0");
         Peak memory peak = peaks[msg.sender];
         require(
             peak.state != PeakState.Extinct,
@@ -167,7 +169,7 @@ contract Core is Initializable, Ownable, ICore {
             if (shouldDistribute) {
                 dusd.mint(address(stakeLPToken), periodIncome);
             } else {
-                // stakers didnt get these, will act as extra volatility cushion
+                // stakers don't get these, will act as extra volatility cushion
                 unclaimedRewards = unclaimedRewards.add(periodIncome);
             }
         }

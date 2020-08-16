@@ -13,7 +13,7 @@ import {Initializable} from "../../common/Initializable.sol";
 import {Ownable} from "../../common/Ownable.sol";
 import {IGauge, IMintr} from "./IGauge.sol";
 
-contract CurveSusdPeak is Initializable, Ownable, IPeak {
+contract CurveSusdPeak is Ownable, Initializable, IPeak {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
     using Math for uint;
@@ -66,18 +66,21 @@ contract CurveSusdPeak is Initializable, Ownable, IPeak {
         external
         returns (uint dusdAmount)
     {
-        uint _old = curveToken.balanceOf(address(this));
         address[N_COINS] memory coins = underlyingCoins;
         for (uint i = 0; i < N_COINS; i++) {
             if (inAmounts[i] > 0) {
                 IERC20(coins[i]).safeTransferFrom(msg.sender, address(this), inAmounts[i]);
             }
         }
+
+        uint _old = curveToken.balanceOf(address(this));
         curve.add_liquidity(inAmounts, 0);
         uint _new = curveToken.balanceOf(address(this));
-        dusdAmount = core.mint(sCrvToUsd(_new.sub(_old)), msg.sender);
+
+        dusdAmount = sCrvToUsd(_new.sub(_old));
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
-        if (dusdAmount >= 1e22) { // whale
+        core.mint(dusdAmount, msg.sender);
+        if (dusdAmount >= 5e21) { // whale
             stake();
         }
     }
@@ -91,10 +94,11 @@ contract CurveSusdPeak is Initializable, Ownable, IPeak {
         external
         returns (uint dusdAmount)
     {
-        curveToken.safeTransferFrom(msg.sender, address(this), inAmount);
-        dusdAmount = core.mint(sCrvToUsd(inAmount), msg.sender);
+        dusdAmount = sCrvToUsd(inAmount);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
-        if (dusdAmount >= 1e22) { // whale
+        curveToken.safeTransferFrom(msg.sender, address(this), inAmount);
+        core.mint(dusdAmount, msg.sender);
+        if (dusdAmount >= 5e21) { // whale
             stake();
         }
     }
@@ -137,8 +141,8 @@ contract CurveSusdPeak is Initializable, Ownable, IPeak {
         external
     {
         uint sCrv = usdToScrv(core.redeem(dusdAmount, msg.sender));
-        _withdraw(sCrv);
         require(sCrv >= minOut, ERR_SLIPPAGE);
+        _withdraw(sCrv);
         curveToken.safeTransfer(msg.sender, sCrv);
     }
 

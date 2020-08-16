@@ -61,7 +61,8 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     modifier updateReward(address account) {
-        updateProtocolIncome();
+        rewardPerTokenStored = updateProtocolIncome();
+        emit RewardPerTokenUpdated(rewardPerTokenStored, block.timestamp);
         if (account != address(0)) {
             rewards[account] = _earned(rewardPerTokenStored, account);
             userRewardPerTokenPaid[account] = rewardPerTokenStored;
@@ -75,9 +76,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
             shouldDistribute = true;
         }
         uint income = core.rewardDistributionCheckpoint(shouldDistribute);
-        rewardPerTokenStored = _rewardPerToken(income);
-        emit RewardPerTokenUpdated(rewardPerTokenStored, block.timestamp);
-        return rewardPerTokenStored;
+        return _rewardPerToken(income);
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function
@@ -162,6 +161,8 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
                 deficitShare = amount;
                 amount = 0;
             }
+            // burning user's deficitShare will reduce the overall deficit in the system,
+            // since dusd.totalSupply() decreases
             IDUSD(address(dusd)).burnForSelf(deficitShare);
             deficit = deficit.sub(deficitShare);
         }

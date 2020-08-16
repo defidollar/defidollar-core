@@ -1,7 +1,7 @@
 pragma solidity 0.5.17;
 
 interface ICore {
-    function mint(uint usdDelta, address account) external returns (uint dusdAmount);
+    function mint(uint dusdAmount, address account) external;
     function redeem(uint dusdAmount, address account) external returns(uint usd);
     function rewardDistributionCheckpoint(bool shouldDistribute) external returns(uint periodIncome);
 

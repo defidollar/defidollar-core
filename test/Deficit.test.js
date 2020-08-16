@@ -121,7 +121,7 @@ contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) =>
         Object.assign(this, _artifacts)
     })
 
-    it('charlie mints dusd', async () => {
+    it('charlie mints 40 dusd', async () => {
         this.amounts = [10, 10, 10, 10].map((n, i) => {
             return toBN(n).mul(toBN(10 ** this.decimals[i]))
         })
