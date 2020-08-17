@@ -167,19 +167,17 @@ contract Core is Ownable, Initializable, ICore {
         checkAndNotifyDeficit
         returns(uint periodIncome)
     {
-        (totalAssets, periodIncome) = lastPeriodIncome();
+        uint _adminFee;
+        (totalAssets, periodIncome, _adminFee) = lastPeriodIncome();
         if (periodIncome == 0) {
             return 0;
         }
+        // note that we do not account for devalued dusd here
         if (shouldDistribute) {
-            // note that we do not account for devalued dusd here
-            uint _adminFee = periodIncome.mul(adminFee).div(FEE_PRECISION);
+            dusd.mint(address(stakeLPToken), periodIncome);
             if (_adminFee > 0) {
                 dusd.mint(address(this), _adminFee);
-                periodIncome = periodIncome.sub(_adminFee);
             }
-            dusd.mint(address(stakeLPToken), periodIncome);
-
         } else {
             // stakers don't get these, will act as extra volatility cushion
             unclaimedRewards = unclaimedRewards.add(periodIncome);
@@ -191,12 +189,14 @@ contract Core is Ownable, Initializable, ICore {
     function lastPeriodIncome()
         public
         view
-        returns(uint _totalAssets, uint periodIncome)
+        returns(uint _totalAssets, uint periodIncome, uint _adminFee)
     {
         _totalAssets = totalSystemAssets();
         uint supply = dusd.totalSupply().add(unclaimedRewards);
         if (_totalAssets > supply) {
             periodIncome = _totalAssets.sub(supply);
+            _adminFee = periodIncome.mul(adminFee).div(FEE_PRECISION);
+            periodIncome = periodIncome.sub(_adminFee);
         }
     }
 
