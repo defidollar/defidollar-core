@@ -150,6 +150,11 @@ contract('StakeLPToken', async (accounts) => {
 		assert.equal(bal.toString(), stakeAmount)
 	})
 
+	it('period income was transferred to stakeLPToken for rewards', async () => {
+		const bal = await this.dusd.balanceOf(this.stakeLPToken.address)
+		assert.equal(parseInt(fromWei(bal)), 14) // alice' stake + 8 income + bob's stake = 14 (+ dust from bob's redeem)
+	})
+
 	it('CurveSusdPeak accrues income=6', async () => {
 		const income = [15, 15, 15, 15].map((n, i) => {
 			return toBN(n).mul(toBN(10 ** (this.decimals[i]-1))) // 1.5 each
@@ -185,20 +190,34 @@ contract('StakeLPToken', async (accounts) => {
 		)
 	})
 
+	it('10% admin fee was introduced', async () => {
+		await this.core.setFee(
+			await this.core.redeemFactor(), // unchanged
+			1000 // FEE_PRECISION = 10k
+		)
+	})
+
 	it('alice withdraws stake', async () => {
 		await this.stakeLPToken.withdraw(toWei('4')) // staked=4
 		const dusdBal = await this.dusd.balanceOf(alice)
 		assert.equal(dusdBal.toString(), toWei('44')) // (original) 40 + 4 (previous reward)
 	})
 
+	it('admin withdraws fee', async () => {
+		const destination = accounts[5]
+		await this.core.withdrawAdminFee(destination)
+		let fee = fromWei(await this.dusd.balanceOf(destination))
+		assert.equal(fee, '0.3')
+	})
+
 	it('alice exits', async () => {
-		// 8 + 6 * 4/6 + 3 = 15
+		// 8 + 6 * 4/6 + 3 * .9 (admin fee) = 14.7
 		let earned = parseInt(fromWei(await this.stakeLPToken.earned(alice)))
-		assert.equal(earned, 15)
+		assert.equal(earned, 14)
 
 		await this.stakeLPToken.exit()
 		const dusdBal = parseInt(fromWei(await this.dusd.balanceOf(alice)))
-		assert.equal(dusdBal, 59) // 44 + 15
+		assert.equal(dusdBal, 58) // 44 + 14
 
 		earned = await this.stakeLPToken.earned(alice)
 		assert.equal(earned.toString(), '0')

@@ -53,14 +53,10 @@ contract('core-client-lib: CurveSusdPeak', async (accounts) => {
 
     it('peak.mintWithScrv', async () => {
         const inAmount = toBN(await this.curveToken.balanceOf(alice)).div(toBN(2)).toString()
-        console.log('here 1')
         await this.curveToken.approve(this.curveSusdPeak.address, inAmount)
-        console.log('here 2')
         const tokens = { crvPlain3andSUSD: 200 }
         const { expectedAmount } = await this.client.calcExpectedMintAmount(tokens)
-        console.log('here 3')
         await this.client.mint(tokens, '200', '.05', { from: alice })
-        console.log('here 4')
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '200')
         assert.equal(fromWei(expectedAmount), '200')
         assert.equal(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address)), '200')

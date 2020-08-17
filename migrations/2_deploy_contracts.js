@@ -73,6 +73,7 @@ module.exports = async function(deployer, network, accounts) {
             StakeLPTokenProxy.address,
             Oracle.address,
             9999, // .01% redeem fee, 0.05% fee would be 9995
+            0, // 0 admin fee
         ).encodeABI()
     )
     await core.whitelistTokens(tokens)
