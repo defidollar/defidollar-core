@@ -168,20 +168,21 @@ contract Core is Ownable, Initializable, ICore {
         returns(uint periodIncome)
     {
         (totalAssets, periodIncome) = lastPeriodIncome();
-        if (periodIncome > 0) {
-            if (shouldDistribute) {
-                // note that we do not account for devalued dusd here
-                uint _adminFee = periodIncome.mul(adminFee).div(FEE_PRECISION);
-                if (_adminFee > 0) {
-                    dusd.mint(address(this), _adminFee);
-                    periodIncome = periodIncome.sub(_adminFee);
-                }
-                dusd.mint(address(stakeLPToken), periodIncome);
-
-            } else {
-                // stakers don't get these, will act as extra volatility cushion
-                unclaimedRewards = unclaimedRewards.add(periodIncome);
+        if (periodIncome == 0) {
+            return 0;
+        }
+        if (shouldDistribute) {
+            // note that we do not account for devalued dusd here
+            uint _adminFee = periodIncome.mul(adminFee).div(FEE_PRECISION);
+            if (_adminFee > 0) {
+                dusd.mint(address(this), _adminFee);
+                periodIncome = periodIncome.sub(_adminFee);
             }
+            dusd.mint(address(stakeLPToken), periodIncome);
+
+        } else {
+            // stakers don't get these, will act as extra volatility cushion
+            unclaimedRewards = unclaimedRewards.add(periodIncome);
         }
     }
 
