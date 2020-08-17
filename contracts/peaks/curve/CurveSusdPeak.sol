@@ -77,9 +77,8 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         curve.add_liquidity(inAmounts, 0);
         uint _new = curveToken.balanceOf(address(this));
 
-        dusdAmount = sCrvToUsd(_new.sub(_old));
+        dusdAmount = core.mint(sCrvToUsd(_new.sub(_old)), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
-        core.mint(dusdAmount, msg.sender);
         if (dusdAmount >= 5e21) { // whale
             stake();
         }
@@ -94,10 +93,9 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         external
         returns (uint dusdAmount)
     {
-        dusdAmount = sCrvToUsd(inAmount);
+        dusdAmount = core.mint(sCrvToUsd(inAmount), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
         curveToken.safeTransferFrom(msg.sender, address(this), inAmount);
-        core.mint(dusdAmount, msg.sender);
         if (dusdAmount >= 5e21) { // whale
             stake();
         }
@@ -202,14 +200,14 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         uint sCrvBal = sCrvBalance();
         uint _old = sCrvToUsd(sCrvBal);
         uint _new = sCrvToUsd(sCrvBal.add(curve.calc_token_amount(inAmounts, true /* deposit */)));
-        return _new.sub(_old);
+        return core.usdToDusd(_new.sub(_old));
     }
 
     function calcMintWithScrv(uint inAmount)
         public view
         returns (uint dusdAmount)
     {
-        return sCrvToUsd(inAmount);
+        return core.usdToDusd(sCrvToUsd(inAmount));
     }
 
     function calcRedeem(uint dusdAmount)

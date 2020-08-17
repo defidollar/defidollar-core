@@ -203,12 +203,12 @@ contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) =>
 
     it('all dusd can be redeemed (race to exit was avoided)', async () => {
         const balances = { old: { bob: [], charlie: [] }, new: { bob: [], charlie: [] } }
-        const divisors = []
+        this.divisors = []
         if (process.env.DEBUG == 'true') {
             for (let i = 0; i < n_coins; i++) {
-                divisors.push(toBN(10 ** this.decimals[i]))
-                balances.old.bob.push((await this.reserves[i].balanceOf(bob)).div(divisors[i]).toString())
-                balances.old.charlie.push((await this.reserves[i].balanceOf(charlie)).div(divisors[i]).toString())
+                this.divisors.push(toBN(10 ** this.decimals[i]))
+                balances.old.bob.push((await this.reserves[i].balanceOf(bob)).div(this.divisors[i]).toString())
+                balances.old.charlie.push((await this.reserves[i].balanceOf(charlie)).div(this.divisors[i]).toString())
             }
         }
 
@@ -217,8 +217,8 @@ contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) =>
 
         if (process.env.DEBUG == 'true') {
             for (let i = 0; i < n_coins; i++) {
-                balances.new.bob.push((await this.reserves[i].balanceOf(bob)).div(divisors[i]).toString())
-                balances.new.charlie.push((await this.reserves[i].balanceOf(charlie)).div(divisors[i]).toString())
+                balances.new.bob.push((await this.reserves[i].balanceOf(bob)).div(this.divisors[i]).toString())
+                balances.new.charlie.push((await this.reserves[i].balanceOf(charlie)).div(this.divisors[i]).toString())
             }
             console.log(balances)
         }
@@ -231,5 +231,20 @@ contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) =>
         assert.equal(parseFloat(deficit).toFixed(3), 9.999)
         assert.equal(fromWei(await this.dusd.totalSupply()), 10) // staked funds
         assert.equal(fromWei(await this.dusd.balanceOf(this.stakeLPToken.address)), 10)
+    })
+
+    it('minting and redeeming devalued dusd is unprofitable', async () => {
+        const bals = []
+        for (let i = 0; i < n_coins; i++) {
+            bals.push((await this.reserves[i].balanceOf(bob)))
+            await this.reserves[i].approve(this.curveSusdPeak.address, bals[i], { from: bob })
+        }
+        await this.curveSusdPeak.mint(bals, 0, { from: bob })
+        await this.curveSusdPeak.redeem(await this.dusd.balanceOf(bob), [0,0,0,0], { from: bob })
+        for (let i = 0; i < n_coins; i++) {
+            assert.ok(
+                toBN(await this.reserves[i].balanceOf(bob)).lt(bals[i])
+            )
+        }
     })
 })

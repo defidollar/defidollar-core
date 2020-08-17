@@ -18,17 +18,18 @@ contract Core is Ownable, Initializable, ICore {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
 
-    uint constant REDEEM_FACTOR_PRECISION = 10000;
+    uint constant FEE_PRECISION = 10000;
 
     IDUSD public dusd;
     IStakeLPToken public stakeLPToken;
     IOracle public oracle;
     address[] public systemCoins;
 
-    uint public redeemFactor;
     uint public totalAssets;
     uint public unclaimedRewards;
     bool public inDeficit;
+    uint public redeemFactor;
+    uint public adminFee;
 
     // Interface contracts for third-party protocol integrations
     enum PeakState { Extinct, Active, Dormant }
@@ -79,7 +80,8 @@ contract Core is Ownable, Initializable, ICore {
         IDUSD _dusd,
         IStakeLPToken _stakeLPToken,
         IOracle _oracle,
-        uint _redeemFactor
+        uint _redeemFactor,
+        uint _adminFee
     )   public
         notInitialized
     {
@@ -89,14 +91,15 @@ contract Core is Ownable, Initializable, ICore {
             address(_oracle) != address(0),
             "0 address during initialization"
         );
-        require(
-            _redeemFactor <= REDEEM_FACTOR_PRECISION,
-            "Contract will end up giving a premium"
-        );
         dusd = _dusd;
         stakeLPToken = _stakeLPToken;
         oracle = _oracle;
+        require(
+            _redeemFactor <= FEE_PRECISION && _adminFee <= FEE_PRECISION,
+            "Incorrect upper bound for fee"
+        );
         redeemFactor = _redeemFactor;
+        adminFee = _adminFee;
     }
 
     /**
@@ -106,20 +109,20 @@ contract Core is Ownable, Initializable, ICore {
     * @param account Account to mint DUSD to
     * @return dusdAmount DUSD amount minted
     */
-    function mint(uint dusdAmount, address account)
+    function mint(uint usdDelta, address account)
         external
-        // doesn't need checkAndNotifyDeficit because supply and assets increase by the same amount
+        checkAndNotifyDeficit
+        returns(uint dusdAmount)
     {
-        require(dusdAmount > 0, "Minting 0");
+        require(usdDelta > 0, "Minting 0");
         Peak memory peak = peaks[msg.sender];
         require(
             peak.state == PeakState.Active,
             "Peak is inactive"
         );
-        // always assumed pegged while minting, even if dusd is devalued
-        // this is required to avoid creating additional deficit
+        dusdAmount = usdToDusd(usdDelta);
         dusd.mint(account, dusdAmount);
-        totalAssets = totalAssets.add(dusdAmount);
+        totalAssets = totalAssets.add(usdDelta);
         emit Mint(account, dusdAmount);
     }
 
@@ -167,7 +170,14 @@ contract Core is Ownable, Initializable, ICore {
         (totalAssets, periodIncome) = lastPeriodIncome();
         if (periodIncome > 0) {
             if (shouldDistribute) {
+                // note that we do not account for devalued dusd here
+                uint _adminFee = periodIncome.mul(adminFee).div(FEE_PRECISION);
+                if (_adminFee > 0) {
+                    dusd.mint(address(this), _adminFee);
+                    periodIncome = periodIncome.sub(_adminFee);
+                }
                 dusd.mint(address(stakeLPToken), periodIncome);
+
             } else {
                 // stakers don't get these, will act as extra volatility cushion
                 unclaimedRewards = unclaimedRewards.add(periodIncome);
@@ -207,6 +217,25 @@ contract Core is Ownable, Initializable, ICore {
         }
     }
 
+    function usdToDusd(uint usd)
+        public
+        view
+        returns(uint)
+    {
+        // system is healthy. Pegged at $1
+        if (!inDeficit) {
+            return usd;
+        }
+        // system is in deficit, see if staked funds can make up for it
+        uint supply = dusd.totalSupply();
+        uint perceivedSupply = supply.sub(stakeLPToken.totalSupply());
+        // staked funds make up for the deficit
+        if (perceivedSupply <= totalAssets) {
+            return usd;
+        }
+        return usd.mul(perceivedSupply).div(totalAssets);
+    }
+
     function dusdToUsd(uint _dusd, bool fee)
         public
         view
@@ -228,7 +257,7 @@ contract Core is Ownable, Initializable, ICore {
             }
         }
         if (fee) {
-            usd = usd.mul(redeemFactor).div(REDEEM_FACTOR_PRECISION);
+            usd = usd.mul(redeemFactor).div(FEE_PRECISION);
         }
         return usd;
     }
@@ -290,6 +319,26 @@ contract Core is Ownable, Initializable, ICore {
             "Peak is extinct"
         );
         peaks[peak].state = state;
+    }
+
+    function setFee(uint _redeemFactor, uint _adminFee)
+        external
+        onlyOwner
+    {
+        require(
+            _redeemFactor <= FEE_PRECISION && _adminFee <= FEE_PRECISION,
+            "Incorrect upper bound for fee"
+        );
+        redeemFactor = _redeemFactor;
+        adminFee = _adminFee;
+    }
+
+    function withdrawAdminFee(address destination)
+        external
+        onlyOwner
+    {
+        IERC20 _dusd = IERC20(address(dusd));
+        _dusd.safeTransfer(destination, _dusd.balanceOf(address(this)));
     }
 
     /* ##### Internal functions ##### */
