@@ -50,7 +50,7 @@ contract('CurveSusdPeak', async (accounts) => {
         const inAmount = toBN(await this.curveToken.balanceOf(alice)).div(toBN(2)).toString()
         await this.curveToken.approve(this.curveSusdPeak.address, inAmount)
         await this.curveSusdPeak.mintWithScrv(inAmount, '0')
-        assert.equal(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address)), '200')
+        assert.equal(fromWei(await this.curveSusdPeak.sCrvBalance()), '200')
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '200')
         assert.equal(fromWei(await this.dusd.balanceOf(alice)), '200')
     })
@@ -65,7 +65,7 @@ contract('CurveSusdPeak', async (accounts) => {
         await Promise.all(tasks)
         await this.curveSusdPeak.mint(this.amounts, '0')
         assert.equal(parseInt(fromWei(await this.dusd.balanceOf(alice))), 217) // 200 + ~(10 + 8)
-        assert.equal(parseInt(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address))), 217)
+        assert.equal(parseInt(fromWei(await this.curveSusdPeak.sCrvBalance())), 217)
     })
 
     it('peak.redeem: Alice redeems 1/2 her dusd', async () => {

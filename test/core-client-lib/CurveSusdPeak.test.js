@@ -59,7 +59,7 @@ contract('core-client-lib: CurveSusdPeak', async (accounts) => {
         await this.client.mint(tokens, '200', '.05', { from: alice })
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '200')
         assert.equal(fromWei(expectedAmount), '200')
-        assert.equal(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address)), '200')
+        assert.equal(fromWei(await this.curveSusdPeak.sCrvBalance()), '200')
         assert.equal(fromWei(await this.dusd.balanceOf(alice)), '200')
     })
 
@@ -76,7 +76,7 @@ contract('core-client-lib: CurveSusdPeak', async (accounts) => {
         await this.client.mint(tokens, '17', '.01', { from: alice })
         assert.equal(parseInt(fromWei(expectedAmount)), 17)
         assert.equal(parseInt(fromWei(await this.dusd.balanceOf(alice))), 217) // 200 + ~(10 + 8)
-        assert.equal(parseInt(fromWei(await this.curveToken.balanceOf(this.curveSusdPeak.address))), 217)
+        assert.equal(parseInt(fromWei(await this.curveSusdPeak.sCrvBalance())), 217)
     })
 
     it('peak.redeem: Alice redeems 1/2 her dusd', async () => {

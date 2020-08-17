@@ -32,7 +32,7 @@ contract('StakeLPToken', async (accounts) => {
 
 		const dusdBalance = await this.dusd.balanceOf(alice)
 		assert.equal(dusdBalance.toString(), toWei('40'))
-		assert.equal((await this.curveToken.balanceOf(this.curveSusdPeak.address)).toString(), toWei('40'))
+		assert.equal(await this.curveSusdPeak.sCrvBalance(), toWei('40'))
 		await utils.assertions({ dusdTotalSupply: toWei('40') }, _artifacts)
 	})
 
@@ -48,7 +48,7 @@ contract('StakeLPToken', async (accounts) => {
 
 		this.dusdBalance = await this.dusd.balanceOf(bob)
 		assert.equal(this.dusdBalance.toString(), toWei('20'))
-		assert.equal((await this.curveToken.balanceOf(this.curveSusdPeak.address)).toString(), toWei('60'))
+		assert.equal(await this.curveSusdPeak.sCrvBalance(), toWei('60'))
 		await this.assertions({ dusdTotalSupply: toWei('60') })
 	})
 

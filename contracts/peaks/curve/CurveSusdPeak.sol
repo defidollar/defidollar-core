@@ -79,9 +79,7 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
 
         dusdAmount = core.mint(sCrvToUsd(_new.sub(_old)), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
-        if (dusdAmount >= 5e21) { // whale
-            stake();
-        }
+        stake();
     }
 
     /**
@@ -96,9 +94,7 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         dusdAmount = core.mint(sCrvToUsd(inAmount), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
         curveToken.safeTransferFrom(msg.sender, address(this), inAmount);
-        if (dusdAmount >= 5e21) { // whale
-            stake();
-        }
+        stake();
     }
 
     /**
@@ -197,10 +193,8 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         public view
         returns (uint dusdAmount)
     {
-        uint sCrvBal = sCrvBalance();
-        uint _old = sCrvToUsd(sCrvBal);
-        uint _new = sCrvToUsd(sCrvBal.add(curve.calc_token_amount(inAmounts, true /* deposit */)));
-        return core.usdToDusd(_new.sub(_old));
+        uint usd = sCrvToUsd(curve.calc_token_amount(inAmounts, true /* deposit */));
+        return core.usdToDusd(usd);
     }
 
     function calcMintWithScrv(uint inAmount)
