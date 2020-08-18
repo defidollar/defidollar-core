@@ -1,0 +1,64 @@
+{
+    "contracts": {
+        "tokens": {
+            "DAI": {
+                "address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
+                "decimals": 18
+            },
+            "USDC": {
+                "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+                "decimals": 6
+            },
+            "USDT": {
+                "address": "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+                "decimals": 6
+            },
+            "sUSD": {
+                "address": "0x57Ab1ec28D129707052df4dF418D58a2D46d5f51",
+                "decimals": 18
+            },
+            "crvPlain3andSUSD": {
+                "address": "0xC25a3A3b969415c80451098fa907EC722572917F",
+                "decimals": 18,
+                "name": "Curve.fi DAI/USDC/USDT/sUSD",
+                "peak": "curveYPool"
+            },
+            "DUSD": {
+                "address": "0xbF70Ea3f20Dc762a6323071abb2Ca3735dcCDa67",
+                "decimals": 18
+            }
+        },
+        "curve": {
+            "snx": "0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F",
+            "crv": "0xD533a949740bb3306d119CC777fa900bA034cd52",
+            "minter": "0xd061d61a4d941c39e5453435b6345dc261c2fce0",
+            "susd": {
+                "swap": "0xA5407eAE9Ba41422680e2e00537571bcC53efBfD",
+                "deposit": "0xFCBa3E75865d2d561BE8D220616520c171F12851",
+                "gauge": "0xA90996896660DEcC6E997655E065b23788857849"
+            }
+        },
+        "chainlink": {
+            "ethUsdAggregator": "0x5f4eC3Df9cbd43714FE2740f5E3616155c5b8419",
+            "daiEthAggregator": "0x773616E4d11A78F511299002da57A0a94577F1f4",
+            "usdcEthAggregator": "0x986b5E1e1755e3C2440e960477f25201B0a8bbD4",
+            "usdtEthAggregator": "0xEe9F2375b4bdF6387aa8265dD4FB8F16512A1d46",
+            "susdEthAggregator": "0x8e0b7e6062272B5eF4524250bFFF8e5Bd3497757"
+        },
+        "peaks": {
+            "curveSUSDPool": {
+                "address": "0x872F66de4408F95837014552300deBAdB45021e8",
+                "coins": [
+                    "DAI",
+                    "USDC",
+                    "USDT",
+                    "sUSD"
+                ],
+                "native": "crvPlain3andSUSD"
+            }
+        },
+        "oracle": "0x00f0eD85D165Ab505944014F2ff530F8ff77654C",
+        "base": "0xD6647C5eF783eACc4f02686E3DC62198394702A5",
+        "valley": "0x44c9D70D1148D88134ddc6554C94d2F8191754CF"
+    }
+}

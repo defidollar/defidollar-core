@@ -195,8 +195,10 @@ contract Core is Ownable, Initializable, ICore {
         uint supply = dusd.totalSupply().add(unclaimedRewards);
         if (_totalAssets > supply) {
             periodIncome = _totalAssets.sub(supply);
-            _adminFee = periodIncome.mul(adminFee).div(FEE_PRECISION);
-            periodIncome = periodIncome.sub(_adminFee);
+            if (adminFee > 0) {
+                _adminFee = periodIncome.mul(adminFee).div(FEE_PRECISION);
+                periodIncome = periodIncome.sub(_adminFee);
+            }
         }
     }
 
