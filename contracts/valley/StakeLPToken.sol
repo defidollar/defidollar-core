@@ -55,7 +55,10 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
         _;
     }
 
-    function initialize(ICore _core, IERC20 _dusd) public notInitialized {
+    function initialize(ICore _core, IERC20 _dusd)
+        public
+        notInitialized
+    {
         core = _core;
         dusd = _dusd;
     }

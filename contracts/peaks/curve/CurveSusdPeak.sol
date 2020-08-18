@@ -73,11 +73,11 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
             }
         }
 
-        uint _old = curveToken.balanceOf(address(this));
+        uint _old = portfolioValue();
         curve.add_liquidity(inAmounts, 0);
-        uint _new = curveToken.balanceOf(address(this));
+        uint _new = portfolioValue();
 
-        dusdAmount = core.mint(sCrvToUsd(_new.sub(_old)), msg.sender);
+        dusdAmount = core.mint(_new.sub(_old), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
         stake();
     }
@@ -105,7 +105,8 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     function redeem(uint dusdAmount, uint[N_COINS] calldata minAmounts)
         external
     {
-        uint sCrv = usdToScrv(core.redeem(dusdAmount, msg.sender));
+        uint sCrv = sCrvBalance()
+            .min(usdToScrv(core.redeem(dusdAmount, msg.sender)));
         _withdraw(sCrv);
         curve.remove_liquidity(sCrv, ZEROES);
         address[N_COINS] memory coins = underlyingCoins;
@@ -122,7 +123,8 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     function redeemInSingleCoin(uint dusdAmount, uint i, uint minOut)
         external
     {
-        uint sCrv = usdToScrv(core.redeem(dusdAmount, msg.sender));
+        uint sCrv = sCrvBalance()
+            .min(usdToScrv(core.redeem(dusdAmount, msg.sender)));
         _withdraw(sCrv);
         curveDeposit.remove_liquidity_one_coin(sCrv, int128(i), minOut, false);
         IERC20 coin = IERC20(underlyingCoins[i]);
@@ -134,7 +136,8 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     function redeemInScrv(uint dusdAmount, uint minOut)
         external
     {
-        uint sCrv = usdToScrv(core.redeem(dusdAmount, msg.sender));
+        uint sCrv = sCrvBalance()
+            .min(usdToScrv(core.redeem(dusdAmount, msg.sender)));
         require(sCrv >= minOut, ERR_SLIPPAGE);
         _withdraw(sCrv);
         curveToken.safeTransfer(msg.sender, sCrv);
@@ -183,11 +186,6 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     }
 
     /* ##### View Functions ##### */
-
-    function sCrvBalance() public view returns(uint) {
-        return curveToken.balanceOf(address(this))
-            .add(gauge.balanceOf(address(this)));
-    }
 
     function calcMint(uint[N_COINS] memory inAmounts)
         public view
@@ -238,11 +236,15 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         return sCrvToUsd(sCrvBalance());
     }
 
+    function sCrvBalance() public view returns(uint) {
+        return curveToken.balanceOf(address(this))
+            .add(gauge.balanceOf(address(this)));
+    }
+
     function usdToScrv(uint usd) public view returns(uint sCrv) {
-        sCrv = sCrvBalance();
         uint exchangeRate = sCrvToUsd(1e18);
         if (exchangeRate > 0) {
-            sCrv = sCrv.min(usd.mul(1e18).div(exchangeRate));
+            return usd.mul(1e18).div(exchangeRate);
         }
     }
 

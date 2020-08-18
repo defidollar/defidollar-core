@@ -180,7 +180,7 @@ contract Core is Ownable, Initializable, ICore {
             }
         } else {
             // stakers don't get these, will act as extra volatility cushion
-            unclaimedRewards = unclaimedRewards.add(periodIncome);
+            unclaimedRewards = unclaimedRewards.add(periodIncome).add(_adminFee);
         }
     }
 
