@@ -160,12 +160,6 @@ contract Core is Ownable, Initializable, ICore {
         _syncSystem();
     }
 
-    function _syncSystem()
-        internal
-    {
-        totalAssets = _updateFeed();
-    }
-
     function rewardDistributionCheckpoint(bool shouldDistribute)
         external
         onlyStakeLPToken
@@ -194,10 +188,10 @@ contract Core is Ownable, Initializable, ICore {
 
     function lastPeriodIncome()
         public view
-        returns(uint _totalAssetsNow, uint periodIncome, uint _adminFee)
+        returns(uint _totalAssets, uint periodIncome, uint _adminFee)
     {
-        _totalAssetsNow = totalSystemAssets();
-        (periodIncome, _adminFee) = _lastPeriodIncome(_totalAssetsNow);
+        _totalAssets = totalSystemAssets();
+        (periodIncome, _adminFee) = _lastPeriodIncome(_totalAssets);
     }
 
     /**
@@ -206,12 +200,12 @@ contract Core is Ownable, Initializable, ICore {
     */
     function currentSystemState()
         public view
-        returns (uint _totalAssets, bool _inDeficit)
+        returns (uint _totalAssets, uint deficit)
     {
         _totalAssets = totalSystemAssets();
         uint supply = dusd.totalSupply();
         if (supply > _totalAssets) {
-            _inDeficit = true;
+            deficit = supply.sub(_totalAssets);
         }
     }
 
@@ -391,6 +385,12 @@ contract Core is Ownable, Initializable, ICore {
                 _periodIncome = _periodIncome.sub(_adminFee);
             }
         }
+    }
+
+    function _syncSystem()
+        internal
+    {
+        totalAssets = _updateFeed();
     }
 
     function _whitelistToken(address token)
