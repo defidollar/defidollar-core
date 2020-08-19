@@ -154,11 +154,16 @@ contract Core is Ownable, Initializable, ICore {
     * @dev Anyone can call this
     */
     function syncSystem()
-        external
+        public
         checkAndNotifyDeficit
     {
-        _updateFeed();
-        totalAssets = totalSystemAssets();
+        _syncSystem();
+    }
+
+    function _syncSystem()
+        internal
+    {
+        totalAssets = _updateFeed();
     }
 
     function rewardDistributionCheckpoint(bool shouldDistribute)
@@ -167,8 +172,9 @@ contract Core is Ownable, Initializable, ICore {
         checkAndNotifyDeficit
         returns(uint periodIncome)
     {
+        _syncSystem(); // totalAssets was updated
         uint _adminFee;
-        (totalAssets, periodIncome, _adminFee) = lastPeriodIncome();
+        (,periodIncome, _adminFee) = lastPeriodIncome();
         if (periodIncome == 0) {
             return 0;
         }
@@ -191,7 +197,7 @@ contract Core is Ownable, Initializable, ICore {
         view
         returns(uint _totalAssets, uint periodIncome, uint _adminFee)
     {
-        _totalAssets = totalSystemAssets();
+        _totalAssets = totalAssets;
         uint supply = dusd.totalSupply().add(unclaimedRewards);
         if (_totalAssets > supply) {
             periodIncome = _totalAssets.sub(supply);
@@ -206,17 +212,18 @@ contract Core is Ownable, Initializable, ICore {
     * @notice Returns the net system assets across all peaks
     * @return _totalAssets system assets denominated in dollars
     */
-    function totalSystemAssets()
+    function totalSystemAssetsNow()
         public
         view
         returns (uint _totalAssets)
     {
+        uint[] memory feed = oracle.getPriceFeed();
         for (uint i = 0; i < peaksAddresses.length; i++) {
             Peak memory peak = peaks[peaksAddresses[i]];
             if (peak.state == PeakState.Extinct) {
                 continue;
             }
-            _totalAssets = _totalAssets.add(IPeak(peaksAddresses[i]).portfolioValue());
+            _totalAssets = _totalAssets.add(IPeak(peaksAddresses[i]).portfolioValueWithFeed(feed));
         }
     }
 
@@ -348,6 +355,7 @@ contract Core is Ownable, Initializable, ICore {
 
     function _updateFeed()
         internal
+        returns(uint _totalAssets)
     {
         uint[] memory feed = oracle.getPriceFeed();
         require(feed.length == systemCoins.length, "Invalid system state");
@@ -362,7 +370,8 @@ contract Core is Ownable, Initializable, ICore {
             for (uint j = 0; j < prices.length; j++) {
                 prices[j] = feed[peak.systemCoinIds[j]];
             }
-            IPeak(peaksAddresses[i]).updateFeed(prices);
+            _totalAssets = _totalAssets.add(
+                IPeak(peaksAddresses[i]).updateFeed(prices, true /* calcPortfolio */));
         }
         emit FeedUpdated(feed);
     }
