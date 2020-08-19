@@ -244,7 +244,7 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     }
 
     function sCrvToUsd(uint sCrvBal) public view returns(uint) {
-        _sCrvToUsd(sCrvBal, oraclePrices);
+        return _sCrvToUsd(sCrvBal, oraclePrices);
     }
 
     function portfolioValue() public view returns(uint) {

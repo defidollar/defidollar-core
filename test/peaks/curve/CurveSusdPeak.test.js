@@ -7,7 +7,7 @@ const toBN = web3.utils.toBN
 const MAX = web3.utils.toTwosComplement(-1);
 const n_coins = 4
 
-contract.only('CurveSusdPeak', async (accounts) => {
+contract('CurveSusdPeak', async (accounts) => {
     let alice = accounts[0]
 
     before(async () => {
@@ -34,7 +34,7 @@ contract.only('CurveSusdPeak', async (accounts) => {
         )
     })
 
-    it.only('curveSusd.add_liquidity', async () => {
+    it('curveSusd.add_liquidity', async () => {
         this.amounts = [100, 100, 100, 100]
         const tasks = []
         for (let i = 0; i < n_coins; i++) {
@@ -46,11 +46,9 @@ contract.only('CurveSusdPeak', async (accounts) => {
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '400')
     })
 
-    it.only('peak.mintWithScrv', async () => {
+    it('peak.mintWithScrv', async () => {
         const inAmount = toBN(await this.curveToken.balanceOf(alice)).div(toBN(2)).toString()
         await this.curveToken.approve(this.curveSusdPeak.address, inAmount)
-        console.log(await this.curveSusdPeak.oracleFeed())
-        console.log((await this.curveSusdPeak.sCrvToUsd('1000000000000000000')).toString())
         await this.curveSusdPeak.mintWithScrv(inAmount, '0')
         assert.equal(fromWei(await this.curveSusdPeak.sCrvBalance()), '200')
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '200')
