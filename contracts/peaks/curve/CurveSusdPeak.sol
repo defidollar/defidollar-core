@@ -150,12 +150,16 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         gauge.deposit(curveToken.balanceOf(address(this)));
     }
 
-    function updateFeed(uint[] calldata _prices) external {
+    function updateFeed(uint[] calldata feed)
+        external
+        returns(uint /* portfolio */)
+    {
         require(msg.sender == address(core), "ERR_NOT_AUTH");
-        require(_prices.length == N_COINS, "ERR_INVALID_UPDATE");
+        require(feed.length == N_COINS, "ERR_INVALID_UPDATE");
         for (uint i = 0; i < N_COINS; i++) {
-            oraclePrices[i] = _prices[i];
+            oraclePrices[i] = feed[i];
         }
+        return portfolioValue();
     }
 
     // This is risky (Bancor Hack Scenario).
@@ -232,8 +236,28 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         amount = curveDeposit.calc_withdraw_one_coin(sCrv, int128(i));
     }
 
+    function usdToScrv(uint usd) public view returns(uint sCrv) {
+        uint exchangeRate = _sCrvToUsd(1e18, oraclePrices);
+        if (exchangeRate > 0) {
+            return usd.mul(1e18).div(exchangeRate);
+        }
+    }
+
+    function sCrvToUsd(uint sCrvBal) public view returns(uint) {
+        return _sCrvToUsd(sCrvBal, oraclePrices);
+    }
+
     function portfolioValue() public view returns(uint) {
-        return sCrvToUsd(sCrvBalance());
+        return _sCrvToUsd(sCrvBalance(), oraclePrices);
+    }
+
+    function portfolioValueWithFeed(uint[] memory feed) public view returns(uint) {
+        // return 0;
+        uint[N_COINS] memory _feed;
+        for (uint i = 0; i < N_COINS; i++) {
+            _feed[i] = feed[i];
+        }
+        return _sCrvToUsd(sCrvBalance(), _feed);
     }
 
     function sCrvBalance() public view returns(uint) {
@@ -241,30 +265,10 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
             .add(gauge.balanceOf(address(this)));
     }
 
-    function usdToScrv(uint usd) public view returns(uint sCrv) {
-        uint exchangeRate = sCrvToUsd(1e18);
-        if (exchangeRate > 0) {
-            return usd.mul(1e18).div(exchangeRate);
+    function oracleFeed() public view returns (uint[N_COINS] memory feed) {
+        for(uint i = 0; i < N_COINS; i++) {
+            feed[i] = oraclePrices[i];
         }
-    }
-
-    function sCrvToUsd(uint sCrvBal) public view returns(uint) {
-        uint sCrvTotalSupply = curveToken.totalSupply();
-        if (sCrvTotalSupply == 0 || sCrvBal == 0) {
-            return 0;
-        }
-        uint[N_COINS] memory balances;
-        uint[N_COINS] memory prices = oraclePrices;
-        for (uint i = 0; i < N_COINS; i++) {
-            balances[i] = curve.balances(int128(i)).mul(prices[i]);
-            if (i == 0 || i == 3) {
-                balances[i] = balances[i].div(1e18);
-            } else {
-                balances[i] = balances[i].div(1e6);
-            }
-        }
-        // https://github.com/curvefi/curve-contract/blob/pool_susd_plain/vyper/stableswap.vy#L149
-        return util.get_D(balances).mul(sCrvBal).div(sCrvTotalSupply);
     }
 
     function deps() public view returns(
@@ -288,6 +292,27 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     }
 
     /* ##### Internal Functions ##### */
+
+    function _sCrvToUsd(uint sCrvBal, uint[N_COINS] memory prices)
+        internal view
+        returns(uint)
+    {
+        uint sCrvTotalSupply = curveToken.totalSupply();
+        if (sCrvTotalSupply == 0 || sCrvBal == 0) {
+            return 0;
+        }
+        uint[N_COINS] memory balances;
+        for (uint i = 0; i < N_COINS; i++) {
+            balances[i] = curve.balances(int128(i)).mul(prices[i]);
+            if (i == 0 || i == 3) {
+                balances[i] = balances[i].div(1e18);
+            } else {
+                balances[i] = balances[i].div(1e6);
+            }
+        }
+        // https://github.com/curvefi/curve-contract/blob/pool_susd_plain/vyper/stableswap.vy#L149
+        return util.get_D(balances).mul(sCrvBal).div(sCrvTotalSupply);
+    }
 
     function _withdraw(uint sCrv) internal {
         uint bal = curveToken.balanceOf(address(this));

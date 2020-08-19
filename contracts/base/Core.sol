@@ -154,11 +154,10 @@ contract Core is Ownable, Initializable, ICore {
     * @dev Anyone can call this
     */
     function syncSystem()
-        external
+        public
         checkAndNotifyDeficit
     {
-        _updateFeed();
-        totalAssets = totalSystemAssets();
+        _syncSystem();
     }
 
     function rewardDistributionCheckpoint(bool shouldDistribute)
@@ -167,8 +166,9 @@ contract Core is Ownable, Initializable, ICore {
         checkAndNotifyDeficit
         returns(uint periodIncome)
     {
+        _syncSystem(); // totalAssets was updated
         uint _adminFee;
-        (totalAssets, periodIncome, _adminFee) = lastPeriodIncome();
+        (periodIncome, _adminFee) = _lastPeriodIncome(totalAssets);
         if (periodIncome == 0) {
             return 0;
         }
@@ -187,36 +187,39 @@ contract Core is Ownable, Initializable, ICore {
     /* ##### View functions ##### */
 
     function lastPeriodIncome()
-        public
-        view
+        public view
         returns(uint _totalAssets, uint periodIncome, uint _adminFee)
     {
         _totalAssets = totalSystemAssets();
-        uint supply = dusd.totalSupply().add(unclaimedRewards);
-        if (_totalAssets > supply) {
-            periodIncome = _totalAssets.sub(supply);
-            if (adminFee > 0) {
-                _adminFee = periodIncome.mul(adminFee).div(FEE_PRECISION);
-                periodIncome = periodIncome.sub(_adminFee);
-            }
-        }
+        (periodIncome, _adminFee) = _lastPeriodIncome(_totalAssets);
     }
 
     /**
     * @notice Returns the net system assets across all peaks
     * @return _totalAssets system assets denominated in dollars
     */
+    function currentSystemState()
+        public view
+        returns (uint _totalAssets, uint deficit)
+    {
+        _totalAssets = totalSystemAssets();
+        uint supply = dusd.totalSupply();
+        if (supply > _totalAssets) {
+            deficit = supply.sub(_totalAssets);
+        }
+    }
+
     function totalSystemAssets()
-        public
-        view
+        public view
         returns (uint _totalAssets)
     {
+        uint[] memory feed = oracle.getPriceFeed();
         for (uint i = 0; i < peaksAddresses.length; i++) {
             Peak memory peak = peaks[peaksAddresses[i]];
             if (peak.state == PeakState.Extinct) {
                 continue;
             }
-            _totalAssets = _totalAssets.add(IPeak(peaksAddresses[i]).portfolioValue());
+            _totalAssets = _totalAssets.add(IPeak(peaksAddresses[i]).portfolioValueWithFeed(feed));
         }
     }
 
@@ -348,6 +351,7 @@ contract Core is Ownable, Initializable, ICore {
 
     function _updateFeed()
         internal
+        returns(uint _totalAssets)
     {
         uint[] memory feed = oracle.getPriceFeed();
         require(feed.length == systemCoins.length, "Invalid system state");
@@ -362,9 +366,31 @@ contract Core is Ownable, Initializable, ICore {
             for (uint j = 0; j < prices.length; j++) {
                 prices[j] = feed[peak.systemCoinIds[j]];
             }
-            IPeak(peaksAddresses[i]).updateFeed(prices);
+            _totalAssets = _totalAssets.add(
+                IPeak(peaksAddresses[i]).updateFeed(prices)
+            );
         }
         emit FeedUpdated(feed);
+    }
+
+    function _lastPeriodIncome(uint _totalAssets)
+        internal view
+        returns(uint _periodIncome, uint _adminFee)
+    {
+        uint supply = dusd.totalSupply().add(unclaimedRewards);
+        if (_totalAssets > supply) {
+            _periodIncome = _totalAssets.sub(supply);
+            if (adminFee > 0) {
+                _adminFee = _periodIncome.mul(adminFee).div(FEE_PRECISION);
+                _periodIncome = _periodIncome.sub(_adminFee);
+            }
+        }
+    }
+
+    function _syncSystem()
+        internal
+    {
+        totalAssets = _updateFeed();
     }
 
     function _whitelistToken(address token)

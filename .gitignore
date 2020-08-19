@@ -2,3 +2,4 @@ node_modules
 build
 venv
 *.env
+deployments/development.json

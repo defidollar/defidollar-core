@@ -25,13 +25,13 @@ contract('CurveSusdPeak', async (accounts) => {
     })
 
     afterEach(async () => {
+        if (process.env.DEBUG == 'true') {
+            await this.printStats()
+        }
         // invariant
         assert.ok(
             parseFloat(fromWei(await this.dusd.totalSupply())) <= parseFloat(fromWei(await this.core.totalSystemAssets()))
         )
-        if (process.env.DEBUG == 'true') {
-            await this.printStats()
-        }
     })
 
     it('curveSusd.add_liquidity', async () => {
