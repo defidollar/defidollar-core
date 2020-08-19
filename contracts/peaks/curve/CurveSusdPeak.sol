@@ -150,18 +150,16 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         gauge.deposit(curveToken.balanceOf(address(this)));
     }
 
-    function updateFeed(uint[] calldata feed, bool calcPortfolio)
+    function updateFeed(uint[] calldata feed)
         external
-        returns(uint portfolio)
+        returns(uint /* portfolio */)
     {
         require(msg.sender == address(core), "ERR_NOT_AUTH");
         require(feed.length == N_COINS, "ERR_INVALID_UPDATE");
         for (uint i = 0; i < N_COINS; i++) {
             oraclePrices[i] = feed[i];
         }
-        if (calcPortfolio) {
-            portfolio = portfolioValueWithFeed(feed);
-        }
+        return portfolioValue();
     }
 
     // This is risky (Bancor Hack Scenario).
@@ -253,13 +251,24 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         return _sCrvToUsd(sCrvBalance(), oraclePrices);
     }
 
-    function portfolioValueWithFeed(uint[N_COINS] memory feed) public view returns(uint) {
-        return _sCrvToUsd(sCrvBalance(), feed);
+    function portfolioValueWithFeed(uint[] memory feed) public view returns(uint) {
+        // return 0;
+        uint[N_COINS] memory _feed;
+        for (uint i = 0; i < N_COINS; i++) {
+            _feed[i] = feed[i];
+        }
+        return _sCrvToUsd(sCrvBalance(), _feed);
     }
 
     function sCrvBalance() public view returns(uint) {
         return curveToken.balanceOf(address(this))
             .add(gauge.balanceOf(address(this)));
+    }
+
+    function oracleFeed() public view returns (uint[N_COINS] memory feed) {
+        for(uint i = 0; i < N_COINS; i++) {
+            feed[i] = oraclePrices[i];
+        }
     }
 
     function deps() public view returns(

@@ -7,7 +7,7 @@ const toBN = web3.utils.toBN
 const MAX = web3.utils.toTwosComplement(-1);
 const n_coins = 4
 
-contract('CurveSusdPeak', async (accounts) => {
+contract.only('CurveSusdPeak', async (accounts) => {
     let alice = accounts[0]
 
     before(async () => {
@@ -25,16 +25,16 @@ contract('CurveSusdPeak', async (accounts) => {
     })
 
     afterEach(async () => {
+        if (process.env.DEBUG == 'true') {
+            await this.printStats()
+        }
         // invariant
         assert.ok(
             parseFloat(fromWei(await this.dusd.totalSupply())) <= parseFloat(fromWei(await this.core.totalSystemAssets()))
         )
-        if (process.env.DEBUG == 'true') {
-            await this.printStats()
-        }
     })
 
-    it('curveSusd.add_liquidity', async () => {
+    it.only('curveSusd.add_liquidity', async () => {
         this.amounts = [100, 100, 100, 100]
         const tasks = []
         for (let i = 0; i < n_coins; i++) {
@@ -46,9 +46,11 @@ contract('CurveSusdPeak', async (accounts) => {
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '400')
     })
 
-    it('peak.mintWithScrv', async () => {
+    it.only('peak.mintWithScrv', async () => {
         const inAmount = toBN(await this.curveToken.balanceOf(alice)).div(toBN(2)).toString()
         await this.curveToken.approve(this.curveSusdPeak.address, inAmount)
+        console.log(await this.curveSusdPeak.oracleFeed())
+        console.log((await this.curveSusdPeak.sCrvToUsd('1000000000000000000')).toString())
         await this.curveSusdPeak.mintWithScrv(inAmount, '0')
         assert.equal(fromWei(await this.curveSusdPeak.sCrvBalance()), '200')
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '200')

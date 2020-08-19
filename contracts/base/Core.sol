@@ -174,7 +174,7 @@ contract Core is Ownable, Initializable, ICore {
     {
         _syncSystem(); // totalAssets was updated
         uint _adminFee;
-        (,periodIncome, _adminFee) = lastPeriodIncome();
+        (periodIncome, _adminFee) = _lastPeriodIncome(totalAssets);
         if (periodIncome == 0) {
             return 0;
         }
@@ -193,28 +193,30 @@ contract Core is Ownable, Initializable, ICore {
     /* ##### View functions ##### */
 
     function lastPeriodIncome()
-        public
-        view
-        returns(uint _totalAssets, uint periodIncome, uint _adminFee)
+        public view
+        returns(uint _totalAssetsNow, uint periodIncome, uint _adminFee)
     {
-        _totalAssets = totalAssets;
-        uint supply = dusd.totalSupply().add(unclaimedRewards);
-        if (_totalAssets > supply) {
-            periodIncome = _totalAssets.sub(supply);
-            if (adminFee > 0) {
-                _adminFee = periodIncome.mul(adminFee).div(FEE_PRECISION);
-                periodIncome = periodIncome.sub(_adminFee);
-            }
-        }
+        _totalAssetsNow = totalSystemAssets();
+        (periodIncome, _adminFee) = _lastPeriodIncome(_totalAssetsNow);
     }
 
     /**
     * @notice Returns the net system assets across all peaks
     * @return _totalAssets system assets denominated in dollars
     */
-    function totalSystemAssetsNow()
-        public
-        view
+    function currentSystemState()
+        public view
+        returns (uint _totalAssets, bool _inDeficit)
+    {
+        _totalAssets = totalSystemAssets();
+        uint supply = dusd.totalSupply();
+        if (supply > _totalAssets) {
+            _inDeficit = true;
+        }
+    }
+
+    function totalSystemAssets()
+        public view
         returns (uint _totalAssets)
     {
         uint[] memory feed = oracle.getPriceFeed();
@@ -371,9 +373,24 @@ contract Core is Ownable, Initializable, ICore {
                 prices[j] = feed[peak.systemCoinIds[j]];
             }
             _totalAssets = _totalAssets.add(
-                IPeak(peaksAddresses[i]).updateFeed(prices, true /* calcPortfolio */));
+                IPeak(peaksAddresses[i]).updateFeed(prices)
+            );
         }
         emit FeedUpdated(feed);
+    }
+
+    function _lastPeriodIncome(uint _totalAssets)
+        internal view
+        returns(uint _periodIncome, uint _adminFee)
+    {
+        uint supply = dusd.totalSupply().add(unclaimedRewards);
+        if (_totalAssets > supply) {
+            _periodIncome = _totalAssets.sub(supply);
+            if (adminFee > 0) {
+                _adminFee = _periodIncome.mul(adminFee).div(FEE_PRECISION);
+                _periodIncome = _periodIncome.sub(_adminFee);
+            }
+        }
     }
 
     function _whitelistToken(address token)
