@@ -6,6 +6,7 @@ interface ICore {
     function rewardDistributionCheckpoint(bool shouldDistribute) external returns(uint periodIncome);
 
     function lastPeriodIncome() external view returns(uint _totalAssets, uint _periodIncome, uint _adminFee);
+    function currentSystemState() external view returns (uint _totalAssets, uint deficit);
     function usdToDusd(uint usd) external view returns(uint);
     function dusdToUsd(uint _dusd, bool fee) external view returns(uint usd);
 }

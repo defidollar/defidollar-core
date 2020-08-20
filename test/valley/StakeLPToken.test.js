@@ -1,6 +1,9 @@
 const assert = require('assert')
 const utils = require('../utils.js')
 
+const StakeLPTokenPausable = artifacts.require("StakeLPTokenPausable");
+const StakeLPTokenProxy = artifacts.require("StakeLPTokenProxy");
+
 const toWei = web3.utils.toWei
 const fromWei = web3.utils.fromWei
 const toBN = web3.utils.toBN
@@ -50,6 +53,12 @@ contract('StakeLPToken', async (accounts) => {
 		assert.equal(this.dusdBalance.toString(), toWei('20'))
 		assert.equal(await this.curveSusdPeak.sCrvBalance(), toWei('60'))
 		await this.assertions({ dusdTotalSupply: toWei('60') })
+	})
+
+	it('test upgradeability', async () => {
+		const proxy = await StakeLPTokenProxy.at(this.stakeLPToken.address)
+		const stakeLPTokenPausable = await StakeLPTokenPausable.new()
+		await proxy.updateImplementation(stakeLPTokenPausable.address)
 	})
 
 	it('alice stakes=4', async () => {
@@ -221,6 +230,17 @@ contract('StakeLPToken', async (accounts) => {
 
 		earned = await this.stakeLPToken.earned(alice)
 		assert.equal(earned.toString(), '0')
+	})
+
+	it('pause staking contract', async () => {
+		const stakeLPTokenPausable = await StakeLPTokenPausable.at(this.stakeLPToken.address)
+		await stakeLPTokenPausable.toggleIsActive(1)
+		try {
+			await this.stakeLPToken.exit()
+			assert.fail('expected to revert with: Staking is paused')
+		} catch(e) {
+			assert.equal(e.reason, 'Staking is paused')
+		}
 	})
 
 	this.assertions = (vals) => {

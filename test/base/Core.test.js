@@ -39,6 +39,7 @@ contract('Core', async (accounts) => {
     it('mint fails for dormant peak', async () => {
         try {
             await this.core.mint(toWei('10'), this.user, { from: accounts[1] })
+            assert.fail('expected to revert')
         } catch(e) {
             assert.equal(e.reason, 'Peak is inactive')
         }
@@ -51,6 +52,7 @@ contract('Core', async (accounts) => {
     it('mint fails for dormant peak', async () => {
         try {
             await this.core.mint(toWei('10'), this.user, { from: accounts[1] })
+            assert.fail('expected to revert')
         } catch(e) {
             assert.equal(e.reason, 'Peak is inactive')
         }
@@ -59,6 +61,7 @@ contract('Core', async (accounts) => {
     it('redeem fails from extinct peak', async () => {
         try {
             await this.core.redeem(toWei('10'), this.user, { from: accounts[1] })
+            assert.fail('expected to revert')
         } catch(e) {
             assert.equal(e.reason, 'Peak is extinct')
         }
@@ -67,6 +70,7 @@ contract('Core', async (accounts) => {
     it('adding a duplicate token fails', async () => {
         try {
             await this.core.whitelistTokens([this.reserves[3].address])
+            assert.fail('expected to revert')
         } catch(e) {
             assert.equal(e.reason, 'Adding a duplicate token')
         }
@@ -76,6 +80,7 @@ contract('Core', async (accounts) => {
         it('whitelistTokens fails', async () => {
             try {
                 await this.core.whitelistTokens([this.reserves[3].address], { from: accounts[1]})
+                assert.fail('expected to revert')
             } catch(e) {
                 assert.equal(e.reason, 'NOT_OWNER')
             }
@@ -84,6 +89,7 @@ contract('Core', async (accounts) => {
         it('setPeakStatus fails', async () => {
             try {
                 await this.core.setPeakStatus(accounts[0], '1', { from: accounts[1]})
+                assert.fail('expected to revert')
             } catch(e) {
                 assert.equal(e.reason, 'NOT_OWNER')
             }

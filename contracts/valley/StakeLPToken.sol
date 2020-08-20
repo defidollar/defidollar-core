@@ -8,6 +8,7 @@ import {ICore} from "../interfaces/ICore.sol";
 import {IDUSD} from "../interfaces/IDUSD.sol";
 import {Initializable} from "../common/Initializable.sol";
 
+
 contract LPTokenWrapper {
     using SafeMath for uint;
     using SafeERC20 for IERC20;
@@ -119,11 +120,12 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     function withdrawAble(address account) public view returns(uint) {
+        (,uint _deficit) = core.currentSystemState();
         uint balance = balanceOf(account);
-        if (totalSupply == 0 || deficit == 0) {
+        if (totalSupply == 0 || _deficit == 0) {
             return balance;
         }
-        uint deficitShare = balance.mul(deficit).div(totalSupply);
+        uint deficitShare = balance.mul(_deficit).div(totalSupply);
         if (deficitShare >= balance) {
             return 0;
         }
