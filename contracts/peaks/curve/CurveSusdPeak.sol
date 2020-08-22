@@ -156,10 +156,24 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     {
         require(msg.sender == address(core), "ERR_NOT_AUTH");
         require(feed.length == N_COINS, "ERR_INVALID_UPDATE");
-        for (uint i = 0; i < N_COINS; i++) {
-            oraclePrices[i] = feed[i];
-        }
+        oraclePrices = processFeed(feed);
         return portfolioValue();
+    }
+
+    function processFeed(uint[] memory feed) public pure returns(uint[N_COINS] memory _feed) {
+        uint max = 0;
+        for (uint i = 0; i < N_COINS; i++) {
+            // _feed[i] = feed[i].min(1e18);
+            _feed[i] = feed[i];
+            if (feed[i] > max) {
+                max = feed[i];
+            }
+        }
+        if (max > 1e18) {
+            for (uint i = 0; i < N_COINS; i++) {
+                _feed[i] = _feed[i].mul(1e18).div(max);
+            }
+        }
     }
 
     // This is risky (Bancor Hack Scenario).
@@ -252,12 +266,7 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     }
 
     function portfolioValueWithFeed(uint[] memory feed) public view returns(uint) {
-        // return 0;
-        uint[N_COINS] memory _feed;
-        for (uint i = 0; i < N_COINS; i++) {
-            _feed[i] = feed[i];
-        }
-        return _sCrvToUsd(sCrvBalance(), _feed);
+        return _sCrvToUsd(sCrvBalance(), processFeed(feed));
     }
 
     function sCrvBalance() public view returns(uint) {

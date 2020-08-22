@@ -228,18 +228,19 @@ contract Core is Ownable, Initializable, ICore {
         view
         returns(uint)
     {
+        return usd;
         // system is healthy. Pegged at $1
-        if (!inDeficit) {
-            return usd;
-        }
-        // system is in deficit, see if staked funds can make up for it
-        uint supply = dusd.totalSupply();
-        uint perceivedSupply = supply.sub(stakeLPToken.totalSupply());
-        // staked funds make up for the deficit
-        if (perceivedSupply <= totalAssets) {
-            return usd;
-        }
-        return usd.mul(perceivedSupply).div(totalAssets);
+        // if (!inDeficit) {
+        //     return usd;
+        // }
+        // // system is in deficit, see if staked funds can make up for it
+        // uint supply = dusd.totalSupply();
+        // uint perceivedSupply = supply.sub(stakeLPToken.totalSupply());
+        // // staked funds make up for the deficit
+        // if (perceivedSupply <= totalAssets) {
+        //     return usd;
+        // }
+        // return usd.mul(perceivedSupply).div(totalAssets);
     }
 
     function dusdToUsd(uint _dusd, bool fee)

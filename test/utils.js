@@ -40,6 +40,8 @@ async function getArtifacts() {
 		decimals,
 		scaleFactor,
 		aggregators,
+		ethAggregator: await Aggregator.at(await oracle.ethUsdAggregator()),
+		oracle,
         stakeLPToken: await StakeLPToken.at(stakeLPTokenProxy.address),
 
         curveSusdPeak: await CurveSusdPeak.at(curveSusdPeakProxy.address),

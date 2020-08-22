@@ -670,7 +670,26 @@ def unkill_me():
 
 @public
 def mock_add_to_balance(amounts: uint256[N_COINS]):
+    for i in range(N_COINS):
+        self.balances[i] += amounts[i]
+
+@public
+def mock_set_balance(amounts: uint256[N_COINS]):
     tethered: bool[N_COINS] = TETHERED
     use_lending: bool[N_COINS] = USE_LENDING
     for i in range(N_COINS):
-        self.balances[i] += amounts[i]
+        if self.balances[i] < amounts[i]:
+            value: uint256 = amounts[i] - self.balances[i]
+            # Take coins from the sender
+            if tethered[i] and not use_lending[i]:
+                USDT(self.coins[i]).transferFrom(msg.sender, self, value)
+            else:
+                assert_modifiable(
+                    cERC20(self.coins[i]).transferFrom(msg.sender, self, value))
+        elif self.balances[i] > amounts[i]:
+            value: uint256 = self.balances[i] - amounts[i]
+            if tethered[i] and not use_lending[i]:
+                USDT(self.coins[i]).transfer(msg.sender, value)
+            else:
+                assert_modifiable(cERC20(self.coins[i]).transfer(msg.sender, value))
+        self.balances[i] = amounts[i]

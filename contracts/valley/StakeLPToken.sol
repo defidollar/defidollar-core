@@ -79,7 +79,8 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
         if (totalSupply > 0) {
             shouldDistribute = true;
         }
-        uint income = core.rewardDistributionCheckpoint(shouldDistribute);
+        uint income = core.rewardDistributionCheckpoint(true);
+        // uint income = core.rewardDistributionCheckpoint(shouldDistribute);
         return _rewardPerToken(income);
     }
 

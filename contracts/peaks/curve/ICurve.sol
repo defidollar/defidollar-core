@@ -17,6 +17,7 @@ interface ICurve {
 
     // for tests
     function mock_add_to_balance(uint[4] calldata amounts) external;
+    function mock_set_balance(uint[4] calldata amounts) external;
 }
 
 interface IUtil {
