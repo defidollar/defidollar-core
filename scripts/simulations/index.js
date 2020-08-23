@@ -1,6 +1,8 @@
 const fs = require('fs');
 const assert = require('assert')
+const DefiDollarClient = require('@defidollar/core-client-lib')
 
+const config = require('../../deployments/development.json')
 const Core = artifacts.require("Core");
 const CoreProxy = artifacts.require("CoreProxy");
 const DUSD = artifacts.require("DUSD");
@@ -23,12 +25,17 @@ const fromWei = web3.utils.fromWei
 const toBN = web3.utils.toBN
 const MAX = web3.utils.toTwosComplement(-1);
 const n_coins = 4
+let alice, bob
 
 async function execute() {
-    const [ alice, bob ] = await web3.eth.getAccounts()
+    const accounts = await web3.eth.getAccounts()
+    alice = accounts[0]
+    bob = accounts[1]
     const _artifacts = await getArtifacts()
     Object.assign(this, _artifacts)
+    // const client = new DefiDollarClient(web3, config)
 
+    // Initialize coins for alice, bob
     let tasks = []
     let amount = '1000000000' // 1B
     for (let i = 0; i < n_coins; i++) {
@@ -40,15 +47,17 @@ async function execute() {
             this.reserves[i].approve(this.curveSusdPeak.address, MAX, { from: bob })
         ])
     }
+    tasks.push(this.dusd.approve(this.stakeLPToken.address, MAX, { from: bob }))
     await Promise.all(tasks)
 
     tasks = []
-    let blockNums = Object.keys(data) // .slice(0, 100)
+    let blockNums = Object.keys(data).slice(1)
     // const start = blockNums.findIndex(b => b > parseInt('10571000'))
-    const start = blockNums.findIndex(b => b > parseInt('10571200')) //10571264
+    // const start = blockNums.findIndex(b => b > parseInt('10571200')) //10571264
     // blockNums = blockNums.slice(start, start+100)
-    let percentAvgDeficit = 0, deficit0 = 0, netIncome = toBN(0), avgApy = toBN(0), percentAvgValueForMoney = 0
-    for (let i = 0; i < blockNums.length; i+=30) {
+    let percentAvgDeficit = 0, deficit0 = 0, netIncome = toBN(0), percentAvgValueForMoney = 0
+    const increment = 1
+    for (let i = 0; i < blockNums.length; i+=increment) {
         console.log(`Processing ${blockNums[i]}`)
         const _data = data[blockNums[i]]
         // set oracle price
@@ -61,81 +70,101 @@ async function execute() {
             )
         }
 
-        // set curve balance
-        tasks.push(this.curveToken.setTotalSupply(_data[5]))
-
-        tasks.push(
-            this.curveSusd.mock_set_balance(_data.slice(6))
-        )
+        // set curve balances
+        tasks.push(setCurveBalances(_data.slice(6).map(toBN), _artifacts))
         await Promise.all(tasks)
 
-        // gather system state
-        const { deficit } = await this.core.currentSystemState()
-        const { periodIncome } = await this.core.lastPeriodIncome()
-        // await this.core.syncSystem()
-        await this.stakeLPToken.updateProtocolIncome()
+        let res = {}
+        if (i) {
+            // gather system state, after the price updates
+            const dusdSupply = toBN(await this.dusd.totalSupply())
+            const { _totalAssets: totalAssets, deficit } = await this.core.currentSystemState()
+            // %age deficit = deficit / dusd supply
+            percentAvgDeficit += parseFloat(fromWei(
+                toBN(deficit).mul(toBN(10).pow(toBN(20))).div(dusdSupply) // 18 + 2 0s for %age
+            ))
+            if (deficit.toString() == '0') {
+                deficit0++
+            }
+
+            const { periodIncome } = await this.core.lastPeriodIncome()
+            netIncome = netIncome.add(periodIncome)
+            let apy = periodIncome
+                .mul(toBN(10 ** 20)) // %
+                .mul(toBN(31536000)) // 365*24*60*60 seconds
+                .div(dusdSupply) // consider all is staked
+                .div(
+                    toBN((blockNums[i] - blockNums[i-increment]) * 15) // time since last processed block
+                )
+
+            res = {
+                dusdSupply: fromWei(dusdSupply),
+                totalAssets: fromWei(totalAssets),
+                deficit: fromWei(deficit),
+                percentDeficit: fromWei(deficit.mul(toBN(10 ** 20)).div(totalAssets)),
+                // pricePerCoin: fromWei(totalAssets.mul(toBN(10 ** 18)).div(dusdSupply)),
+                periodIncome: fromWei(periodIncome),
+                apy: apy ? parseFloat(fromWei(apy)) : 0,
+            }
+
+            if (deficit.toString() == '0') {
+                assert.ok(periodIncome.gt(toBN(0)), 'if deficit is 0, period income > 0') // well mostly
+            }
+        }
+
+        await this.stakeLPToken.updateProtocolIncome() // syncs system as well
 
         // mint dusd
-        const bal = await this.dusd.balanceOf(bob)
         const feed = await this.curveSusdPeak.oracleFeed()
+        // const feed = await this.oracle.getPriceFeed()
         const mintAmounts = []
         let dollarValue = toBN(0), amount
         for (let i = 0; i < n_coins; i++) {
-            amount = toBN(getRandomInt(25))
+            amount = toBN(getRandomInt(2500))
             dollarValue = dollarValue.add(amount.mul(toBN(feed[i])))
             mintAmounts.push(amount.mul(this.scaleFactor[i]))
         }
         await this.curveSusdPeak.mint(mintAmounts, '0', { from: bob })
+        const dusdMinted = await this.dusd.balanceOf(bob)
+        await this.stakeLPToken.stake(dusdMinted, { from: bob }) // stake all
 
         // aggregate stats
-        const dusdMinted = (await this.dusd.balanceOf(bob)).sub(bal)
         const valueForMoney = parseFloat(fromWei(scale(dusdMinted, 20).div(dollarValue)))
         percentAvgValueForMoney += valueForMoney
-        const totalAssets = await this.core.totalAssets()
-        const dusdSupply = await this.dusd.totalSupply()
-        netIncome = netIncome.add(periodIncome)
-        let apy
-        if (i) {
-            apy = periodIncome
-                .mul(toBN(10 ** 2))
-                .mul(toBN(365*24*60*60))
-                .div(dusdSupply)
-                .div(
-                    toBN((blockNums[i] - blockNums[i-30]) * 15)
-                )
-            avgApy = avgApy.add(apy)
-        }
-        // avgApy += parseFloat(fromWei()
-        // %age deficit
-        percentAvgDeficit += parseFloat(fromWei(deficit.mul(toBN(10 ** 20)).div(await this.dusd.totalSupply())))
-        if (deficit.toString() == '0') {
-            deficit0++
-        }
-        console.log({
+
+        Object.assign(res, {
+            // oracleFeed: feed.map(a => (parseFloat(fromWei(toBN(a).mul(toBN(1000)))/1000))),
             oracleFeed: (await this.oracle.getPriceFeed()).map(a => (parseFloat(fromWei(toBN(a).mul(toBN(1000)))/1000))),
             feed: feed.map(a => (parseFloat(fromWei(toBN(a).mul(toBN(1000)))/1000))),
-            totalAssets: fromWei(totalAssets),
-            dusdSupply: fromWei(dusdSupply),
-            dollarValue: fromWei(dollarValue),
+            // scrv: fromWei(await this.curveSusdPeak.sCrvBalance()),
+
+            // // user stats
+            // dusdMinted: fromWei(dusdMinted),
+            // dollarValue: fromWei(dollarValue),
             valueForMoney,
-            deficit: fromWei(deficit),
-            percentDeficit: fromWei(deficit.mul(toBN(10 ** 20)).div(totalAssets)),
-            pricePerCoin: fromWei(totalAssets.mul(toBN(10 ** 18)).div(dusdSupply)),
-            periodIncome: fromWei(periodIncome),
-            apy: apy ? apy.toString() : 0
         })
-        if (i && deficit.toString() == '0') {
-            assert.ok(periodIncome.gt(toBN(0)), 'Deficit / period income mismatch')
+
+        // agg stats
+        let netApy = toBN(0)
+        const time = (parseInt(blockNums[i]) - parseInt(blockNums[0])) * 15
+        if (time) {
+            netApy = (await this.stakeLPToken.rewardPerTokenStored())
+                .mul(toBN(10 ** 2)) // %
+                .mul(toBN(31536000)) // 365*24*60*60 seconds
+                .div(toBN(time))
         }
+
+        const blocksProcessed = (i+1) / increment
+        Object.assign(res, {
+            blocksProcessed,
+            percentAvgValueForMoney: percentAvgValueForMoney / blocksProcessed,
+            netIncome: fromWei(netIncome),
+            netApy: parseFloat(fromWei(netApy)),
+            percentAvgDeficit: percentAvgDeficit / blocksProcessed,
+            deficit0
+        })
+        console.log(res)
     }
-    console.log({
-        blocksProcessed: blockNums.length,
-        percentAvgValueForMoney: percentAvgValueForMoney / blockNums.length,
-        netIncome: fromWei(netIncome),
-        avgApy: avgApy.div(toBN(blockNums.length-1)).toString(),
-        percentAvgDeficit: percentAvgDeficit / blockNums.length,
-        deficit0
-    })
 }
 
 async function getArtifacts() {
@@ -192,3 +221,33 @@ module.exports = async function (callback) {
     }
     callback()
 }
+
+async function setCurveBalances(targetBals, _artifacts) {
+    // console.log(fromWei(await _artifacts.curveToken.balanceOf(alice)))
+    // console.log(fromWei(await _artifacts.curveToken.totalSupply()))
+    const add = [0,0,0,0], remove = [0,0,0,0]
+    let shouldAdd = false, shouldRemove = false
+    for (let i = 0; i < targetBals.length; i++) {
+        const bal = toBN(await _artifacts.reserves[i].balanceOf(_artifacts.curveSusd.address))
+        if (bal.gt(targetBals[i])) {
+            remove[i] = bal.sub(targetBals[i])
+            shouldRemove = true
+        } else if (bal.lt(targetBals[i])) {
+            add[i] = targetBals[i].sub(bal)
+            shouldAdd = true
+        }
+    }
+    if (shouldAdd) {
+        await _artifacts.curveSusd.add_liquidity(add, '0')
+    }
+    if (shouldRemove) {
+        await _artifacts.curveSusd.remove_liquidity_imbalance(remove, MAX)
+    }
+    // console.log(fromWei(await _artifacts.curveToken.balanceOf(alice)))
+    // console.log(fromWei(await _artifacts.curveToken.totalSupply()))
+}
+
+/** Notes
+- Income suddenly increases at block 10570300
+ *
+*/

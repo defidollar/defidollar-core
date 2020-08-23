@@ -65,7 +65,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     modifier updateReward(address account) {
-        rewardPerTokenStored = updateProtocolIncome();
+        updateProtocolIncome();
         emit RewardPerTokenUpdated(rewardPerTokenStored, block.timestamp);
         if (account != address(0)) {
             rewards[account] = _earned(rewardPerTokenStored, account);
@@ -79,9 +79,9 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
         if (totalSupply > 0) {
             shouldDistribute = true;
         }
-        uint income = core.rewardDistributionCheckpoint(true);
-        // uint income = core.rewardDistributionCheckpoint(shouldDistribute);
-        return _rewardPerToken(income);
+        uint income = core.rewardDistributionCheckpoint(shouldDistribute);
+        rewardPerTokenStored = _rewardPerToken(income);
+        return rewardPerTokenStored;
     }
 
     // stake visibility is public as overriding LPTokenWrapper's stake() function

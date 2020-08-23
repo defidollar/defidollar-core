@@ -15,11 +15,11 @@ contract MockSusdToken is Reserve {
         _burn(account, amount);
     }
 
-    function totalSupply() public view returns(uint) {
-        return _totalSupply;
-    }
+    // function totalSupply() public view returns(uint) {
+    //     return _totalSupply;
+    // }
 
-    function setTotalSupply(uint ts) public {
-        _totalSupply = ts;
-    }
+    // function setTotalSupply(uint ts) public {
+    //     _totalSupply = ts;
+    // }
 }

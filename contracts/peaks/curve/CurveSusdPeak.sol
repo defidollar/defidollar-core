@@ -76,11 +76,12 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         uint _old = portfolioValue();
         curve.add_liquidity(inAmounts, 0);
         uint _new = portfolioValue();
-
         dusdAmount = core.mint(_new.sub(_old), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
         stake();
     }
+
+    function
 
     /**
     * @notice Mint DUSD with Curve LP tokens
@@ -161,19 +162,20 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     }
 
     function processFeed(uint[] memory feed) public pure returns(uint[N_COINS] memory _feed) {
-        uint max = 0;
+        // uint max = 0;
         for (uint i = 0; i < N_COINS; i++) {
             // _feed[i] = feed[i].min(1e18);
             _feed[i] = feed[i];
-            if (feed[i] > max) {
-                max = feed[i];
-            }
+            // _feed[i] = feed[i];
+            // if (feed[i] > max) {
+            //     max = feed[i];
+            // }
         }
-        if (max > 1e18) {
-            for (uint i = 0; i < N_COINS; i++) {
-                _feed[i] = _feed[i].mul(1e18).div(max);
-            }
-        }
+        // if (max > 1e18) {
+        //     for (uint i = 0; i < N_COINS; i++) {
+        //         _feed[i] = _feed[i].mul(1e18).div(max);
+        //     }
+        // }
     }
 
     // This is risky (Bancor Hack Scenario).
