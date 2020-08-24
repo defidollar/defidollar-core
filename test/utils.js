@@ -47,7 +47,7 @@ async function getArtifacts() {
         curveSusdPeak: await CurveSusdPeak.at(curveSusdPeakProxy.address),
         curveToken: await MockSusdToken.deployed(),
 	}
-	const { _curveDeposit, _curve } = await res.curveSusdPeak.deps()
+	const { _curveDeposit, _curve } = await res.curveSusdPeak.vars()
 	res.curveSusd = await ICurve.at(_curve)
 	res.curveDeposit = await ICurveDeposit.at(_curveDeposit)
 	return res
