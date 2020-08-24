@@ -23,8 +23,8 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     string constant ERR_SLIPPAGE = "They see you slippin";
 
     uint[N_COINS] ZEROES = [uint(0),uint(0),uint(0),uint(0)];
-    address[N_COINS] public underlyingCoins;
-    uint[N_COINS] public feed;
+    address[N_COINS] underlyingCoins;
+    uint[N_COINS] feed;
 
     ICurveDeposit curveDeposit; // deposit contract
     ICurve curve; // swap contract
@@ -249,7 +249,7 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
             .add(gauge.balanceOf(address(this)));
     }
 
-    function deps() public view returns(
+    function vars() public view returns(
         address _curveDeposit,
         address _curve,
         address _curveToken,
@@ -257,6 +257,7 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
         address _gauge,
         address _mintr,
         address _core,
+        address[N_COINS] memory _underlyingCoins,
         uint[N_COINS] memory _feed
     ) {
         return(
@@ -267,6 +268,7 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
             address(gauge),
             address(mintr),
             address(core),
+            underlyingCoins,
             feed
         );
     }

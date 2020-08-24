@@ -1,8 +1,6 @@
 const fs = require('fs');
 const assert = require('assert')
-const DefiDollarClient = require('@defidollar/core-client-lib')
 
-const config = require('../../deployments/development.json')
 const Core = artifacts.require("Core");
 const CoreProxy = artifacts.require("CoreProxy");
 const DUSD = artifacts.require("DUSD");
@@ -18,7 +16,7 @@ const ICurve = artifacts.require("ICurve");
 const ICurveDeposit = artifacts.require("ICurveDeposit");
 
 const data = JSON.parse(
-    fs.readFileSync(`${process.cwd()}/archive-data-aug-min.json`).toString()
+    fs.readFileSync(`${process.cwd()}/archive-data-aug.json`).toString()
 )
 
 const fromWei = web3.utils.fromWei
@@ -33,7 +31,6 @@ async function execute() {
     bob = accounts[1]
     const _artifacts = await getArtifacts()
     Object.assign(this, _artifacts)
-    // const client = new DefiDollarClient(web3, config)
 
     // Initialize coins for alice, bob
     let tasks = []
@@ -52,9 +49,6 @@ async function execute() {
 
     tasks = []
     let blockNums = Object.keys(data).slice(1)
-    // const start = blockNums.findIndex(b => b > parseInt('10571000'))
-    // const start = blockNums.findIndex(b => b > parseInt('10571200')) //10571264
-    // blockNums = blockNums.slice(start, start+100)
     let percentAvgDeficit = 0, deficit0 = 0, netIncome = toBN(0), percentAvgValueForMoney = 0
     const increment = 1
     for (let i = 0; i < blockNums.length; i+=increment) {
@@ -78,11 +72,10 @@ async function execute() {
         if (i) {
             // gather system state, after the price updates
             const dusdSupply = toBN(await this.dusd.totalSupply())
-            const { _totalAssets: totalAssets, deficit } = await this.core.currentSystemState()
-            // %age deficit = deficit / dusd supply
-            percentAvgDeficit += parseFloat(fromWei(
-                toBN(deficit).mul(toBN(10).pow(toBN(20))).div(dusdSupply) // 18 + 2 0s for %age
-            ))
+            const { _totalAssets: totalAssets, _deficit: deficit, _deficitPercent } = await this.core.currentSystemState()
+            console.log({ totalAssets: totalAssets.toString(), deficit: deficit.toString() })
+            const deficitPercent = parseFloat(fromWei(scale(_deficitPercent, 13)))
+            percentAvgDeficit += deficitPercent
             if (deficit.toString() == '0') {
                 deficit0++
             }
@@ -105,18 +98,17 @@ async function execute() {
                 // pricePerCoin: fromWei(totalAssets.mul(toBN(10 ** 18)).div(dusdSupply)),
                 periodIncome: fromWei(periodIncome),
                 apy: apy ? parseFloat(fromWei(apy)) : 0,
+                unclaimedRewards: fromWei(await this.core.unclaimedRewards())
             }
-
-            if (deficit.toString() == '0') {
-                assert.ok(periodIncome.gt(toBN(0)), 'if deficit is 0, period income > 0') // well mostly
-            }
+            // if (deficit.toString() == '0') {
+            //     assert.ok(periodIncome.gt(toBN(0)), 'if deficit is 0, period income > 0') // well mostly
+            // }
         }
 
         await this.stakeLPToken.updateProtocolIncome() // syncs system as well
 
         // mint dusd
-        const feed = await this.curveSusdPeak.oracleFeed()
-        // const feed = await this.oracle.getPriceFeed()
+        const { _feed: feed } = await this.curveSusdPeak.vars()
         const mintAmounts = []
         let dollarValue = toBN(0), amount
         for (let i = 0; i < n_coins; i++) {
@@ -198,7 +190,7 @@ async function getArtifacts() {
         curveSusdPeak: await CurveSusdPeak.at(curveSusdPeakProxy.address),
         curveToken: await MockSusdToken.deployed(),
 	}
-	const { _curveDeposit, _curve } = await res.curveSusdPeak.deps()
+	const { _curveDeposit, _curve } = await res.curveSusdPeak.vars()
 	res.curveSusd = await ICurve.at(_curve)
 	res.curveDeposit = await ICurveDeposit.at(_curveDeposit)
 	return res
