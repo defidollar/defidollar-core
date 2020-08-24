@@ -60,6 +60,26 @@ contract('StakeLPToken', async (accounts) => {
 		await proxy.updateImplementation(stakeLPToken.address)
 	})
 
+	it('pause staking contract', async () => {
+		await this.stakeLPToken.toggleIsPaused(1)
+		try {
+			await this.stakeLPToken.exit()
+			assert.fail('expected to revert with: Staking is paused')
+		} catch(e) {
+			assert.equal(e.reason, 'Staking is paused')
+		}
+	})
+
+	it('unpause staking contract', async () => {
+		try {
+			await this.stakeLPToken.toggleIsPaused(0, { from: bob })
+			assert.fail('expected to revert')
+		} catch(e) {
+			assert.equal(e.reason, 'NOT_OWNER')
+		}
+		await this.stakeLPToken.toggleIsPaused(0)
+	})
+
 	it('alice stakes=4', async () => {
 		await this.assertions({
 			dusdTotalSupply: toWei('60'),
@@ -222,16 +242,6 @@ contract('StakeLPToken', async (accounts) => {
 
 		earned = await this.stakeLPToken.earned(alice)
 		assert.equal(earned.toString(), '0')
-	})
-
-	it('pause staking contract', async () => {
-		await this.stakeLPToken.toggleIsPaused(1)
-		try {
-			await this.stakeLPToken.exit()
-			assert.fail('expected to revert with: Staking is paused')
-		} catch(e) {
-			assert.equal(e.reason, 'Staking is paused')
-		}
 	})
 
 	this.assertions = (vals) => {

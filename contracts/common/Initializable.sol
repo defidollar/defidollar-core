@@ -13,7 +13,7 @@ contract Initializable {
     uint256[20] private _gap;
 
     function getStore(uint a) internal view returns(uint) {
-        require(a < 50, "Not allowed");
+        require(a < 20, "Not allowed");
         return _gap[a];
     }
 

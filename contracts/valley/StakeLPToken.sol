@@ -138,8 +138,8 @@ contract StakeLPToken is OwnableProxy, Initializable, LPTokenWrapper {
         return balance.sub(deficitShare);
     }
 
-    function toggleIsPaused(bool status) external onlyOwner {
-        isPaused = status;
+    function toggleIsPaused(bool _isPaused) external onlyOwner {
+        isPaused = _isPaused;
     }
 
     // Internal functions

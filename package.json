@@ -7,6 +7,7 @@
     "compile": "truffle compile",
     "migrate": "truffle migrate --reset",
     "ganache": "ganache-cli -i 420 -l 10000000 -m 'mosquito lizard cloth enhance armed month twice machine decline post toy float'",
+    "ganache:ci": "npm run ganache > /dev/null &",
     "test": "truffle test",
     "test:debug": "DEBUG=true npm test",
     "coverage": "truffle run coverage"

@@ -94,7 +94,6 @@ function printDebugReceipt(r) {
 async function assertions(vals, artifacts) {
 	if (vals.totalSystemAssets) {
 		const totalSystemAssets = await artifacts.core.totalSystemAssets()
-		// vals.totalSystemAssets = toBN(vals.totalSystemAssets).sub(toBN('40')).toString() // rounding error of 40 wei
 		assert.equal(totalSystemAssets.toString(), vals.totalSystemAssets)
 	}
 	if (vals.totalAssets) {
