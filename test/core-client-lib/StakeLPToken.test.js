@@ -121,7 +121,7 @@ contract('core-client-lib: StakeLPToken', async (accounts) => {
 		await this.curveSusd.mock_add_to_balance(income)
 		await this.assertions({ totalSystemAssets: toWei('72') })
 
-		const { periodIncome } = await this.core.lastPeriodIncome()
+		const { _periodIncome: periodIncome } = await this.core.lastPeriodIncome()
 		assert.equal(periodIncome.toString(), toWei('8'))
 
 		const earned = await this.stakeLPToken.earned(alice)
@@ -138,7 +138,7 @@ contract('core-client-lib: StakeLPToken', async (accounts) => {
 	})
 
 	it('should not affect lastPeriodIncome', async () => {
-		const { periodIncome } = await this.core.lastPeriodIncome()
+		const { _periodIncome: periodIncome } = await this.core.lastPeriodIncome()
 		assert.equal(parseInt(fromWei(periodIncome)), 8)
 
 		const earned = parseInt(fromWei(await this.stakeLPToken.earned(alice)))

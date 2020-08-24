@@ -80,27 +80,20 @@ contract('Deficit flow (staked funds cover deficit)', async (accounts) => {
         assert.equal(parseInt(fromWei(withdrawAble)), 3)
     })
 
-    it('reverts if alice withdraws 4', async () => {
-        try {
-            await this.stakeLPToken.withdraw(utils.scale(4, 18))
-        } catch (e) {
-            assert.equal(e.reason, 'Withdrawing more than staked or illiquid due to system deficit')
-        }
+    it('alice withdraws 4 but receives (4 - deficitShare)', async () => {
+        const amount = utils.scale(4, 18)
+        // deficit=4 on stake=8 means deficitShare=2 on amount=4
+        await this.stakeLPToken.withdraw(amount)
+        assert.equal(
+            parseInt(fromWei(await this.dusd.balanceOf(alice))),
+            3, // 2 (balance + < 2 withdrawn)
+        )
     })
 
     it('alice exits', async () => {
         const bal = await this.dusd.balanceOf(alice)
-        const aliceWillGet = toBN(await this.stakeLPToken.balanceOf(alice)).sub(await this.stakeLPToken.deficit())
-        // console.log({
-        //     deficit: fromWei(await this.stakeLPToken.deficit()),
-        //     totalSupply: fromWei(await this.stakeLPToken.totalSupply()),
-        //     dusdTotalSupply: fromWei(await this.dusd.totalSupply()),
-        //     StakeLPTokenDusd: fromWei(await this.dusd.balanceOf(this.stakeLPToken.address)),
-        //     aliceStakeLPToken: fromWei(await this.stakeLPToken.balanceOf(alice)),
-        //     aliceDusd: fromWei(await this.dusd.balanceOf(alice)),
-        //     aliceEarned: fromWei(await this.stakeLPToken.earned(alice)),
-        //     totalSystemAssets: fromWei(await this.core.totalSystemAssets())
-        // })
+        const aliceWillGet = toBN(await this.stakeLPToken.balanceOf(alice))
+            .sub(await this.stakeLPToken.deficit())
         await this.stakeLPToken.exit()
         assert.equal(
             (await this.dusd.balanceOf(alice)).toString(),
@@ -185,12 +178,13 @@ contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) =>
         assert.equal(withdrawAble.toString(), '0')
     })
 
-    it('reverts if alice attempts to withdraw 1 wei', async () => {
-        try {
-            await this.stakeLPToken.withdraw(1) // even 1 wei should fail
-        } catch (e) {
-            assert.equal(e.reason, 'Withdrawing more than staked or illiquid due to system deficit')
-        }
+    it('all of alice\'s coins are used to cover deficit', async () => {
+        const bal = await this.dusd.balanceOf(alice)
+        await this.stakeLPToken.exit()
+        assert.equal(
+            (await this.dusd.balanceOf(alice)).toString(),
+            bal.toString()
+        )
     })
 
     it('dusd is devalued while redeeming', async () => {
@@ -226,11 +220,9 @@ contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) =>
 
     it('all except staked dusd was redeemed', async () => {
         assert.equal((await this.curveToken.balanceOf(this.core.address)), '0')
-        // after accounting for the redeem fee, deficit (9.999..) just a lil bit less than 10.
-        const deficit = fromWei(await this.stakeLPToken.deficit())
-        assert.equal(parseFloat(deficit).toFixed(3), 9.999)
-        assert.equal(fromWei(await this.dusd.totalSupply()), 10) // staked funds
-        assert.equal(fromWei(await this.dusd.balanceOf(this.stakeLPToken.address)), 10)
+        const deficit = await this.stakeLPToken.deficit()
+        assert.equal(deficit.toString(), '0')
+        assert.equal((await this.dusd.totalSupply()).toString(),'0')
     })
 
     it('minting and redeeming devalued dusd is unprofitable', async () => {

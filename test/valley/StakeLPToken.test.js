@@ -1,6 +1,9 @@
 const assert = require('assert')
 const utils = require('../utils.js')
 
+const StakeLPTokenProxy = artifacts.require("StakeLPTokenProxy");
+const StakeLPToken = artifacts.require("StakeLPToken");
+
 const toWei = web3.utils.toWei
 const fromWei = web3.utils.fromWei
 const toBN = web3.utils.toBN
@@ -28,8 +31,7 @@ contract('StakeLPToken', async (accounts) => {
 			tasks.push(this.reserves[i].approve(this.curveSusdPeak.address, this.amounts[i]))
 		}
 		await Promise.all(tasks)
-		await this.curveSusdPeak.mint(this.amounts, toWei('40'))
-
+		const mint = await this.curveSusdPeak.mint(this.amounts, toWei('40'))
 		const dusdBalance = await this.dusd.balanceOf(alice)
 		assert.equal(dusdBalance.toString(), toWei('40'))
 		assert.equal(await this.curveSusdPeak.sCrvBalance(), toWei('40'))
@@ -50,6 +52,32 @@ contract('StakeLPToken', async (accounts) => {
 		assert.equal(this.dusdBalance.toString(), toWei('20'))
 		assert.equal(await this.curveSusdPeak.sCrvBalance(), toWei('60'))
 		await this.assertions({ dusdTotalSupply: toWei('60') })
+	})
+
+	it('test upgradeability', async () => {
+		const proxy = await StakeLPTokenProxy.at(this.stakeLPToken.address)
+		const stakeLPToken = await StakeLPToken.new()
+		await proxy.updateImplementation(stakeLPToken.address)
+	})
+
+	it('pause staking contract', async () => {
+		await this.stakeLPToken.toggleIsPaused(1)
+		try {
+			await this.stakeLPToken.exit()
+			assert.fail('expected to revert with: Staking is paused')
+		} catch(e) {
+			assert.equal(e.reason, 'Staking is paused')
+		}
+	})
+
+	it('unpause staking contract', async () => {
+		try {
+			await this.stakeLPToken.toggleIsPaused(0, { from: bob })
+			assert.fail('expected to revert')
+		} catch(e) {
+			assert.equal(e.reason, 'NOT_OWNER')
+		}
+		await this.stakeLPToken.toggleIsPaused(0)
 	})
 
 	it('alice stakes=4', async () => {
@@ -93,7 +121,7 @@ contract('StakeLPToken', async (accounts) => {
 
 	it('alice gets reward', async () => {
 		let earned = await this.stakeLPToken.earned(alice)
-		assert.equal(earned.toString(), toWei('4')) // entire income
+		assert.equal(earned.toString(), toWei('4')) // entire income - col buffer
 
 		await this.stakeLPToken.getReward()
 		// reward was minted as dusd
@@ -113,7 +141,7 @@ contract('StakeLPToken', async (accounts) => {
 		await this.curveSusd.mock_add_to_balance(income)
 		await this.assertions({ totalSystemAssets: toWei('72') })
 
-		const { periodIncome } = await this.core.lastPeriodIncome()
+		const { _periodIncome: periodIncome } = await this.core.lastPeriodIncome()
 		assert.equal(periodIncome.toString(), toWei('8'))
 
 		const earned = await this.stakeLPToken.earned(alice)
@@ -130,7 +158,7 @@ contract('StakeLPToken', async (accounts) => {
 	})
 
 	it('should not affect lastPeriodIncome', async () => {
-		const { periodIncome } = await this.core.lastPeriodIncome()
+		const { _periodIncome: periodIncome } = await this.core.lastPeriodIncome()
 		assert.equal(parseInt(fromWei(periodIncome)), 8)
 
 		const earned = parseInt(fromWei(await this.stakeLPToken.earned(alice)))
@@ -190,7 +218,7 @@ contract('StakeLPToken', async (accounts) => {
 		)
 	})
 
-	it('10% admin fee was introduced', async () => {
+	it('10% col buffer fee was introduced', async () => {
 		await this.core.setFee(
 			await this.core.redeemFactor(), // unchanged
 			1000 // FEE_PRECISION = 10k
@@ -203,15 +231,8 @@ contract('StakeLPToken', async (accounts) => {
 		assert.equal(dusdBal.toString(), toWei('44')) // (original) 40 + 4 (previous reward)
 	})
 
-	it('admin withdraws fee', async () => {
-		const destination = accounts[5]
-		await this.core.withdrawAdminFee(destination)
-		let fee = fromWei(await this.dusd.balanceOf(destination))
-		assert.equal(fee, '0.3')
-	})
-
 	it('alice exits', async () => {
-		// 8 + 6 * 4/6 + 3 * .9 (admin fee) = 14.7
+		// 8 + 6 * 4/6 + 3 * .9 (col buffer) = 14.7
 		let earned = parseInt(fromWei(await this.stakeLPToken.earned(alice)))
 		assert.equal(earned, 14)
 

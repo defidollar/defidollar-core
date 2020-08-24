@@ -1,9 +1,9 @@
 pragma solidity 0.5.17;
 
 import {Proxy} from "./Proxy.sol";
-import {Ownable} from "../Ownable.sol";
+import {OwnableProxy} from "../OwnableProxy.sol";
 
-contract UpgradableProxy is Ownable, Proxy {
+contract UpgradableProxy is OwnableProxy, Proxy {
     bytes32 constant IMPLEMENTATION_SLOT = keccak256("proxy.implementation");
 
     event ProxyUpdated(address indexed previousImpl, address indexed newImpl);

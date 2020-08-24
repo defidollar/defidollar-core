@@ -10,10 +10,10 @@ import {ICore} from "../../interfaces/ICore.sol";
 import {IPeak} from "../../interfaces/IPeak.sol";
 
 import {Initializable} from "../../common/Initializable.sol";
-import {Ownable} from "../../common/Ownable.sol";
+import {OwnableProxy} from "../../common/OwnableProxy.sol";
 import {IGauge, IMintr} from "./IGauge.sol";
 
-contract CurveSusdPeak is Ownable, Initializable, IPeak {
+contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
     using Math for uint;
@@ -23,8 +23,8 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     string constant ERR_SLIPPAGE = "They see you slippin";
 
     uint[N_COINS] ZEROES = [uint(0),uint(0),uint(0),uint(0)];
-    address[N_COINS] public underlyingCoins;
-    uint[N_COINS] public oraclePrices;
+    address[N_COINS] underlyingCoins;
+    uint[N_COINS] feed;
 
     ICurveDeposit curveDeposit; // deposit contract
     ICurve curve; // swap contract
@@ -76,7 +76,6 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         uint _old = portfolioValue();
         curve.add_liquidity(inAmounts, 0);
         uint _new = portfolioValue();
-
         dusdAmount = core.mint(_new.sub(_old), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
         stake();
@@ -105,9 +104,7 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     function redeem(uint dusdAmount, uint[N_COINS] calldata minAmounts)
         external
     {
-        uint sCrv = sCrvBalance()
-            .min(usdToScrv(core.redeem(dusdAmount, msg.sender)));
-        _withdraw(sCrv);
+        uint sCrv = _secureFunding(core.redeem(dusdAmount, msg.sender));
         curve.remove_liquidity(sCrv, ZEROES);
         address[N_COINS] memory coins = underlyingCoins;
         IERC20 coin;
@@ -123,9 +120,7 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     function redeemInSingleCoin(uint dusdAmount, uint i, uint minOut)
         external
     {
-        uint sCrv = sCrvBalance()
-            .min(usdToScrv(core.redeem(dusdAmount, msg.sender)));
-        _withdraw(sCrv);
+        uint sCrv = _secureFunding(core.redeem(dusdAmount, msg.sender));
         curveDeposit.remove_liquidity_one_coin(sCrv, int128(i), minOut, false);
         IERC20 coin = IERC20(underlyingCoins[i]);
         uint toTransfer = coin.balanceOf(address(this));
@@ -136,8 +131,7 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     function redeemInScrv(uint dusdAmount, uint minOut)
         external
     {
-        uint sCrv = sCrvBalance()
-            .min(usdToScrv(core.redeem(dusdAmount, msg.sender)));
+        uint sCrv = _secureFunding(core.redeem(dusdAmount, msg.sender));
         require(sCrv >= minOut, ERR_SLIPPAGE);
         _withdraw(sCrv);
         curveToken.safeTransfer(msg.sender, sCrv);
@@ -147,29 +141,17 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     * @notice Stake in sCrv Gauge
     */
     function stake() public {
-        gauge.deposit(curveToken.balanceOf(address(this)));
+        _stake(curveToken.balanceOf(address(this)));
     }
 
-    function updateFeed(uint[] calldata feed)
+    function updateFeed(uint[] calldata _feed)
         external
         returns(uint /* portfolio */)
     {
         require(msg.sender == address(core), "ERR_NOT_AUTH");
-        require(feed.length == N_COINS, "ERR_INVALID_UPDATE");
-        for (uint i = 0; i < N_COINS; i++) {
-            oraclePrices[i] = feed[i];
-        }
+        require(_feed.length == N_COINS, "ERR_INVALID_UPDATE");
+        feed = _processFeed(_feed);
         return portfolioValue();
-    }
-
-    // This is risky (Bancor Hack Scenario).
-    // Think about if we need strict token approvals during the actions at the cost of higher gas.
-    function replenishApprovals(uint value) public {
-        curveToken.safeIncreaseAllowance(address(curveDeposit), value);
-        curveToken.safeIncreaseAllowance(address(gauge), value);
-        for (uint i = 0; i < N_COINS; i++) {
-            IERC20(underlyingCoins[i]).safeIncreaseAllowance(address(curve), value);
-        }
     }
 
     function getRewards(address[] calldata tokens, address destination) external onlyOwner {
@@ -189,21 +171,28 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         gauge.claim_rewards();
     }
 
+    function replenishApprovals(uint value) public {
+        curveToken.safeIncreaseAllowance(address(curveDeposit), value);
+        curveToken.safeIncreaseAllowance(address(gauge), value);
+        for (uint i = 0; i < N_COINS; i++) {
+            IERC20(underlyingCoins[i]).safeIncreaseAllowance(address(curve), value);
+        }
+    }
+
     /* ##### View Functions ##### */
 
     function calcMint(uint[N_COINS] memory inAmounts)
         public view
         returns (uint dusdAmount)
     {
-        uint usd = sCrvToUsd(curve.calc_token_amount(inAmounts, true /* deposit */));
-        return core.usdToDusd(usd);
+        return sCrvToUsd(curve.calc_token_amount(inAmounts, true /* deposit */));
     }
 
     function calcMintWithScrv(uint inAmount)
         public view
         returns (uint dusdAmount)
     {
-        return core.usdToDusd(sCrvToUsd(inAmount));
+        return sCrvToUsd(inAmount);
     }
 
     function calcRedeem(uint dusdAmount)
@@ -237,27 +226,22 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
     }
 
     function usdToScrv(uint usd) public view returns(uint sCrv) {
-        uint exchangeRate = _sCrvToUsd(1e18, oraclePrices);
+        uint exchangeRate = sCrvToUsd(1e18);
         if (exchangeRate > 0) {
             return usd.mul(1e18).div(exchangeRate);
         }
     }
 
-    function sCrvToUsd(uint sCrvBal) public view returns(uint) {
-        return _sCrvToUsd(sCrvBal, oraclePrices);
-    }
-
     function portfolioValue() public view returns(uint) {
-        return _sCrvToUsd(sCrvBalance(), oraclePrices);
+        return sCrvToUsd(sCrvBalance());
     }
 
-    function portfolioValueWithFeed(uint[] memory feed) public view returns(uint) {
-        // return 0;
-        uint[N_COINS] memory _feed;
-        for (uint i = 0; i < N_COINS; i++) {
-            _feed[i] = feed[i];
-        }
-        return _sCrvToUsd(sCrvBalance(), _feed);
+    function sCrvToUsd(uint sCrvBal) public view returns(uint) {
+        return _sCrvToUsd(sCrvBal, feed);
+    }
+
+    function portfolioValueWithFeed(uint[] calldata _feed) external view returns(uint) {
+        return _sCrvToUsd(sCrvBalance(), _processFeed(_feed));
     }
 
     function sCrvBalance() public view returns(uint) {
@@ -265,20 +249,16 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
             .add(gauge.balanceOf(address(this)));
     }
 
-    function oracleFeed() public view returns (uint[N_COINS] memory feed) {
-        for(uint i = 0; i < N_COINS; i++) {
-            feed[i] = oraclePrices[i];
-        }
-    }
-
-    function deps() public view returns(
+    function vars() public view returns(
         address _curveDeposit,
         address _curve,
         address _curveToken,
         address _util,
         address _gauge,
         address _mintr,
-        address _core
+        address _core,
+        address[N_COINS] memory _underlyingCoins,
+        uint[N_COINS] memory _feed
     ) {
         return(
             address(curveDeposit),
@@ -287,13 +267,15 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
             address(util),
             address(gauge),
             address(mintr),
-            address(core)
+            address(core),
+            underlyingCoins,
+            feed
         );
     }
 
     /* ##### Internal Functions ##### */
 
-    function _sCrvToUsd(uint sCrvBal, uint[N_COINS] memory prices)
+    function _sCrvToUsd(uint sCrvBal, uint[N_COINS] memory _feed)
         internal view
         returns(uint)
     {
@@ -303,7 +285,7 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         }
         uint[N_COINS] memory balances;
         for (uint i = 0; i < N_COINS; i++) {
-            balances[i] = curve.balances(int128(i)).mul(prices[i]);
+            balances[i] = curve.balances(int128(i)).mul(_feed[i]);
             if (i == 0 || i == 3) {
                 balances[i] = balances[i].div(1e18);
             } else {
@@ -312,6 +294,32 @@ contract CurveSusdPeak is Ownable, Initializable, IPeak {
         }
         // https://github.com/curvefi/curve-contract/blob/pool_susd_plain/vyper/stableswap.vy#L149
         return util.get_D(balances).mul(sCrvBal).div(sCrvTotalSupply);
+    }
+
+    function _secureFunding(uint usd) internal returns(uint sCrv) {
+        uint here = curveToken.balanceOf(address(this));
+        uint there = gauge.balanceOf(address(this));
+        sCrv = usdToScrv(usd).min(here.add(there)); // in an extreme scenario there might not be enough sCrv to redeem
+        if (sCrv > here) {
+            _withdraw(sCrv.sub(here));
+        } else if (sCrv < here) {
+            // stake the remaining
+            _stake(here.sub(sCrv));
+        }
+    }
+
+    function _processFeed(uint[] memory _feed)
+        internal
+        pure
+        returns(uint[N_COINS] memory _processedFeed)
+    {
+        for (uint i = 0; i < N_COINS; i++) {
+            _processedFeed[i] = _feed[i].min(1e18);
+        }
+    }
+
+    function _stake(uint amount) internal {
+        gauge.deposit(amount);
     }
 
     function _withdraw(uint sCrv) internal {

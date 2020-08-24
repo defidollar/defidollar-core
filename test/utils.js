@@ -40,12 +40,14 @@ async function getArtifacts() {
 		decimals,
 		scaleFactor,
 		aggregators,
+		ethAggregator: await Aggregator.at(await oracle.ethUsdAggregator()),
+		oracle,
         stakeLPToken: await StakeLPToken.at(stakeLPTokenProxy.address),
 
         curveSusdPeak: await CurveSusdPeak.at(curveSusdPeakProxy.address),
         curveToken: await MockSusdToken.deployed(),
 	}
-	const { _curveDeposit, _curve } = await res.curveSusdPeak.deps()
+	const { _curveDeposit, _curve } = await res.curveSusdPeak.vars()
 	res.curveSusd = await ICurve.at(_curve)
 	res.curveDeposit = await ICurveDeposit.at(_curveDeposit)
 	return res
@@ -98,10 +100,6 @@ async function assertions(vals, artifacts) {
 		const totalAssets = await artifacts.core.totalAssets()
 		assert.equal(totalAssets.toString(), vals.totalAssets)
 	}
-	if (vals.surplus) {
-		const surplus = await artifacts.core.surplus()
-		assert.equal(surplus.toString(), vals.surplus)
-	}
 	if (vals.deficit) {
 		const deficit = await artifacts.stakeLPToken.deficit()
 		assert.equal(deficit.toString(), vals.deficit)
@@ -117,9 +115,6 @@ async function assertions(vals, artifacts) {
 	}
 	if (vals.rewardPerTokenStored) {
 		assert.equal((await artifacts.stakeLPToken.rewardPerTokenStored()).toString(), vals.rewardPerTokenStored)
-	}
-	if (vals.lastOverCollateralizationAmount) {
-		assert.equal((await artifacts.core.lastOverCollateralizationAmount()).toString(), vals.lastOverCollateralizationAmount)
 	}
 }
 

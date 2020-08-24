@@ -670,7 +670,5 @@ def unkill_me():
 
 @public
 def mock_add_to_balance(amounts: uint256[N_COINS]):
-    tethered: bool[N_COINS] = TETHERED
-    use_lending: bool[N_COINS] = USE_LENDING
     for i in range(N_COINS):
         self.balances[i] += amounts[i]

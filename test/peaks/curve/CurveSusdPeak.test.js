@@ -13,7 +13,6 @@ contract('CurveSusdPeak', async (accounts) => {
     before(async () => {
         const artifacts = await utils.getArtifacts()
         Object.assign(this, artifacts)
-        alice = accounts[0]
 
         this.amounts = [200, 200, 200, 200]
         const tasks = []
