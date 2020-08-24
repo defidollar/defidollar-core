@@ -11,10 +11,10 @@ import {IDUSD} from "../interfaces/IDUSD.sol";
 import {ICore} from "../interfaces/ICore.sol";
 
 import {Initializable} from "../common/Initializable.sol";
-import {Ownable} from "../common/Ownable.sol";
+import {OwnableProxy} from "../common/OwnableProxy.sol";
 
 
-contract Core is Ownable, Initializable, ICore {
+contract Core is OwnableProxy, Initializable, ICore {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
 
@@ -212,28 +212,25 @@ contract Core is Ownable, Initializable, ICore {
         return usd;
     }
 
-    /* ##### Following are just helper functions, not being used in the contract ##### */
-    function lastPeriodIncome()
-        public view
-        returns(uint _totalAssets, uint periodIncome, uint _colBuffer)
-    {
-        _totalAssets = totalSystemAssets();
-        (periodIncome, _colBuffer) = _lastPeriodIncome(_totalAssets);
-    }
-
-    /**
-    * @notice Returns the net system assets across all peaks
-    * @return _totalAssets system assets denominated in dollars
-    */
     function currentSystemState()
         public view
-        returns (uint _totalAssets, uint deficit)
+        returns (uint _totalAssets, uint _deficit, uint _deficitPercent)
     {
         _totalAssets = totalSystemAssets();
         uint supply = dusd.totalSupply();
         if (supply > _totalAssets) {
-            deficit = supply.sub(_totalAssets);
+            _deficit = supply.sub(_totalAssets);
+            _deficitPercent = _deficit.mul(1e7).div(supply); // 5 decimal precision
         }
+    }
+
+    /* ##### Following are just helper functions, not being used anywhere ##### */
+    function lastPeriodIncome()
+        public view
+        returns(uint _totalAssets, uint _periodIncome, uint _colBuffer)
+    {
+        _totalAssets = totalSystemAssets();
+        (_periodIncome, _colBuffer) = _lastPeriodIncome(_totalAssets);
     }
 
     function totalSystemAssets()
@@ -246,7 +243,9 @@ contract Core is Ownable, Initializable, ICore {
             if (peak.state == PeakState.Extinct) {
                 continue;
             }
-            _totalAssets = _totalAssets.add(IPeak(peaksAddresses[i]).portfolioValueWithFeed(_feed));
+            _totalAssets = _totalAssets.add(
+                IPeak(peaksAddresses[i]).portfolioValueWithFeed(_feed)
+            );
         }
     }
 

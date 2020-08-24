@@ -1,8 +1,8 @@
 const assert = require('assert')
 const utils = require('../utils.js')
 
-const StakeLPTokenPausable = artifacts.require("StakeLPTokenPausable");
 const StakeLPTokenProxy = artifacts.require("StakeLPTokenProxy");
+const StakeLPToken = artifacts.require("StakeLPToken");
 
 const toWei = web3.utils.toWei
 const fromWei = web3.utils.fromWei
@@ -56,8 +56,8 @@ contract('StakeLPToken', async (accounts) => {
 
 	it('test upgradeability', async () => {
 		const proxy = await StakeLPTokenProxy.at(this.stakeLPToken.address)
-		const stakeLPTokenPausable = await StakeLPTokenPausable.new()
-		await proxy.updateImplementation(stakeLPTokenPausable.address)
+		const stakeLPToken = await StakeLPToken.new()
+		await proxy.updateImplementation(stakeLPToken.address)
 	})
 
 	it('alice stakes=4', async () => {
@@ -121,7 +121,7 @@ contract('StakeLPToken', async (accounts) => {
 		await this.curveSusd.mock_add_to_balance(income)
 		await this.assertions({ totalSystemAssets: toWei('72') })
 
-		const { periodIncome } = await this.core.lastPeriodIncome()
+		const { _periodIncome: periodIncome } = await this.core.lastPeriodIncome()
 		assert.equal(periodIncome.toString(), toWei('8'))
 
 		const earned = await this.stakeLPToken.earned(alice)
@@ -138,7 +138,7 @@ contract('StakeLPToken', async (accounts) => {
 	})
 
 	it('should not affect lastPeriodIncome', async () => {
-		const { periodIncome } = await this.core.lastPeriodIncome()
+		const { _periodIncome: periodIncome } = await this.core.lastPeriodIncome()
 		assert.equal(parseInt(fromWei(periodIncome)), 8)
 
 		const earned = parseInt(fromWei(await this.stakeLPToken.earned(alice)))
@@ -225,8 +225,7 @@ contract('StakeLPToken', async (accounts) => {
 	})
 
 	it('pause staking contract', async () => {
-		const stakeLPTokenPausable = await StakeLPTokenPausable.at(this.stakeLPToken.address)
-		await stakeLPTokenPausable.toggleIsActive(1)
+		await this.stakeLPToken.toggleIsPaused(1)
 		try {
 			await this.stakeLPToken.exit()
 			assert.fail('expected to revert with: Staking is paused')

@@ -89,7 +89,7 @@ contract('StakeLPToken', async (accounts) => {
 	})
 
 	it('lastPeriodIncome', async () => {
-		const { periodIncome } = await this.core.lastPeriodIncome()
+		const { _periodIncome: periodIncome } = await this.core.lastPeriodIncome()
 		assert.equal(periodIncome.toString(), toWei('8')) // unclaimed income was accounted for
 
 		const unclaimedRewards = await this.core.unclaimedRewards()

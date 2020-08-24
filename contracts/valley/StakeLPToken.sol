@@ -7,6 +7,7 @@ import {SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {ICore} from "../interfaces/ICore.sol";
 import {IDUSD} from "../interfaces/IDUSD.sol";
 import {Initializable} from "../common/Initializable.sol";
+import {OwnableProxy} from "../common/OwnableProxy.sol";
 
 
 contract LPTokenWrapper {
@@ -34,11 +35,12 @@ contract LPTokenWrapper {
     }
 }
 
-contract StakeLPToken is Initializable, LPTokenWrapper {
+contract StakeLPToken is OwnableProxy, Initializable, LPTokenWrapper {
     ICore public core;
 
     uint public rewardPerTokenStored;
     uint public deficit;
+    bool public isPaused;
 
     mapping(address => uint) public userRewardPerTokenPaid;
     mapping(address => uint) public rewards;
@@ -47,6 +49,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     event Withdrawn(address indexed user, uint indexed amount);
     event RewardPaid(address indexed user, uint indexed reward);
     event RewardPerTokenUpdated(uint indexed rewardPerToken, uint indexed when);
+    event DeficitUpdated(uint indexed deficit);
 
     modifier onlyCore() {
         require(
@@ -75,6 +78,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     function updateProtocolIncome() public returns(uint) {
+        require(!isPaused, "Staking is paused");
         bool shouldDistribute;
         if (totalSupply > 0) {
             shouldDistribute = true;
@@ -112,6 +116,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
 
     function notify(uint _deficit) external onlyCore {
         deficit = _deficit;
+        emit DeficitUpdated(_deficit);
     }
 
     // View Functions
@@ -121,7 +126,7 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
     }
 
     function withdrawAble(address account) public view returns(uint) {
-        (,uint _deficit) = core.currentSystemState();
+        (,uint _deficit,) = core.currentSystemState();
         uint balance = balanceOf(account);
         if (totalSupply == 0 || _deficit == 0) {
             return balance;
@@ -131,6 +136,10 @@ contract StakeLPToken is Initializable, LPTokenWrapper {
             return 0;
         }
         return balance.sub(deficitShare);
+    }
+
+    function toggleIsPaused(bool status) external onlyOwner {
+        isPaused = status;
     }
 
     // Internal functions

@@ -87,7 +87,7 @@ async function execute() {
                 deficit0++
             }
 
-            const { periodIncome } = await this.core.lastPeriodIncome()
+            const { _periodIncome: periodIncome } = await this.core.lastPeriodIncome()
             netIncome = netIncome.add(periodIncome)
             let apy = periodIncome
                 .mul(toBN(10 ** 20)) // %

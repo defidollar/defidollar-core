@@ -10,10 +10,10 @@ import {ICore} from "../../interfaces/ICore.sol";
 import {IPeak} from "../../interfaces/IPeak.sol";
 
 import {Initializable} from "../../common/Initializable.sol";
-import {Ownable} from "../../common/Ownable.sol";
+import {OwnableProxy} from "../../common/OwnableProxy.sol";
 import {IGauge, IMintr} from "./IGauge.sol";
 
-contract CurveSusdPeak is Ownable, Initializable, IPeak {
+contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
     using Math for uint;

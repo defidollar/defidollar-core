@@ -1,7 +1,7 @@
 pragma solidity 0.5.17;
 
 
-contract Ownable {
+contract OwnableProxy {
     bytes32 constant OWNER_SLOT = keccak256("proxy.owner");
 
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
@@ -37,7 +37,7 @@ contract Ownable {
     }
 
     function _transferOwnership(address newOwner) internal {
-        require(newOwner != address(0), "Ownable: new owner is the zero address");
+        require(newOwner != address(0), "OwnableProxy: new owner is the zero address");
         emit OwnershipTransferred(owner(), newOwner);
         bytes32 position = OWNER_SLOT;
         assembly {
