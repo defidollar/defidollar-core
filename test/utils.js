@@ -94,15 +94,12 @@ function printDebugReceipt(r) {
 async function assertions(vals, artifacts) {
 	if (vals.totalSystemAssets) {
 		const totalSystemAssets = await artifacts.core.totalSystemAssets()
+		// vals.totalSystemAssets = toBN(vals.totalSystemAssets).sub(toBN('40')).toString() // rounding error of 40 wei
 		assert.equal(totalSystemAssets.toString(), vals.totalSystemAssets)
 	}
 	if (vals.totalAssets) {
 		const totalAssets = await artifacts.core.totalAssets()
 		assert.equal(totalAssets.toString(), vals.totalAssets)
-	}
-	if (vals.surplus) {
-		const surplus = await artifacts.core.surplus()
-		assert.equal(surplus.toString(), vals.surplus)
 	}
 	if (vals.deficit) {
 		const deficit = await artifacts.stakeLPToken.deficit()
@@ -119,9 +116,6 @@ async function assertions(vals, artifacts) {
 	}
 	if (vals.rewardPerTokenStored) {
 		assert.equal((await artifacts.stakeLPToken.rewardPerTokenStored()).toString(), vals.rewardPerTokenStored)
-	}
-	if (vals.lastOverCollateralizationAmount) {
-		assert.equal((await artifacts.core.lastOverCollateralizationAmount()).toString(), vals.lastOverCollateralizationAmount)
 	}
 }
 
