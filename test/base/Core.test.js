@@ -35,7 +35,7 @@ contract('Core', async (accounts) => {
             await this.core.mint(toWei('4'), this.user)
             assert.fail('expected to revert')
         } catch(e) {
-            assert.equal(e.reason, 'Minting 0 OR Peak is inactive OR peak has hit ceiling')
+            assert.equal(e.reason, 'ERR_MINT')
         }
 
         // raise ceiling
@@ -71,7 +71,7 @@ contract('Core', async (accounts) => {
             await this.core.mint(toWei('10'), this.user, { from: accounts[1] })
             assert.fail('expected to revert')
         } catch(e) {
-            assert.equal(e.reason, 'Minting 0 OR Peak is inactive OR peak has hit ceiling')
+            assert.equal(e.reason, 'ERR_MINT')
         }
     })
 
@@ -84,7 +84,7 @@ contract('Core', async (accounts) => {
             await this.core.mint(toWei('10'), this.user, { from: accounts[1] })
             assert.fail('expected to revert')
         } catch(e) {
-            assert.equal(e.reason, 'Minting 0 OR Peak is inactive OR peak has hit ceiling')
+            assert.equal(e.reason, 'ERR_MINT')
         }
     })
 
@@ -93,7 +93,7 @@ contract('Core', async (accounts) => {
             await this.core.redeem(toWei('10'), this.user, { from: accounts[1] })
             assert.fail('expected to revert')
         } catch(e) {
-            assert.equal(e.reason, 'Redeeming 0 OR Peak is extinct')
+            assert.equal(e.reason, 'ERR_REDEEM')
         }
     })
 

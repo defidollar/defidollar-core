@@ -118,15 +118,16 @@ contract Core is OwnableProxy, Initializable, ICore {
         checkAndNotifyDeficit
         returns(uint dusdAmount)
     {
-        dusdAmount = usdDelta;
-        peaks[msg.sender].amount = peaks[msg.sender].amount.add(dusdAmount);
         Peak memory peak = peaks[msg.sender];
+        dusdAmount = usdDelta;
+        uint tvl = peak.amount.add(dusdAmount);
         require(
             usdDelta > 0
             && peak.state == PeakState.Active
-            && peak.amount <= peak.ceiling,
-            "Minting 0 OR Peak is inactive OR peak has hit ceiling"
+            && tvl <= peak.ceiling,
+            "ERR_MINT"
         );
+        peaks[msg.sender].amount = tvl;
         dusd.mint(account, dusdAmount);
         totalAssets = totalAssets.add(usdDelta);
         emit Mint(account, dusdAmount);
@@ -146,7 +147,7 @@ contract Core is OwnableProxy, Initializable, ICore {
         Peak memory peak = peaks[msg.sender];
         require(
             dusdAmount > 0 && peak.state != PeakState.Extinct,
-            "Redeeming 0 OR Peak is extinct"
+            "ERR_REDEEM"
         );
         peaks[msg.sender].amount = peak.amount.sub(peak.amount.min(dusdAmount));
         usd = dusdToUsd(dusdAmount, true);

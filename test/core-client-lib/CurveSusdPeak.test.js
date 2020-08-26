@@ -57,7 +57,8 @@ contract('core-client-lib: CurveSusdPeak', async (accounts) => {
         const tokens = { crvPlain3andSUSD: 200 }
         const { expectedAmount } = await this.client.calcExpectedMintAmount(tokens)
         assert.equal(fromWei(expectedAmount), '200')
-        await this.client.mint(tokens, '200', '.05', { from: alice, transactionHash: true })
+        const txHash = await this.client.mint(tokens, '200', '.05', { from: alice, transactionHash: true })
+        assert.equal(txHash.slice(0, 2), '0x')
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '200')
         assert.equal(fromWei(await this.curveSusdPeak.sCrvBalance()), '200')
         assert.equal(fromWei(await this.dusd.balanceOf(alice)), '200')

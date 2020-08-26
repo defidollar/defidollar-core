@@ -15,7 +15,7 @@ const daiABI = require('../test/abi/dai.json');
 const { contracts } = JSON.parse(fs.readFileSync(`../deployments/mainnet.json`).toString())
 
 // userAddress must be unlocked using --unlock ADDRESS
-const userAddress = '0x07bb41df8c1d275c4259cdd0dbf0189d6a9a5f32'
+const userAddress = '0x3dfd23a6c5e8bbcfc9581d2e864a68feb6a076d3'
 
 const _artifacts = {
     dai: new web3.eth.Contract(daiABI, '0x6B175474E89094C44Da98b954EedeAC495271d0F'),
