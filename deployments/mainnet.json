@@ -24,7 +24,7 @@
                 "peak": "curveYPool"
             },
             "DUSD": {
-                "address": "0xbF70Ea3f20Dc762a6323071abb2Ca3735dcCDa67",
+                "address": "0x5BC25f649fc4e26069dDF4cF4010F9f706c23831",
                 "decimals": 18
             }
         },
@@ -47,7 +47,7 @@
         },
         "peaks": {
             "curveSUSDPool": {
-                "address": "0x872F66de4408F95837014552300deBAdB45021e8",
+                "address": "0x80db6e1a3f6dc0D048026f3BeDb39807843366e4",
                 "coins": [
                     "DAI",
                     "USDC",
@@ -57,8 +57,8 @@
                 "native": "crvPlain3andSUSD"
             }
         },
-        "oracle": "0x00f0eD85D165Ab505944014F2ff530F8ff77654C",
-        "base": "0xD6647C5eF783eACc4f02686E3DC62198394702A5",
-        "valley": "0x44c9D70D1148D88134ddc6554C94d2F8191754CF"
+        "oracle": "0x4EaC4c4e9050464067D673102F8E24b2FccEB350",
+        "base": "0xE449Ca7d10b041255E7e989D158Bee355d8f88d3",
+        "valley": "0xb47638956e3D95f591D0a38F6F47EA6cAFee78B6"
     }
 }
