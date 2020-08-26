@@ -78,7 +78,6 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
         uint _new = portfolioValue();
         dusdAmount = core.mint(_new.sub(_old), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
-        stake();
     }
 
     /**
@@ -93,7 +92,6 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
         dusdAmount = core.mint(sCrvToUsd(inAmount), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
         curveToken.safeTransferFrom(msg.sender, address(this), inAmount);
-        stake();
     }
 
     /**
