@@ -1,8 +1,8 @@
 pragma solidity 0.5.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import {SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import {SafeERC20, SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import {Math} from "@openzeppelin/contracts/math/Math.sol";
 
 import {IOracle} from "../interfaces/IOracle.sol";
 import {IStakeLPToken} from "../interfaces/IStakeLPToken.sol";
@@ -17,6 +17,7 @@ import {OwnableProxy} from "../common/OwnableProxy.sol";
 contract Core is OwnableProxy, Initializable, ICore {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
+    using Math for uint;
 
     uint constant FEE_PRECISION = 10000;
 
@@ -36,9 +37,11 @@ contract Core is OwnableProxy, Initializable, ICore {
     enum PeakState { Extinct, Active, Dormant }
     struct Peak {
         uint[] systemCoinIds; // system indices of the coins accepted by the peak
+        uint amount;
+        uint ceiling;
         PeakState state;
     }
-    mapping(address => Peak) peaks;
+    mapping(address => Peak) public peaks;
     address[] public peaksAddresses;
 
     // END OF STORAGE VARIABLES
@@ -115,13 +118,16 @@ contract Core is OwnableProxy, Initializable, ICore {
         checkAndNotifyDeficit
         returns(uint dusdAmount)
     {
-        require(usdDelta > 0, "Minting 0");
         Peak memory peak = peaks[msg.sender];
-        require(
-            peak.state == PeakState.Active,
-            "Peak is inactive"
-        );
         dusdAmount = usdDelta;
+        uint tvl = peak.amount.add(dusdAmount);
+        require(
+            usdDelta > 0
+            && peak.state == PeakState.Active
+            && tvl <= peak.ceiling,
+            "ERR_MINT"
+        );
+        peaks[msg.sender].amount = tvl;
         dusd.mint(account, dusdAmount);
         totalAssets = totalAssets.add(usdDelta);
         emit Mint(account, dusdAmount);
@@ -138,12 +144,12 @@ contract Core is OwnableProxy, Initializable, ICore {
         checkAndNotifyDeficit
         returns(uint usd)
     {
-        require(dusdAmount > 0, "Redeeming 0");
         Peak memory peak = peaks[msg.sender];
         require(
-            peak.state != PeakState.Extinct,
-            "Peak is extinct"
+            dusdAmount > 0 && peak.state != PeakState.Extinct,
+            "ERR_REDEEM"
         );
+        peaks[msg.sender].amount = peak.amount.sub(peak.amount.min(dusdAmount));
         usd = dusdToUsd(dusdAmount, true);
         dusd.burn(account, dusdAmount);
         totalAssets = totalAssets.sub(usd);
@@ -274,6 +280,7 @@ contract Core is OwnableProxy, Initializable, ICore {
     function whitelistPeak(
         address peak,
         uint[] calldata _systemCoins,
+        uint ceiling,
         bool shouldUpdateFeed
     )   external
         onlyOwner
@@ -287,7 +294,7 @@ contract Core is OwnableProxy, Initializable, ICore {
             "Peak already exists"
         );
         peaksAddresses.push(peak);
-        peaks[peak] = Peak(_systemCoins, PeakState.Active);
+        peaks[peak] = Peak(_systemCoins, 0, ceiling, PeakState.Active);
         if (shouldUpdateFeed) {
             _updateFeed(true);
         }
@@ -297,7 +304,7 @@ contract Core is OwnableProxy, Initializable, ICore {
     /**
     * @notice Change a peaks status
     */
-    function setPeakStatus(address peak, PeakState state)
+    function setPeakStatus(address peak, uint ceiling, PeakState state)
         external
         onlyOwner
     {
@@ -305,6 +312,7 @@ contract Core is OwnableProxy, Initializable, ICore {
             peaks[peak].state != PeakState.Extinct,
             "Peak is extinct"
         );
+        peaks[peak].ceiling = ceiling;
         peaks[peak].state = state;
     }
 

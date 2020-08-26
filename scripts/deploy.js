@@ -101,7 +101,7 @@ async function execute() {
             tokens.map(t => t.address)
         ).encodeABI()
     )
-    await core.whitelistPeak(curveSusdPeakProxy.address, [0, 1, 2, 3], true)
+    await core.whitelistPeak(curveSusdPeakProxy.address, [0, 1, 2, 3], web3.utils.toWei('10000000'), true)
 
     config.contracts.peaks.curveSUSDPool.address = curveSusdPeakProxy.address,
     fs.writeFileSync(

@@ -2,8 +2,6 @@ const assert = require('assert')
 const utils = require('../utils.js')
 
 const toWei = web3.utils.toWei
-const toBN = web3.utils.toBN
-const MAX = web3.utils.toTwosComplement(-1);
 
 contract('Core', async (accounts) => {
 
@@ -11,25 +9,57 @@ contract('Core', async (accounts) => {
         const artifacts = await utils.getArtifacts()
         Object.assign(this, artifacts)
         this.user = accounts[1]
-        await this.core.whitelistPeak(accounts[0], [0, 1, 2, 3], false)
+        await this.core.whitelistPeak(accounts[0], [0, 1, 2, 3], utils.scale(10, 18), false)
     })
 
     it('mint', async () => {
         await this.core.mint(toWei('10'), this.user)
         const dusdBalance = await this.dusd.balanceOf(this.user)
         assert.equal(dusdBalance.toString(), toWei('10'))
+        const { amount } = await this.core.peaks(accounts[0])
+        assert.equal(amount.toString(), toWei('10'))
     })
 
     it('redeem', async () => {
         await this.core.redeem(toWei('3'), this.user)
         const dusdBalance = await this.dusd.balanceOf(this.user)
         assert.equal(dusdBalance.toString(), toWei('7'))
+        const { amount } = await this.core.peaks(accounts[0])
+        assert.equal(amount.toString(), toWei('7'))
+    })
+
+    it('ceiling test', async () => {
+        assert.equal((await this.core.peaks(accounts[0])).ceiling.toString(), toWei('10'))
+
+        try {
+            await this.core.mint(toWei('4'), this.user)
+            assert.fail('expected to revert')
+        } catch(e) {
+            assert.equal(e.reason, 'ERR_MINT')
+        }
+
+        // raise ceiling
+        await this.core.setPeakStatus(accounts[0], utils.scale(11, 18), '1')
+        assert.equal((await this.core.peaks(accounts[0])).ceiling.toString(), toWei('11'))
+
+        await this.core.mint(toWei('4'), this.user)
+        const { amount } = await this.core.peaks(accounts[0])
+        assert.equal(amount.toString(), toWei('11'))
+
+        await this.core.redeem(toWei('4'), this.user)
+        assert.equal((await this.core.peaks(accounts[0])).amount.toString(), toWei('7'))
+        assert.equal((await this.core.peaks(accounts[0])).ceiling.toString(), toWei('11'))
+
+        // reduce ceiling
+        await this.core.setPeakStatus(accounts[0], utils.scale(6, 18), '1')
+        assert.equal((await this.core.peaks(accounts[0])).ceiling.toString(), toWei('6'))
     })
 
     it('set peak as dormant', async () => {
-        await this.core.setPeakStatus(accounts[0], 2) // dormant
+        await this.core.setPeakStatus(accounts[0], 0, 2) // dormant and also reduces ceiling
     })
 
+    // lower ceiling shouldn't affect redeem
     it('redeem is possible from dormant peak', async () => {
         await this.core.redeem(toWei('7'), this.user)
         const dusdBalance = await this.dusd.balanceOf(this.user)
@@ -41,12 +71,12 @@ contract('Core', async (accounts) => {
             await this.core.mint(toWei('10'), this.user, { from: accounts[1] })
             assert.fail('expected to revert')
         } catch(e) {
-            assert.equal(e.reason, 'Peak is inactive')
+            assert.equal(e.reason, 'ERR_MINT')
         }
     })
 
     it('set peak as extinct', async () => {
-        await this.core.setPeakStatus(accounts[0], 0)
+        await this.core.setPeakStatus(accounts[0], 0, 0)
     })
 
     it('mint fails for dormant peak', async () => {
@@ -54,7 +84,7 @@ contract('Core', async (accounts) => {
             await this.core.mint(toWei('10'), this.user, { from: accounts[1] })
             assert.fail('expected to revert')
         } catch(e) {
-            assert.equal(e.reason, 'Peak is inactive')
+            assert.equal(e.reason, 'ERR_MINT')
         }
     })
 
@@ -63,7 +93,7 @@ contract('Core', async (accounts) => {
             await this.core.redeem(toWei('10'), this.user, { from: accounts[1] })
             assert.fail('expected to revert')
         } catch(e) {
-            assert.equal(e.reason, 'Peak is extinct')
+            assert.equal(e.reason, 'ERR_REDEEM')
         }
     })
 
@@ -88,7 +118,7 @@ contract('Core', async (accounts) => {
 
         it('setPeakStatus fails', async () => {
             try {
-                await this.core.setPeakStatus(accounts[0], '1', { from: accounts[1]})
+                await this.core.setPeakStatus(accounts[0], 0, 1, { from: accounts[1]})
                 assert.fail('expected to revert')
             } catch(e) {
                 assert.equal(e.reason, 'NOT_OWNER')

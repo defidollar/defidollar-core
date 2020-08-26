@@ -15,6 +15,7 @@ const susdCurveABI = require('../scripts/abis/susdCurve.json')
 const susdCurveDepositABI = require('../scripts/abis/susdCurveDeposit.json')
 
 const toBN = web3.utils.toBN
+const toWei = web3.utils.toWei
 
 module.exports = async function(deployer, network, accounts) {
     const config = utils.getContractAddresses()
@@ -84,7 +85,7 @@ module.exports = async function(deployer, network, accounts) {
             tokens
         ).encodeABI()
     )
-    await core.whitelistPeak(curveSusdPeakProxy.address, [0, 1, 2, 3], true)
+    await core.whitelistPeak(curveSusdPeakProxy.address, [0, 1, 2, 3], toWei('1000000'), true)
     peak.address = CurveSusdPeakProxy.address,
     config.contracts.peaks = config.contracts.peaks || {}
     config.contracts.peaks['curveSUSDPool'] = peak
