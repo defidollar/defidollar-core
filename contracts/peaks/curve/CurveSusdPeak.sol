@@ -13,7 +13,6 @@ import {Initializable} from "../../common/Initializable.sol";
 import {OwnableProxy} from "../../common/OwnableProxy.sol";
 import {IGauge, IMintr} from "./IGauge.sol";
 
-
 contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
