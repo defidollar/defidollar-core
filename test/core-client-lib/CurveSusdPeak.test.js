@@ -38,6 +38,10 @@ contract('core-client-lib: CurveSusdPeak', async (accounts) => {
         }
     })
 
+    it('ceiling', async () => {
+        assert.equal(await this.client.ceiling(), toWei('1234567'))
+    })
+
     it('curveSusd.add_liquidity', async () => {
         this.amounts = [100, 100, 100, 100]
         for (let i = 0; i < n_coins; i++) {
@@ -62,6 +66,7 @@ contract('core-client-lib: CurveSusdPeak', async (accounts) => {
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '200')
         assert.equal(fromWei(await this.curveSusdPeak.sCrvBalance()), '200')
         assert.equal(fromWei(await this.dusd.balanceOf(alice)), '200')
+        assert.equal(await this.client.available(), toWei('1234367'))
     })
 
     it('curveSusdPeak.mint', async () => {

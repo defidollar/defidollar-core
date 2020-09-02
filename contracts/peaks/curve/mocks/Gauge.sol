@@ -29,5 +29,7 @@ contract Gauge is IGauge {
         scrv.transfer(msg.sender, amount);
     }
 
+    function claimable_tokens(address) external view returns (uint) {}
+    function claimable_reward(address) external view returns (uint) {}
     function claim_rewards() external {}
 }

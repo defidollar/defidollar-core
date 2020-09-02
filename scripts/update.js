@@ -2,23 +2,31 @@ const Core = artifacts.require("Core");
 const CoreProxy = artifacts.require("CoreProxy");
 const CurveSusdPeak = artifacts.require("CurveSusdPeak");
 const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
+const DUSD = artifacts.require("DUSD");
+
+const fromWei = web3.utils.fromWei
+let from
 
 async function execute() {
+    from = '0x08F7506E0381f387e901c9D0552cf4052A0740a4' // owner account
+
     let core = await Core.new()
-    console.log({ Core: core.address })
-
-    const coreProxy = await CoreProxy.at('0xD6647C5eF783eACc4f02686E3DC62198394702A5')
-    console.log({ CoreProxy: coreProxy.address })
-
-    await coreProxy.updateImplementation(core.address)
+    const coreProxy = await CoreProxy.at('0xE449Ca7d10b041255E7e989D158Bee355d8f88d3')
+    await coreProxy.updateImplementation(core.address, { from })
 
     let curveSusdPeak = await CurveSusdPeak.new()
-    console.log({ CurveSusdPeak: curveSusdPeak.address })
+    const curveSusdPeakProxy = await CurveSusdPeakProxy.at('0x80db6e1a3f6dc0D048026f3BeDb39807843366e4')
+    await curveSusdPeakProxy.updateImplementation(curveSusdPeak.address, { from })
 
-    const curveSusdPeakProxy = await CurveSusdPeakProxy.at('0x872F66de4408F95837014552300deBAdB45021e8')
-    console.log({ CurveSusdPeakProxy: curveSusdPeakProxy.address })
+    await harvest(curveSusdPeakProxy.address)
+}
 
-    await curveSusdPeakProxy.updateImplementation(curveSusdPeak.address)
+async function harvest(curveSusdPeakProxyAddress) {
+    const dusd = await DUSD.at('0x5BC25f649fc4e26069dDF4cF4010F9f706c23831')
+    console.log(fromWei(await dusd.balanceOf(from)))
+    const curveSusdPeak = await CurveSusdPeak.at(curveSusdPeakProxyAddress)
+    await curveSusdPeak.harvest(0, { from })
+    console.log(fromWei(await dusd.balanceOf(from)))
 }
 
 function sleep(s) {
