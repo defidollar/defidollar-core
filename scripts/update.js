@@ -3,6 +3,7 @@ const CoreProxy = artifacts.require("CoreProxy");
 const CurveSusdPeak = artifacts.require("CurveSusdPeak");
 const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
 const DUSD = artifacts.require("DUSD");
+const IERC20 = artifacts.require("IERC20");
 
 const fromWei = web3.utils.fromWei
 let from
@@ -19,6 +20,7 @@ async function execute() {
     await curveSusdPeakProxy.updateImplementation(curveSusdPeak.address, { from })
 
     await harvest(curveSusdPeakProxy.address)
+    // await claimRewards(curveSusdPeakProxy.address)
 }
 
 async function harvest(curveSusdPeakProxyAddress) {
@@ -29,8 +31,13 @@ async function harvest(curveSusdPeakProxyAddress) {
     console.log(fromWei(await dusd.balanceOf(from)))
 }
 
-function sleep(s) {
-    return new Promise(resolve => setTimeout(resolve, s * 1000));
+async function claimRewards(curveSusdPeakProxyAddress) {
+    const crv = await IERC20.at('0xD533a949740bb3306d119CC777fa900bA034cd52')
+    const snx = await IERC20.at('0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F')
+    console.log({ crv: fromWei(await crv.balanceOf(from)), snx: fromWei(await snx.balanceOf(from)) })
+    const curveSusdPeak = await CurveSusdPeak.at(curveSusdPeakProxyAddress)
+    await curveSusdPeak.getRewards([crv.address,snx.address], from, { from })
+    console.log({ crv: fromWei(await crv.balanceOf(from)), snx: fromWei(await snx.balanceOf(from)) })
 }
 
 module.exports = async function (callback) {
