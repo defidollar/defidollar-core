@@ -72,7 +72,10 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
                 IERC20(coins[i]).safeTransferFrom(msg.sender, address(this), inAmounts[i]);
             }
         }
-        return _mint(inAmounts, minDusdAmount);
+        dusdAmount = _mint(inAmounts, minDusdAmount);
+        if (dusdAmount >= 1e22) { // whale
+            stake();
+        }
     }
 
     function _mint(uint[N_COINS] memory inAmounts, uint minDusdAmount)
@@ -84,9 +87,6 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
         uint _new = portfolioValue();
         dusdAmount = core.mint(_new.sub(_old), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
-        if (dusdAmount >= 1e22) { // whale
-            stake();
-        }
     }
 
     /**
@@ -354,7 +354,9 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     }
 
     function _stake(uint amount) internal {
-        gauge.deposit(amount);
+        if (amount > 0) {
+            gauge.deposit(amount);
+        }
     }
 
     function _withdraw(uint sCrv) internal {
