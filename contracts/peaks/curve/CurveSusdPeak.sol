@@ -165,8 +165,10 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     }
 
     // thank you Andre :)
-    function harvest(uint minDusdAmount) external onlyOwner returns(uint) {
-        claimRewards();
+    function harvest(bool shouldClaim, uint minDusdAmount) external onlyOwner returns(uint) {
+        if (shouldClaim) {
+            claimRewards();
+        }
         address uni = address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
         address[] memory path = new address[](3);
         path[1] = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // weth

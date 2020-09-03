@@ -27,7 +27,7 @@ async function harvest(curveSusdPeakProxyAddress) {
     const dusd = await DUSD.at('0x5BC25f649fc4e26069dDF4cF4010F9f706c23831')
     console.log(fromWei(await dusd.balanceOf(from)))
     const curveSusdPeak = await CurveSusdPeak.at(curveSusdPeakProxyAddress)
-    await curveSusdPeak.harvest(0, { from })
+    await curveSusdPeak.harvest(true, 0, { from })
     console.log(fromWei(await dusd.balanceOf(from)))
 }
 
