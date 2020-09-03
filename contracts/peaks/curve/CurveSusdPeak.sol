@@ -201,6 +201,18 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
         return _mint([0,_usdc,_usdt,0], minDusdAmount);
     }
 
+    function getRewards(address[] calldata tokens, address destination) external onlyOwner {
+        claimRewards();
+        for (uint i = 0; i < tokens.length; i++) {
+            IERC20 token = IERC20(tokens[i]);
+            require(
+                address(token) != address(curveToken),
+                "Admin can't withdraw curve lp tokens"
+            );
+            token.safeTransfer(destination, token.balanceOf(address(this)));
+        }
+    }
+
     function claimRewards() public {
         mintr.mint(address(gauge));
         gauge.claim_rewards();
