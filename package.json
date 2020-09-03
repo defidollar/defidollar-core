@@ -16,11 +16,12 @@
   "license": "ISC",
   "dependencies": {
     "@chainlink/contracts": "0.0.7-beta",
-    "@defidollar/core-client-lib": "github:defidollar/core-client-lib#061fee835253c88740a493099ecabd9f7751377d",
+    "@defidollar/core-client-lib": "github:defidollar/core-client-lib#fd187c78595448008959f5f50ef6ba08cd842cd0",
     "@openzeppelin/contracts": "^2.5.1"
   },
   "devDependencies": {
     "@truffle/hdwallet-provider": "^1.0.42",
+    "csv-writer": "^1.6.0",
     "eth-gas-reporter": "^0.2.17",
     "ganache": "^6.4.4",
     "solidity-coverage": "^0.7.9",

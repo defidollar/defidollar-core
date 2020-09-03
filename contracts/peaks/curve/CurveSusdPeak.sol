@@ -72,7 +72,16 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
                 IERC20(coins[i]).safeTransferFrom(msg.sender, address(this), inAmounts[i]);
             }
         }
+        dusdAmount = _mint(inAmounts, minDusdAmount);
+        if (dusdAmount >= 1e22) { // whale
+            stake();
+        }
+    }
 
+    function _mint(uint[N_COINS] memory inAmounts, uint minDusdAmount)
+        internal
+        returns (uint dusdAmount)
+    {
         uint _old = portfolioValue();
         curve.add_liquidity(inAmounts, 0);
         uint _new = portfolioValue();
@@ -89,9 +98,12 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
         external
         returns (uint dusdAmount)
     {
+        curveToken.safeTransferFrom(msg.sender, address(this), inAmount);
         dusdAmount = core.mint(sCrvToUsd(inAmount), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
-        curveToken.safeTransferFrom(msg.sender, address(this), inAmount);
+        if (dusdAmount >= 1e22) { // whale
+            stake();
+        }
     }
 
     /**
@@ -152,8 +164,47 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
         return portfolioValue();
     }
 
+    // thank you Andre :)
+    function harvest(bool shouldClaim, uint minDusdAmount) external onlyOwner returns(uint) {
+        if (shouldClaim) {
+            claimRewards();
+        }
+        address uni = address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+        address[] memory path = new address[](3);
+        path[1] = address(0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2); // weth
+
+        address __crv = address(0xD533a949740bb3306d119CC777fa900bA034cd52);
+        IERC20 crv = IERC20(__crv);
+        uint _crv = crv.balanceOf(address(this));
+        uint _usdt;
+        if (_crv > 0) {
+            crv.safeApprove(uni, 0);
+            crv.safeApprove(uni, _crv);
+            path[0] = __crv;
+            address __usdt = address(0xdAC17F958D2ee523a2206206994597C13D831ec7);
+            path[2] = __usdt;
+            Uni(uni).swapExactTokensForTokens(_crv, uint(0), path, address(this), now.add(1800));
+            _usdt = IERC20(__usdt).balanceOf(address(this));
+        }
+
+        address __snx = address(0xC011a73ee8576Fb46F5E1c5751cA3B9Fe0af2a6F);
+        IERC20 snx = IERC20(__snx);
+        uint _snx = snx.balanceOf(address(this));
+        uint _usdc;
+        if (_snx > 0) {
+            snx.safeApprove(uni, 0);
+            snx.safeApprove(uni, _snx);
+            path[0] = __snx;
+            address __usdc = address(0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48);
+            path[2] = __usdc;
+            Uni(uni).swapExactTokensForTokens(_snx, uint(0), path, address(this), now.add(1800));
+            _usdc = IERC20(__usdc).balanceOf(address(this));
+        }
+        return _mint([0,_usdc,_usdt,0], minDusdAmount);
+    }
+
     function getRewards(address[] calldata tokens, address destination) external onlyOwner {
-        harvest();
+        claimRewards();
         for (uint i = 0; i < tokens.length; i++) {
             IERC20 token = IERC20(tokens[i]);
             require(
@@ -164,7 +215,7 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
         }
     }
 
-    function harvest() public {
+    function claimRewards() public {
         mintr.mint(address(gauge));
         gauge.claim_rewards();
     }
@@ -317,7 +368,9 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     }
 
     function _stake(uint amount) internal {
-        gauge.deposit(amount);
+        if (amount > 0) {
+            gauge.deposit(amount);
+        }
     }
 
     function _withdraw(uint sCrv) internal {
@@ -326,4 +379,8 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
             gauge.withdraw(sCrv.sub(bal), false);
         }
     }
+}
+
+interface Uni {
+    function swapExactTokensForTokens(uint, uint, address[] calldata, address, uint) external;
 }

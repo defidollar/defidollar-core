@@ -1,6 +1,6 @@
 const fs = require('fs')
 const Web3 = require('web3')
-const web3 = new Web3('')
+const web3 = new Web3(process.env.WEB3)
 
 const Aggregator = require('../../build/contracts/AggregatorInterface.json')
 const IERC20 = require('../../build/contracts/IERC20.json')
