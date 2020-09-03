@@ -62,8 +62,8 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     * @param inAmounts Exact inAmounts in the same order as required by the curve pool
     * @param minDusdAmount Minimum DUSD to mint, used for capping slippage
     */
-    function mint(uint[N_COINS] memory inAmounts, uint minDusdAmount)
-        public
+    function mint(uint[N_COINS] calldata inAmounts, uint minDusdAmount)
+        external
         returns (uint dusdAmount)
     {
         address[N_COINS] memory coins = underlyingCoins;
