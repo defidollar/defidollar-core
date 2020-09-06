@@ -10,6 +10,7 @@ const n_coins = 4
 const CurveSusdPeak = artifacts.require("CurveSusdPeak");
 const Core = artifacts.require("Core");
 const DUSD = artifacts.require("DUSD");
+const IERC20 = artifacts.require("IERC20");
 
 const daiABI = require('../test/abi/dai.json');
 const { contracts } = JSON.parse(fs.readFileSync(`../deployments/mainnet.json`).toString())
@@ -113,7 +114,7 @@ async function printTokenBalances(_artifacts) {
         scrv: fromWei(await curveToken.methods.balanceOf(from).call()),
         dusd: fromWei(await dusd.methods.balanceOf(from).call()),
         system: {
-            scrv: fromWei(await curveToken.methods.balanceOf(susdPeak.options.address).call()),
+            scrv: fromWei(await susdPeak.methods.sCrvBalance().call()),
             totalSupply: fromWei(await dusd.methods.totalSupply().call()),
             totalAssets: fromWei(await core.methods.totalAssets().call()),
             totalSystemAssets: fromWei(await core.methods.totalSystemAssets().call())

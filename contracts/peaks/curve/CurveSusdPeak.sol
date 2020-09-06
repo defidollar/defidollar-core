@@ -73,9 +73,7 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
             }
         }
         dusdAmount = _mint(inAmounts, minDusdAmount);
-        if (dusdAmount >= 1e22) { // whale
-            stake();
-        }
+        stake();
     }
 
     function _mint(uint[N_COINS] memory inAmounts, uint minDusdAmount)
@@ -101,9 +99,7 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
         curveToken.safeTransferFrom(msg.sender, address(this), inAmount);
         dusdAmount = core.mint(sCrvToUsd(inAmount), msg.sender);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
-        if (dusdAmount >= 1e22) { // whale
-            stake();
-        }
+        _stake(inAmount);
     }
 
     /**
@@ -131,7 +127,7 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
         external
     {
         uint sCrv = _secureFunding(core.redeem(dusdAmount, msg.sender));
-        curveDeposit.remove_liquidity_one_coin(sCrv, int128(i), minOut, false);
+        curveDeposit.remove_liquidity_one_coin(sCrv, int128(i), minOut);
         IERC20 coin = IERC20(underlyingCoins[i]);
         uint toTransfer = coin.balanceOf(address(this));
         require(toTransfer >= minOut, ERR_SLIPPAGE);
@@ -143,7 +139,6 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     {
         uint sCrv = _secureFunding(core.redeem(dusdAmount, msg.sender));
         require(sCrv >= minOut, ERR_SLIPPAGE);
-        _withdraw(sCrv);
         curveToken.safeTransfer(msg.sender, sCrv);
     }
 
@@ -346,15 +341,8 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     }
 
     function _secureFunding(uint usd) internal returns(uint sCrv) {
-        uint here = curveToken.balanceOf(address(this));
-        uint there = gauge.balanceOf(address(this));
-        sCrv = usdToScrv(usd).min(here.add(there)); // in an extreme scenario there might not be enough sCrv to redeem
-        if (sCrv > here) {
-            _withdraw(sCrv.sub(here));
-        } else if (sCrv < here) {
-            // stake the remaining
-            _stake(here.sub(sCrv));
-        }
+        sCrv = usdToScrv(usd).min(sCrvBalance()); // in an extreme scenario there might not be enough sCrv to redeem
+        gauge.withdraw(sCrv, false);
     }
 
     function _processFeed(uint[] memory _feed)
@@ -370,13 +358,6 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     function _stake(uint amount) internal {
         if (amount > 0) {
             gauge.deposit(amount);
-        }
-    }
-
-    function _withdraw(uint sCrv) internal {
-        uint bal = curveToken.balanceOf(address(this));
-        if (sCrv > bal) {
-            gauge.withdraw(sCrv.sub(bal), false);
         }
     }
 }
