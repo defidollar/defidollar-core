@@ -72,7 +72,7 @@ contract('CurveSusdPeak', async (accounts) => {
     it('curveDeposit.remove_liquidity_one_coin(dai): alice', async () => {
         const inAmount = await this.curveToken.balanceOf(alice)
         await this.curveToken.approve(this.curveDeposit.address, inAmount)
-        await this.curveDeposit.remove_liquidity_one_coin(inAmount,0,0,false)
+        await this.curveDeposit.remove_liquidity_one_coin(inAmount,0,0)
         // await this.curveSusd.remove_liquidity_imbalance([this.dai,0,0,0], MAX)
         // await this.curveSusd.remove_liquidity(inAmount, [0,0,0,0])
     })
