@@ -5,7 +5,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {SafeMath} from "@openzeppelin/contracts/math/SafeMath.sol";
 import {Math} from "@openzeppelin/contracts/math/Math.sol";
 
-import {ICurveDeposit, ICurve, IUtil} from "./ICurve.sol";
+import {ICurveDeposit, ICurve, IUtil} from "../../interfaces/ICurve.sol";
 import {ICore} from "../../interfaces/ICore.sol";
 import {IPeak} from "../../interfaces/IPeak.sol";
 
@@ -319,25 +319,11 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
 
     /* ##### Internal Functions ##### */
 
-    function _sCrvToUsd(uint sCrvBal, uint[N_COINS] memory _feed)
+    function _sCrvToUsd(uint sCrvBal, uint[N_COINS] memory /* _feed */)
         internal view
         returns(uint)
     {
-        uint sCrvTotalSupply = curveToken.totalSupply();
-        if (sCrvTotalSupply == 0 || sCrvBal == 0) {
-            return 0;
-        }
-        uint[N_COINS] memory balances;
-        for (uint i = 0; i < N_COINS; i++) {
-            balances[i] = curve.balances(int128(i)).mul(_feed[i]);
-            if (i == 0 || i == 3) {
-                balances[i] = balances[i].div(1e18);
-            } else {
-                balances[i] = balances[i].div(1e6);
-            }
-        }
-        // https://github.com/curvefi/curve-contract/blob/pool_susd_plain/vyper/stableswap.vy#L149
-        return util.get_D(balances).mul(sCrvBal).div(sCrvTotalSupply);
+        return sCrvBal.mul(curve.get_virtual_price());
     }
 
     function _secureFunding(uint usd) internal returns(uint sCrv) {
