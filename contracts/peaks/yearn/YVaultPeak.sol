@@ -20,36 +20,27 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
     string constant ERR_SLIPPAGE = "ERR_SLIPPAGE";
     string constant ERR_INSUFFICIENT_FUNDS = "INSUFFICIENT_FUNDS";
 
-    ICore core;
-    IController controller;
-    ICurve yPool;
-    IERC20 yUsd;
-    IERC20 yyCrv;
+    uint min = 9500;
+    uint constant max = 10000;
 
-    uint public min = 9500;
-    uint public constant max = 10000;
-    
-    function initialize(
-        ICore _core,
-        IController _controller,
-        ICurve _yPool,
-        IERC20 _yUsd,
-        IERC20 _yyCrv
-    )
+    IController controller;
+
+    ICore core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
+    ICurve yPool = ICurve(0x45F783CCE6B7FF23B2ab2D70e416cdb7D6055f51);
+    IERC20 yUsd = IERC20(0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8);
+    IERC20 yyCrv = IERC20(0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c);
+
+    function initialize(IController _controller)
         public
         notInitialized
     {
-        core = _core;
         controller = _controller;
-        yPool = _yPool;
-        yUsd = _yUsd;
-        yyCrv = _yyCrv;
     }
 
     function mintWithYusd(uint inAmount) external returns(uint dusdAmount) {
         yUsd.safeTransferFrom(msg.sender, address(this), inAmount);
         dusdAmount = calcMintWithYusd(inAmount);
-        core.mint(dusdAmount, msg.sender);  
+        core.mint(dusdAmount, msg.sender);
 
         // best effort at keeping min.div(max) funds here
         (uint here, uint there) = yUsdDistribution();
@@ -129,33 +120,29 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
     function yUsdToUsd() public view returns (uint) {
         return yPool.get_virtual_price();
     }
-    
+
     function portfolioValue() external view returns(uint) {
         (uint here, uint there) = yUsdDistribution();
         return here.add(there).mul(yUsdToUsd());
     }
 
-    // function vars() public view returns(
-    //     address _curveDeposit,
-    //     address _curve,
-    //     address _curveToken,
-    //     address _util,
-    //     address _gauge,
-    //     address _mintr,
-    //     address _core,
-    //     address[N_COINS] memory _underlyingCoins,
-    //     uint[N_COINS] memory _feed
-    // ) {
-    //     return(
-    //         address(curveDeposit),
-    //         address(curve),
-    //         address(curveToken),
-    //         address(util),
-    //         address(gauge),
-    //         address(mintr),
-    //         address(core),
-    //         underlyingCoins,
-    //         feed
-    //     );
-    // }
+    function setMin(uint _min) external onlyOwner {
+        min = _min;
+    }
+
+    function vars() public view returns(
+        address _core,
+        address _yPool,
+        address _yUsd,
+        address _yyCrv,
+        uint _min
+    ) {
+        return(
+            address(core),
+            address(yPool),
+            address(yUsd),
+            address(yyCrv),
+            min
+        );
+    }
 }
