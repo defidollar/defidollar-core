@@ -74,6 +74,14 @@ contract StakeLPToken is OwnableProxy, Initializable, LPTokenWrapper {
         _;
     }
 
+    // stake visibility is public as overriding LPTokenWrapper's stake() function
+    function stake(uint amount) public updateReward(msg.sender) {
+        require(!isPaused, "Staking is paused");
+        require(amount > 0, "Cannot stake 0");
+        super.stake(amount);
+        emit Staked(msg.sender, amount);
+    }
+
     function withdraw(uint amount) public updateReward(msg.sender) {
         _withdraw(amount);
     }
