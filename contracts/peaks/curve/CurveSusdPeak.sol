@@ -323,7 +323,7 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
         internal view
         returns(uint)
     {
-        return sCrvBal.mul(curve.get_virtual_price());
+        return sCrvBal.mul(curve.get_virtual_price()).div(1e18);
     }
 
     function _secureFunding(uint usd) internal returns(uint sCrv) {

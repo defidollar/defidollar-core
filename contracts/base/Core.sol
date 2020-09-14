@@ -128,6 +128,14 @@ contract Core is OwnableProxy, Initializable, ICore {
         return dusdAmount;
     }
 
+    function dusdToUsd(uint _dusd, bool fee) public view returns(uint usd) {
+        usd = _dusd;
+        if (fee) {
+            usd = usd.mul(redeemFactor).div(FEE_PRECISION);
+        }
+        return usd;
+    }
+
     function totalSystemAssets() public view returns (uint _totalAssets) {
         for (uint i = 0; i < peaksAddresses.length; i++) {
             Peak memory peak = peaks[peaksAddresses[i]];
@@ -139,7 +147,6 @@ contract Core is OwnableProxy, Initializable, ICore {
             );
         }
     }
-
 
     /* ##### Admin functions ##### */
 

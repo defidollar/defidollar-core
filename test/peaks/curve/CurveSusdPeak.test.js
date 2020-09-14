@@ -46,9 +46,12 @@ contract('CurveSusdPeak', async (accounts) => {
     })
 
     it('peak.mintWithScrv', async () => {
+        // console.log((await this.core.peaks(this.curveSusdPeak.address)).ceiling.toString())
+        // console.log((await this.core.peaks(this.curveSusdPeak.address)).amount.toString())
         const inAmount = toBN(await this.curveToken.balanceOf(alice)).div(toBN(2)).toString()
         await this.curveToken.approve(this.curveSusdPeak.address, inAmount)
         await this.curveSusdPeak.mintWithScrv(inAmount, '0')
+        // console.log((await this.curveSusdPeak.mintWithScrv.call(inAmount, '0')).toString())
         assert.equal(fromWei(await this.curveSusdPeak.sCrvBalance()), '200')
         assert.equal(fromWei(await this.curveToken.balanceOf(alice)), '200')
         assert.equal(fromWei(await this.dusd.balanceOf(alice)), '200')

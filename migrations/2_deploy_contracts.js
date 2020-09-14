@@ -77,7 +77,7 @@ module.exports = async function(deployer, network, accounts) {
         ).encodeABI()
     )
     await core.whitelistTokens(tokens)
-    await core.syncSystem()
+    // await core.syncSystem()
 
     config.contracts.base = CoreProxy.address
     config.contracts.valley = StakeLPTokenProxy.address
