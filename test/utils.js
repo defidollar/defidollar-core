@@ -17,7 +17,7 @@ const YVaultPeak = artifacts.require("YVaultPeak");
 const YVaultPeakProxy = artifacts.require("YVaultPeakProxy");
 const YVaultZap = artifacts.require("YVaultZapTest");
 const Controller = artifacts.require("Controller");
-const MockyVault = artifacts.require("MockyVault");
+const MockYvault = artifacts.require("MockYvault");
 
 const n_coins = 5
 const toBN = web3.utils.toBN
@@ -57,7 +57,7 @@ async function getArtifacts() {
 
 		yVaultPeak: await YVaultPeak.at(YVaultPeakProxy.address),
 		yVaultZap: await YVaultZap.deployed(),
-		yVault: await MockyVault.deployed()
+		yVault: await MockYvault.deployed()
 	}
 	const { _curveDeposit, _curve } = await res.curveSusdPeak.vars()
 	res.curveSusd = await ICurve.at(_curve)

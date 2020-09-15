@@ -3,10 +3,10 @@ const fs = require('fs')
 const Core = artifacts.require("Core");
 const DUSD = artifacts.require("DUSD");
 const CoreProxy = artifacts.require("CoreProxy");
-const YVaultPeak = artifacts.require("YVaultPeak");
+const YVaultPeak = artifacts.require("YVaultPeakTest");
 const YVaultPeakProxy = artifacts.require("YVaultPeakProxy");
 const YVaultZap = artifacts.require("YVaultZapTest");
-const MockyVault = artifacts.require("MockyVault");
+const MockYvault = artifacts.require("MockYvault");
 const Controller = artifacts.require("Controller");
 const ControllerProxy = artifacts.require("ControllerProxy");
 
@@ -72,21 +72,14 @@ module.exports = async function(deployer, network, accounts) {
     await controllerProxy.updateImplementation(Controller.address);
     const controller = await Controller.at(controllerProxy.address)
 
-    const yVault = await deployer.deploy(MockyVault, yCrv.address, '0x0000000000000000000000000000000000000000')
+    const yVault = await deployer.deploy(MockYvault, yCrv.address, '0x0000000000000000000000000000000000000000')
 
     await deployer.deploy(YVaultPeak)
     const yVaultPeakProxy = await deployer.deploy(YVaultPeakProxy)
     const yVaultPeak = await YVaultPeak.at(YVaultPeakProxy.address)
     await yVaultPeakProxy.updateAndCall(
         YVaultPeak.address,
-        yVaultPeak.contract.methods.initialize(
-            controller.address,
-            core.address,
-            curve.options.address,
-            yCrv.address,
-            yVault.address,
-            9500
-        ).encodeABI()
+        yVaultPeak.contract.methods.initialize(controller.address).encodeABI()
     )
     const yVaultZap = await deployer.deploy(YVaultZap, yVaultPeak.address)
     await Promise.all([
@@ -99,6 +92,12 @@ module.exports = async function(deployer, network, accounts) {
             DUSD.address,
             tokens
         ),
+        yVaultPeak.setDeps(
+            core.address,
+            curve.options.address,
+            yCrv.address,
+            yVault.address
+        )
     ])
     peak.address = yVaultPeakProxy.address,
     config.contracts.peaks = config.contracts.peaks || {}

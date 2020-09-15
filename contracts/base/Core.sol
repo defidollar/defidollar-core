@@ -115,7 +115,7 @@ contract Core is OwnableProxy, Initializable, ICore {
     */
     function redeem(uint dusdAmount, address account)
         external
-        returns(uint)
+        returns(uint usd)
     {
         Peak memory peak = peaks[msg.sender];
         require(

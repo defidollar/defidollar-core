@@ -7,7 +7,7 @@ const toBN = web3.utils.toBN
 const MAX = web3.utils.toTwosComplement(-1);
 const n_coins = 4
 
-contract.only('YVaultPeak', async (accounts) => {
+contract('YVaultPeak', async (accounts) => {
     let alice = accounts[0]
 
     before(async () => {
