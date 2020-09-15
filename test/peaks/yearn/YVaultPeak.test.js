@@ -7,7 +7,7 @@ const toBN = web3.utils.toBN
 const MAX = web3.utils.toTwosComplement(-1);
 const n_coins = 4
 
-contract('CurveSusdPeak', async (accounts) => {
+contract('YVaultPeak', async (accounts) => {
     let alice = accounts[0]
 
     before(async () => {
@@ -15,6 +15,7 @@ contract('CurveSusdPeak', async (accounts) => {
         Object.assign(this, artifacts)
 
         this.amounts = [200, 200, 200, 200]
+        this.reserves = this.reserves.slice(0, 3).concat([this.reserves[4]])
         const tasks = []
         for (let i = 0; i < n_coins; i++) {
             this.amounts[i] = toBN(this.amounts[i]).mul(toBN(10 ** this.decimals[i]))
@@ -23,7 +24,17 @@ contract('CurveSusdPeak', async (accounts) => {
         await Promise.all(tasks)
     })
 
-    it('curveSusd.add_liquidity', async () => {
-
+    it('yVaultZap.mint', async () => {
+        this.amounts = [100, 100, 100, 100]
+        const tasks = []
+        for (let i = 0; i < n_coins; i++) {
+            this.amounts[i] = toBN(this.amounts[i]).mul(toBN(10 ** this.decimals[i]))
+            tasks.push(this.reserves[i].approve(this.yVaultZap.address, this.amounts[i]))
+        }
+        await Promise.all(tasks)
+        await this.yVaultZap.mint(this.amounts, '0')
+        assert.equal(fromWei(await this.dusd.balanceOf(alice)), '400')
+        assert.equal(fromWei(await this.yCrv.balanceOf(this.yVaultPeak.address)), '20')
+        assert.equal(fromWei(await this.yCrv.balanceOf(this.yVault.address)), '380')
     })
 })

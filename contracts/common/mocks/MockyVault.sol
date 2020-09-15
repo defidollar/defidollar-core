@@ -288,8 +288,8 @@ contract MockyVault is ERC20, ERC20Detailed {
   }
 
   function balance() public view returns (uint) {
-      return token.balanceOf(address(this))
-             .add(VaultController(controller).balanceOf(address(token)));
+      return token.balanceOf(address(this));
+            //  .add(VaultController(controller).balanceOf(address(token)));
   }
 
   function setMin(uint _min) external {
@@ -352,7 +352,7 @@ contract MockyVault is ERC20, ERC20Detailed {
       token.safeTransfer(msg.sender, r);
   }
 
-  function getPricePerFullShare() public view returns (uint) {
-    return balance().mul(1e18).div(totalSupply());
-  }
+    function getPricePerFullShare() public view returns (uint) {
+        return balance().mul(1e18).div(totalSupply());
+    }
 }

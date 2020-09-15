@@ -21,7 +21,13 @@ contract Controller is OwnableProxy, Initializable {
     }
 
     function earn(IERC20 token) public {
-        vaults[address(token)].deposit(token.balanceOf(address(this)));
+        IVault vault = vaults[address(token)];
+        uint b = token.balanceOf(address(this));
+        if (b > 0) {
+            token.safeApprove(address(vault), 0);
+            token.safeApprove(address(vault), b);
+            vault.deposit(b);
+        }
     }
 
     function vaultWithdraw(IERC20 token, uint _shares) public onlyPeak {
@@ -37,6 +43,9 @@ contract Controller is OwnableProxy, Initializable {
 
     function getPricePerFullShare(address token) public view returns(uint) {
         IVault vault = vaults[token];
+        if (vault.totalSupply() == 0) {
+            return 1e18;
+        }
         return vault.getPricePerFullShare();
     }
 

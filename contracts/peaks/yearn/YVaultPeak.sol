@@ -19,22 +19,35 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
 
     string constant ERR_SLIPPAGE = "ERR_SLIPPAGE";
     string constant ERR_INSUFFICIENT_FUNDS = "INSUFFICIENT_FUNDS";
+    uint constant MAX = 10000;
 
-    uint min = 9500;
-    uint constant max = 10000;
 
     IController controller;
+    uint public min;
 
-    ICore core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
-    ICurve ySwap = ICurve(0x45F783CCE6B7FF23B2ab2D70e416cdb7D6055f51);
-    IERC20 yCrv = IERC20(0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8);
-    IERC20 yUSD = IERC20(0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c);
+    // ICore core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
+    // ICurve ySwap = ICurve(0x45F783CCE6B7FF23B2ab2D70e416cdb7D6055f51);
+    // IERC20 yCrv = IERC20(0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8);
+    // IERC20 yUSD = IERC20(0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c);
 
-    function initialize(IController _controller)
+    ICore core;
+    ICurve ySwap;
+    IERC20 yCrv;
+    IERC20 yUSD;
+
+    function initialize(
+        IController _controller,
+        ICore _core, ICurve _ySwap, IERC20 _yCrv, IERC20 _yUSD, uint _min
+    )
         public
         notInitialized
     {
         controller = _controller;
+        core = _core;
+        ySwap = _ySwap;
+        yCrv = _yCrv;
+        yUSD = _yUSD;
+        min = _min;
     }
 
     function mintWithYcrv(uint inAmount) external returns(uint dusdAmount) {
@@ -42,13 +55,18 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
         dusdAmount = calcMintWithYcrv(inAmount);
         core.mint(dusdAmount, msg.sender);
 
-        // best effort at keeping min.div(max) funds here
-        (uint here, uint there) = yCrvDistribution();
-        uint shouldBeHere = here.add(there).mul(min).div(max);
-        if (here > shouldBeHere) {
-            yCrv.safeTransfer(address(controller), here.sub(shouldBeHere));
-            controller.earn(address(yCrv)); // this is just acting like a callback
+        // best effort at keeping min.div(MAX) funds here
+        uint farm = toFarm();
+        if (farm > 0) {
+            yCrv.safeTransfer(address(controller), farm);
+            controller.earn(address(yCrv)); // this is acting like a callback
         }
+    }
+
+    // Sets minimum required on-hand to keep small withdrawals cheap
+    function toFarm() public view returns (uint ans) {
+        (uint here, uint there) = yCrvDistribution();
+        return here.add(there).mul(min).div(MAX);
     }
 
     function calcMintWithYcrv(uint inAmount) public view returns (uint dusdAmount) {
@@ -58,7 +76,8 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
     function yCrvDistribution() public view returns (uint here, uint there) {
         here = yCrv.balanceOf(address(this));
         there = yUSD.balanceOf(address(controller))
-            .mul(controller.getPricePerFullShare(address(yCrv)));
+            .mul(controller.getPricePerFullShare(address(yCrv)))
+            .div(1e18);
     }
 
     function redeemInYcrv(uint dusdAmount, uint minOut) external returns(uint r) {
@@ -118,6 +137,9 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
     }
 
     function yCrvToUsd() public view returns (uint) {
+        if (yCrv.totalSupply() == 0) {
+            return 1e18;
+        }
         return ySwap.get_virtual_price();
     }
 

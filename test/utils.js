@@ -10,11 +10,13 @@ const CurveSusdPeak = artifacts.require("CurveSusdPeak");
 const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
 const YVaultPeak = artifacts.require("YVaultPeak");
 const YVaultPeakProxy = artifacts.require("YVaultPeakProxy");
+const YVaultZap = artifacts.require("YVaultZapTest");
 const MockSusdToken = artifacts.require("MockSusdToken");
 const ICurve = artifacts.require("ICurve");
 const ICurveDeposit = artifacts.require("ICurveDeposit");
+const MockyVault = artifacts.require("MockyVault");
 
-const n_coins = 4
+const n_coins = 5
 const toBN = web3.utils.toBN
 const fromWei = web3.utils.fromWei
 
@@ -31,7 +33,9 @@ async function getArtifacts() {
         reserves.push(await Reserve.at((await core.systemCoins(i))))
 		decimals.push(await reserves[i].decimals())
 		scaleFactor.push(toBN(10 ** decimals[i]))
-		aggregators.push(await Aggregator.at(await oracle.refs(i)))
+		if (i < 4) {
+			aggregators.push(await Aggregator.at(await oracle.refs(i)))
+		}
     }
 	const stakeLPTokenProxy = await StakeLPTokenProxy.deployed()
     const res = {
@@ -46,16 +50,20 @@ async function getArtifacts() {
         stakeLPToken: await StakeLPToken.at(stakeLPTokenProxy.address),
 
         curveSusdPeak: await CurveSusdPeak.at(CurveSusdPeakProxy.address),
-        yVaultPeak: await YVaultPeak.at(YVaultPeakProxy.address),
-        curveToken: await MockSusdToken.deployed(),
+		curveToken: await MockSusdToken.deployed(),
+
+		yVaultPeak: await YVaultPeak.at(YVaultPeakProxy.address),
+		yVaultZap: await YVaultZap.deployed(),
+		yVault: await MockyVault.deployed()
 	}
 	const { _curveDeposit, _curve } = await res.curveSusdPeak.vars()
 	res.curveSusd = await ICurve.at(_curve)
 	res.curveDeposit = await ICurveDeposit.at(_curveDeposit)
 
-	const { _yUsd } = await res.curveSusdPeak.vars()
-	res.curveY = await ICurve.at(_curve)
-	res.curveDeposit = await ICurveDeposit.at(_curveDeposit)
+	const { _yCrv } = await res.yVaultPeak.vars()
+	res.yCrv = await MockSusdToken.at(_yCrv)
+	// res.curveY = await ICurve.at(_curve)
+	// res.curveDeposit = await ICurveDeposit.at(_curveDeposit)
 	return res
 }
 

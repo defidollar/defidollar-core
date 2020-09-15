@@ -4,4 +4,5 @@ interface IVault {
     function deposit(uint) external;
     function withdraw(uint _shares) external;
     function getPricePerFullShare() external view returns (uint);
+    function totalSupply() external view returns (uint);
 }

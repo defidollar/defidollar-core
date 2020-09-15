@@ -1,10 +1,11 @@
 const fs = require('fs')
 
 const Core = artifacts.require("Core");
+const DUSD = artifacts.require("DUSD");
 const CoreProxy = artifacts.require("CoreProxy");
-const YVaultPeak = artifacts.require("YVaultPeakTest");
+const YVaultPeak = artifacts.require("YVaultPeak");
 const YVaultPeakProxy = artifacts.require("YVaultPeakProxy");
-const yVaultZap = artifacts.require("yVaultZap");
+const YVaultZap = artifacts.require("YVaultZapTest");
 const MockyVault = artifacts.require("MockyVault");
 const Controller = artifacts.require("Controller");
 const ControllerProxy = artifacts.require("ControllerProxy");
@@ -23,7 +24,7 @@ module.exports = async function(deployer, network, accounts) {
     const config = utils.getContractAddresses()
     const peak = {
         coins: ["DAI", "USDC", "USDT", "TUSD"],
-        native: "yDAI+yUSDC+yUSDT+yTUSD"
+        native: "yCRV"
     }
     // TUSD
     const coreProxy = await CoreProxy.deployed()
@@ -35,12 +36,12 @@ module.exports = async function(deployer, network, accounts) {
     const tokens = reserves.map(r => r.address)
 
     // Deploy yPool
-    const yUSD = await deployer.deploy(MockSusdToken)
-    config.contracts.tokens['yDAI+yUSDC+yUSDT+yTUSD'] = {
-        address: yUSD.address,
+    const yCrv = await MockSusdToken.new()
+    config.contracts.tokens['yCRV'] = {
+        address: yCrv.address,
         decimals: 18,
-        name: "Curve.fi yDAI/yUSDC/yUSDT/yTUSD",
-        peak: "yVault"
+        name: "Curve.fi yDAI/yCrvC/yCrvT/yTUSD",
+        peak: "yVaultPeak"
     }
 
     let curve = new web3.eth.Contract(susdCurveABI)
@@ -49,7 +50,7 @@ module.exports = async function(deployer, network, accounts) {
         arguments: [
             tokens,
             tokens,
-            yUSD.address,
+            yCrv.address,
             100,
             4000000
         ]
@@ -62,15 +63,16 @@ module.exports = async function(deployer, network, accounts) {
             tokens,
             tokens,
             curve.options.address,
-            yUSD.address
+            yCrv.address
         ]
     }).send({ from: accounts[0], gas: 10000000 })
 
     await deployer.deploy(Controller)
     const controllerProxy = await deployer.deploy(ControllerProxy)
+    await controllerProxy.updateImplementation(Controller.address);
     const controller = await Controller.at(controllerProxy.address)
 
-    const yVault = await deployer.deploy(MockyVault, yUSD.address, '0x0000000000000000000000000000000000000000')
+    const yVault = await deployer.deploy(MockyVault, yCrv.address, '0x0000000000000000000000000000000000000000')
 
     await deployer.deploy(YVaultPeak)
     const yVaultPeakProxy = await deployer.deploy(YVaultPeakProxy)
@@ -78,27 +80,29 @@ module.exports = async function(deployer, network, accounts) {
     await yVaultPeakProxy.updateAndCall(
         YVaultPeak.address,
         yVaultPeak.contract.methods.initialize(
-            controller.address
-        ).encodeABI()
-    )
-    await Promise.all([
-        controller.addPeak(yVaultPeak.address),
-        controller.addVault(yUSD.address, yVault.address),
-        core.whitelistPeak(yVaultPeakProxy.address, [0, 1, 2, 4], toWei('1234567'), true),
-        yVaultPeak.setDeps(
+            controller.address,
             core.address,
             curve.options.address,
-            yUSD.address,
+            yCrv.address,
             yVault.address,
+            9500
+        ).encodeABI()
+    )
+    const yVaultZap = await deployer.deploy(YVaultZap, yVaultPeak.address)
+    await Promise.all([
+        controller.addPeak(yVaultPeak.address),
+        controller.addVault(yCrv.address, yVault.address),
+        core.whitelistPeak(yVaultPeakProxy.address, [0, 1, 2, 4], toWei('1234567'), true),
+        yVaultZap.setDeps(
+            curveDeposit.options.address,
+            yCrv.address,
+            DUSD.address,
+            tokens
         ),
-        deployer.deploy(
-            yVaultZap,
-
-        )
     ])
     peak.address = yVaultPeakProxy.address,
     config.contracts.peaks = config.contracts.peaks || {}
-    config.contracts.peaks['yVault'] = peak
+    config.contracts.peaks['yVaultPeak'] = peak
     utils.writeContractAddresses(config)
 
     // todo fix
