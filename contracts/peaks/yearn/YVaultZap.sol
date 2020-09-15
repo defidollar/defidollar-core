@@ -47,7 +47,6 @@ contract YVaultZap {
         }
         yDeposit.add_liquidity(inAmounts, 0);
         uint inAmount = yCrv.balanceOf(address(this));
-        yCrv.safeApprove(address(yVaultPeak), 0);
         yCrv.safeApprove(address(yVaultPeak), inAmount);
         dusdAmount = yVaultPeak.mintWithYcrv(inAmount);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
@@ -64,7 +63,6 @@ contract YVaultZap {
     {
         dusd.safeTransferFrom(msg.sender, address(this), dusdAmount);
         uint r = yVaultPeak.redeemInYcrv(dusdAmount, 0);
-        yCrv.safeApprove(address(yDeposit), 0);
         yCrv.safeApprove(address(yDeposit), r);
         yDeposit.remove_liquidity(r, ZEROES);
         address[N_COINS] memory coins = underlyingCoins;
@@ -83,7 +81,6 @@ contract YVaultZap {
     {
         dusd.safeTransferFrom(msg.sender, address(this), dusdAmount);
         uint r = yVaultPeak.redeemInYcrv(dusdAmount, 0);
-        yCrv.safeApprove(address(yDeposit), 0);
         yCrv.safeApprove(address(yDeposit), r);
         yDeposit.remove_liquidity_one_coin(r, int128(i), minOut); // checks for slippage
         IERC20 coin = IERC20(underlyingCoins[i]);

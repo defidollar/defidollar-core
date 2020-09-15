@@ -103,7 +103,7 @@ contract StakeLPToken is OwnableProxy, Initializable, LPTokenWrapper {
 
     // View Functions
     function earned(address account) public view returns (uint) {
-        return _earned(_rewardPerToken(0), account);
+        return _earned(rewardPerTokenStored, account);
     }
 
     function withdrawAble(address account) public view returns(uint) {
@@ -121,17 +121,6 @@ contract StakeLPToken is OwnableProxy, Initializable, LPTokenWrapper {
                 .mul(_rewardPerTokenStored.sub(userRewardPerTokenPaid[account]))
                 .div(1e18)
                 .add(rewards[account]);
-    }
-
-    function _rewardPerToken(uint income) internal view returns(uint) {
-        if (totalSupply == 0 || income == 0) {
-            return rewardPerTokenStored;
-        }
-        return rewardPerTokenStored.add(
-            income
-            .mul(1e18)
-            .div(totalSupply)
-        );
     }
 
     function _withdraw(uint amount) internal {

@@ -43,7 +43,7 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
         ySwap = ICurve(0x45F783CCE6B7FF23B2ab2D70e416cdb7D6055f51);
         yCrv = IERC20(0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8);
         yUSD = IERC20(0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c);
-        min = 9500;
+        min = 500;
     }
 
     function mintWithYcrv(uint inAmount) external returns(uint dusdAmount) {
@@ -60,13 +60,13 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
     }
 
     // Sets minimum required on-hand to keep small withdrawals cheap
-    function toFarm() public view returns (uint ans) {
+    function toFarm() public view returns (uint) {
         (uint here, uint there) = yCrvDistribution();
-        return here.add(there).mul(min).div(MAX);
-    }
-
-    function calcMintWithYcrv(uint inAmount) public view returns (uint dusdAmount) {
-        return inAmount.mul(ySwap.get_virtual_price()).div(1e18);
+        uint shouldBeHere = here.add(there).mul(min).div(MAX);
+        if (here > shouldBeHere) {
+            return here.sub(shouldBeHere);
+        }
+        return 0;
     }
 
     function yCrvDistribution() public view returns (uint here, uint there) {
@@ -76,10 +76,15 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
             .div(1e18);
     }
 
+    function calcMintWithYcrv(uint inAmount) public view returns (uint dusdAmount) {
+        return inAmount.mul(yCrvToUsd()).div(1e18);
+    }
+
     function redeemInYcrv(uint dusdAmount, uint minOut) external returns(uint r) {
-        r = dusdAmount.mul(1e18).div(ySwap.get_virtual_price());
+        r = dusdAmount.mul(1e18).div(yCrvToUsd());
         uint b = yCrv.balanceOf(address(this));
         if (b < r) {
+            // withdraw only as much as needed from vault
             uint _withdraw = r.sub(b).mul(1e18).div(controller.getPricePerFullShare(address(yCrv)));
             controller.vaultWithdraw(yCrv, _withdraw);
             r = yCrv.balanceOf(address(this));
@@ -90,7 +95,7 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
     }
 
     function calcRedeemWithYcrv(uint dusdAmount) public view returns (uint) {
-        uint r = dusdAmount.mul(1e18).div(ySwap.get_virtual_price());
+        uint r = dusdAmount.mul(1e18).div(yCrvToUsd());
         (uint here, uint there) = yCrvDistribution();
         return r.min(here.add(there));
     }
@@ -133,19 +138,12 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
     }
 
     function yCrvToUsd() public view returns (uint) {
-        if (yCrv.totalSupply() == 0) {
-            return 1e18;
-        }
         return ySwap.get_virtual_price();
     }
 
     function portfolioValue() external view returns(uint) {
         (uint here, uint there) = yCrvDistribution();
         return here.add(there).mul(yCrvToUsd());
-    }
-
-    function setMin(uint _min) external onlyOwner {
-        min = _min;
     }
 
     function vars() public view returns(
@@ -164,5 +162,9 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
             address(controller),
             min
         );
+    }
+
+    function setMin(uint _min) external onlyOwner {
+        min = _min;
     }
 }

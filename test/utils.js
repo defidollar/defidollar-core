@@ -42,17 +42,17 @@ async function getArtifacts() {
     }
 	const stakeLPTokenProxy = await StakeLPTokenProxy.deployed()
     const res = {
-        core,
-        dusd,
-        reserves,
+		core,
+		dusd,
+		reserves,
 		decimals,
 		scaleFactor,
 		aggregators,
 		ethAggregator: await Aggregator.at(await oracle.ethUsdAggregator()),
 		oracle,
-        stakeLPToken: await StakeLPToken.at(stakeLPTokenProxy.address),
+		stakeLPToken: await StakeLPToken.at(stakeLPTokenProxy.address),
 
-        curveSusdPeak: await CurveSusdPeak.at(CurveSusdPeakProxy.address),
+		curveSusdPeak: await CurveSusdPeak.at(CurveSusdPeakProxy.address),
 		curveToken: await MockSusdToken.deployed(),
 
 		yVaultPeak: await YVaultPeak.at(YVaultPeakProxy.address),
