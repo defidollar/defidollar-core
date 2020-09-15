@@ -32,6 +32,9 @@
                 "swap": "0xA5407eAE9Ba41422680e2e00537571bcC53efBfD",
                 "deposit": "0xFCBa3E75865d2d561BE8D220616520c171F12851",
                 "gauge": "0xA90996896660DEcC6E997655E065b23788857849"
+            },
+            "ypool": {
+                "deposit": "0xbBC81d23Ea2c3ec7e56D39296F0cbB648873a5d3"
             }
         },
         "chainlink": {

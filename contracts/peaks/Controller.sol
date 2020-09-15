@@ -5,19 +5,21 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/math/Math.sol";
 
 import {IVault} from "../interfaces/IVault.sol";
+import {Initializable} from "../common/Initializable.sol";
+import {OwnableProxy} from "../common/OwnableProxy.sol";
 
-contract Controller {
+contract Controller is OwnableProxy, Initializable {
     using SafeERC20 for IERC20;
     using Math for uint;
-    
+
     mapping(address => bool) public peaks;
     mapping (address => IVault) public vaults;
-    
+
     modifier onlyPeak() {
         require(peaks[msg.sender], "!peak");
         _;
     }
-    
+
     function earn(IERC20 token) public {
         vaults[address(token)].deposit(token.balanceOf(address(this)));
     }
@@ -36,5 +38,14 @@ contract Controller {
     function getPricePerFullShare(address token) public view returns(uint) {
         IVault vault = vaults[token];
         return vault.getPricePerFullShare();
+    }
+
+    function addPeak(address peak) external onlyOwner {
+        peaks[peak] = true;
+    }
+
+    function addVault(address token, address vault) external onlyOwner {
+        // require isContract
+        vaults[token] = IVault(vault);
     }
 }
