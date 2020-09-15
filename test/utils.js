@@ -6,14 +6,17 @@ const Oracle = artifacts.require("Oracle");
 const Aggregator = artifacts.require("MockAggregator");
 const StakeLPTokenProxy = artifacts.require("StakeLPTokenProxy");
 const StakeLPToken = artifacts.require("StakeLPToken");
+
 const CurveSusdPeak = artifacts.require("CurveSusdPeak");
 const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
-const YVaultPeak = artifacts.require("YVaultPeak");
-const YVaultPeakProxy = artifacts.require("YVaultPeakProxy");
-const YVaultZap = artifacts.require("YVaultZapTest");
 const MockSusdToken = artifacts.require("MockSusdToken");
 const ICurve = artifacts.require("ICurve");
 const ICurveDeposit = artifacts.require("ICurveDeposit");
+
+const YVaultPeak = artifacts.require("YVaultPeak");
+const YVaultPeakProxy = artifacts.require("YVaultPeakProxy");
+const YVaultZap = artifacts.require("YVaultZapTest");
+const Controller = artifacts.require("Controller");
 const MockyVault = artifacts.require("MockyVault");
 
 const n_coins = 5
@@ -60,10 +63,9 @@ async function getArtifacts() {
 	res.curveSusd = await ICurve.at(_curve)
 	res.curveDeposit = await ICurveDeposit.at(_curveDeposit)
 
-	const { _yCrv } = await res.yVaultPeak.vars()
+	const { _yCrv, _controller } = await res.yVaultPeak.vars()
 	res.yCrv = await MockSusdToken.at(_yCrv)
-	// res.curveY = await ICurve.at(_curve)
-	// res.curveDeposit = await ICurveDeposit.at(_curveDeposit)
+	res.controller = await Controller.at(_controller)
 	return res
 }
 

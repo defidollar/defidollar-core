@@ -157,6 +157,7 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
         address _ySwap,
         address _yCrv,
         address _yUSD,
+        address _controller,
         uint _min
     ) {
         return(
@@ -164,6 +165,7 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
             address(ySwap),
             address(yCrv),
             address(yUSD),
+            address(controller),
             min
         );
     }

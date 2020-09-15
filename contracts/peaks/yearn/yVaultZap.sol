@@ -64,6 +64,8 @@ contract YVaultZap {
     {
         dusd.safeTransferFrom(msg.sender, address(this), dusdAmount);
         uint r = yVaultPeak.redeemInYcrv(dusdAmount, 0);
+        yCrv.safeApprove(address(yDeposit), 0);
+        yCrv.safeApprove(address(yDeposit), r);
         yDeposit.remove_liquidity(r, ZEROES);
         address[N_COINS] memory coins = underlyingCoins;
         IERC20 coin;
@@ -81,6 +83,8 @@ contract YVaultZap {
     {
         dusd.safeTransferFrom(msg.sender, address(this), dusdAmount);
         uint r = yVaultPeak.redeemInYcrv(dusdAmount, 0);
+        yCrv.safeApprove(address(yDeposit), 0);
+        yCrv.safeApprove(address(yDeposit), r);
         yDeposit.remove_liquidity_one_coin(r, int128(i), minOut); // checks for slippage
         IERC20 coin = IERC20(underlyingCoins[i]);
         uint toTransfer = coin.balanceOf(address(this));
