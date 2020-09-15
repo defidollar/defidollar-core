@@ -8,6 +8,8 @@ const StakeLPTokenProxy = artifacts.require("StakeLPTokenProxy");
 const StakeLPToken = artifacts.require("StakeLPToken");
 const CurveSusdPeak = artifacts.require("CurveSusdPeak");
 const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
+const YVaultPeak = artifacts.require("YVaultPeak");
+const YVaultPeakProxy = artifacts.require("YVaultPeakProxy");
 const MockSusdToken = artifacts.require("MockSusdToken");
 const ICurve = artifacts.require("ICurve");
 const ICurveDeposit = artifacts.require("ICurveDeposit");
@@ -32,7 +34,6 @@ async function getArtifacts() {
 		aggregators.push(await Aggregator.at(await oracle.refs(i)))
     }
 	const stakeLPTokenProxy = await StakeLPTokenProxy.deployed()
-	const curveSusdPeakProxy = await CurveSusdPeakProxy.deployed()
     const res = {
         core,
         dusd,
@@ -44,11 +45,16 @@ async function getArtifacts() {
 		oracle,
         stakeLPToken: await StakeLPToken.at(stakeLPTokenProxy.address),
 
-        curveSusdPeak: await CurveSusdPeak.at(curveSusdPeakProxy.address),
+        curveSusdPeak: await CurveSusdPeak.at(CurveSusdPeakProxy.address),
+        yVaultPeak: await YVaultPeak.at(YVaultPeakProxy.address),
         curveToken: await MockSusdToken.deployed(),
 	}
 	const { _curveDeposit, _curve } = await res.curveSusdPeak.vars()
 	res.curveSusd = await ICurve.at(_curve)
+	res.curveDeposit = await ICurveDeposit.at(_curveDeposit)
+
+	const { _yUsd } = await res.curveSusdPeak.vars()
+	res.curveY = await ICurve.at(_curve)
 	res.curveDeposit = await ICurveDeposit.at(_curveDeposit)
 	return res
 }

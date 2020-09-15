@@ -9,10 +9,10 @@ import {IController} from "../../interfaces/IController.sol";
 import {YVaultPeak} from "./YVaultPeak.sol";
 
 contract YVaultPeakTest is YVaultPeak {
-    function setDeps(ICore _core, ICurve _yPool, IERC20 _yUsd, IERC20 _yyCrv) public {
+    function setDeps(ICore _core, ICurve _ySwap, IERC20 _yCrv, IERC20 _yUSD) public {
         core = _core;
-        yPool = _yPool;
-        yUsd = _yUsd;
-        yyCrv = _yyCrv;
+        ySwap = _ySwap;
+        yCrv = _yCrv;
+        yUSD = _yUSD;
     }
 }

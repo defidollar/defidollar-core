@@ -15,13 +15,21 @@ contract yVaultZap {
     uint[N_COINS] ZEROES = [uint(0),uint(0),uint(0),uint(0)];
     address[N_COINS] underlyingCoins;
 
-    ICurveDeposit yPool;
+    ICurveDeposit yDeposit;
     IERC20 yUsd;
     IERC20 dusd;
     YVaultPeak yVaultPeak;
 
-    constructor() public {
-
+    constructor(
+        ICurveDeposit _yDeposit,
+        IERC20 _yUsd,
+        IERC20 _dusd,
+        YVaultPeak _yVaultPeak
+    ) public {
+        yDeposit = _yDeposit;
+        yUsd = _yUsd;
+        dusd = _dusd;
+        yVaultPeak = _yVaultPeak;
     }
 
     /**
@@ -39,11 +47,11 @@ contract yVaultZap {
                 IERC20(coins[i]).safeTransferFrom(msg.sender, address(this), inAmounts[i]);
             }
         }
-        yPool.add_liquidity(inAmounts, 0);
+        yDeposit.add_liquidity(inAmounts, 0);
         uint inAmount = yUsd.balanceOf(address(this));
         yUsd.safeApprove(address(yVaultPeak), 0);
         yUsd.safeApprove(address(yVaultPeak), inAmount);
-        dusdAmount = yVaultPeak.mintWithYusd(inAmount);
+        dusdAmount = yVaultPeak.mintWithYcrv(inAmount);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
         dusd.safeTransfer(msg.sender, dusdAmount);
     }
@@ -57,8 +65,8 @@ contract yVaultZap {
         external
     {
         dusd.safeTransferFrom(msg.sender, address(this), dusdAmount);
-        uint r = yVaultPeak.redeemInYusd(dusdAmount, 0);
-        yPool.remove_liquidity(r, ZEROES);
+        uint r = yVaultPeak.redeemInYcrv(dusdAmount, 0);
+        yDeposit.remove_liquidity(r, ZEROES);
         address[N_COINS] memory coins = underlyingCoins;
         IERC20 coin;
         uint toTransfer;
@@ -74,8 +82,8 @@ contract yVaultZap {
         external
     {
         dusd.safeTransferFrom(msg.sender, address(this), dusdAmount);
-        uint r = yVaultPeak.redeemInYusd(dusdAmount, 0);
-        yPool.remove_liquidity_one_coin(r, int128(i), minOut); // checks for slippage
+        uint r = yVaultPeak.redeemInYcrv(dusdAmount, 0);
+        yDeposit.remove_liquidity_one_coin(r, int128(i), minOut); // checks for slippage
         IERC20 coin = IERC20(underlyingCoins[i]);
         uint toTransfer = coin.balanceOf(address(this));
         coin.safeTransfer(msg.sender, toTransfer);

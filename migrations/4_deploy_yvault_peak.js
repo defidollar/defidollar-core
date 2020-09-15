@@ -2,8 +2,9 @@ const fs = require('fs')
 
 const Core = artifacts.require("Core");
 const CoreProxy = artifacts.require("CoreProxy");
-const YVaultPeak = artifacts.require("YVaultPeak");
+const YVaultPeak = artifacts.require("YVaultPeakTest");
 const YVaultPeakProxy = artifacts.require("YVaultPeakProxy");
+const yVaultZap = artifacts.require("yVaultZap");
 const MockyVault = artifacts.require("MockyVault");
 const Controller = artifacts.require("Controller");
 const ControllerProxy = artifacts.require("ControllerProxy");
@@ -34,9 +35,9 @@ module.exports = async function(deployer, network, accounts) {
     const tokens = reserves.map(r => r.address)
 
     // Deploy yPool
-    const curveToken = await deployer.deploy(MockSusdToken)
+    const yUSD = await deployer.deploy(MockSusdToken)
     config.contracts.tokens['yDAI+yUSDC+yUSDT+yTUSD'] = {
-        address: curveToken.address,
+        address: yUSD.address,
         decimals: 18,
         name: "Curve.fi yDAI/yUSDC/yUSDT/yTUSD",
         peak: "yVault"
@@ -48,7 +49,7 @@ module.exports = async function(deployer, network, accounts) {
         arguments: [
             tokens,
             tokens,
-            curveToken.address,
+            yUSD.address,
             100,
             4000000
         ]
@@ -61,7 +62,7 @@ module.exports = async function(deployer, network, accounts) {
             tokens,
             tokens,
             curve.options.address,
-            curveToken.address
+            yUSD.address
         ]
     }).send({ from: accounts[0], gas: 10000000 })
 
@@ -69,7 +70,7 @@ module.exports = async function(deployer, network, accounts) {
     const controllerProxy = await deployer.deploy(ControllerProxy)
     const controller = await Controller.at(controllerProxy.address)
 
-    const yVault = await deployer.deploy(MockyVault, curveToken.address, '0x0000000000000000000000000000000000000000')
+    const yVault = await deployer.deploy(MockyVault, yUSD.address, '0x0000000000000000000000000000000000000000')
 
     await deployer.deploy(YVaultPeak)
     const yVaultPeakProxy = await deployer.deploy(YVaultPeakProxy)
@@ -82,8 +83,18 @@ module.exports = async function(deployer, network, accounts) {
     )
     await Promise.all([
         controller.addPeak(yVaultPeak.address),
-        controller.addVault(curveToken.address, yVault.address),
-        core.whitelistPeak(yVaultPeakProxy.address, [0, 1, 2, 4], toWei('1234567'), true)
+        controller.addVault(yUSD.address, yVault.address),
+        core.whitelistPeak(yVaultPeakProxy.address, [0, 1, 2, 4], toWei('1234567'), true),
+        yVaultPeak.setDeps(
+            core.address,
+            curve.options.address,
+            yUSD.address,
+            yVault.address,
+        ),
+        deployer.deploy(
+            yVaultZap,
+
+        )
     ])
     peak.address = yVaultPeakProxy.address,
     config.contracts.peaks = config.contracts.peaks || {}

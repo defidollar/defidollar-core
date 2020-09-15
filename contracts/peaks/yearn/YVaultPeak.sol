@@ -26,9 +26,9 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
     IController controller;
 
     ICore core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
-    ICurve yPool = ICurve(0x45F783CCE6B7FF23B2ab2D70e416cdb7D6055f51);
-    IERC20 yUsd = IERC20(0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8);
-    IERC20 yyCrv = IERC20(0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c);
+    ICurve ySwap = ICurve(0x45F783CCE6B7FF23B2ab2D70e416cdb7D6055f51);
+    IERC20 yCrv = IERC20(0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8);
+    IERC20 yUSD = IERC20(0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c);
 
     function initialize(IController _controller)
         public
@@ -37,93 +37,93 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
         controller = _controller;
     }
 
-    function mintWithYusd(uint inAmount) external returns(uint dusdAmount) {
-        yUsd.safeTransferFrom(msg.sender, address(this), inAmount);
-        dusdAmount = calcMintWithYusd(inAmount);
+    function mintWithYcrv(uint inAmount) external returns(uint dusdAmount) {
+        yCrv.safeTransferFrom(msg.sender, address(this), inAmount);
+        dusdAmount = calcMintWithYcrv(inAmount);
         core.mint(dusdAmount, msg.sender);
 
         // best effort at keeping min.div(max) funds here
-        (uint here, uint there) = yUsdDistribution();
+        (uint here, uint there) = yCrvDistribution();
         uint shouldBeHere = here.add(there).mul(min).div(max);
         if (here > shouldBeHere) {
-            yUsd.safeTransfer(address(controller), here.sub(shouldBeHere));
-            controller.earn(address(yUsd)); // this is just acting like a callback
+            yCrv.safeTransfer(address(controller), here.sub(shouldBeHere));
+            controller.earn(address(yCrv)); // this is just acting like a callback
         }
     }
 
-    function calcMintWithYusd(uint inAmount) public view returns (uint dusdAmount) {
-        return inAmount.mul(yPool.get_virtual_price()).div(1e18);
+    function calcMintWithYcrv(uint inAmount) public view returns (uint dusdAmount) {
+        return inAmount.mul(ySwap.get_virtual_price()).div(1e18);
     }
 
-    function yUsdDistribution() public view returns (uint here, uint there) {
-        here = yUsd.balanceOf(address(this));
-        there = yyCrv.balanceOf(address(controller))
-            .mul(controller.getPricePerFullShare(address(yUsd)));
+    function yCrvDistribution() public view returns (uint here, uint there) {
+        here = yCrv.balanceOf(address(this));
+        there = yUSD.balanceOf(address(controller))
+            .mul(controller.getPricePerFullShare(address(yCrv)));
     }
 
-    function redeemInYusd(uint dusdAmount, uint minOut) external returns(uint r) {
-        r = dusdAmount.mul(1e18).div(yPool.get_virtual_price());
-        uint b = yUsd.balanceOf(address(this));
+    function redeemInYcrv(uint dusdAmount, uint minOut) external returns(uint r) {
+        r = dusdAmount.mul(1e18).div(ySwap.get_virtual_price());
+        uint b = yCrv.balanceOf(address(this));
         if (b < r) {
-            uint _withdraw = r.sub(b).mul(1e18).div(controller.getPricePerFullShare(address(yUsd)));
-            controller.vaultWithdraw(yUsd, _withdraw);
-            r = yUsd.balanceOf(address(this));
+            uint _withdraw = r.sub(b).mul(1e18).div(controller.getPricePerFullShare(address(yCrv)));
+            controller.vaultWithdraw(yCrv, _withdraw);
+            r = yCrv.balanceOf(address(this));
         }
         require(r >= minOut, ERR_INSUFFICIENT_FUNDS);
         core.redeem(dusdAmount, msg.sender);
-        yUsd.safeTransfer(msg.sender, r);
+        yCrv.safeTransfer(msg.sender, r);
     }
 
-    function calcRedeemWithYusd(uint dusdAmount) public view returns (uint) {
-        uint r = dusdAmount.mul(1e18).div(yPool.get_virtual_price());
-        (uint here, uint there) = yUsdDistribution();
+    function calcRedeemWithYcrv(uint dusdAmount) public view returns (uint) {
+        uint r = dusdAmount.mul(1e18).div(ySwap.get_virtual_price());
+        (uint here, uint there) = yCrvDistribution();
         return r.min(here.add(there));
     }
 
-    // yyCRV
+    // yUSD
 
-    function mintWithYycrv(uint inAmount) external {
-        yyCrv.safeTransferFrom(msg.sender, address(controller), inAmount);
-        core.mint(calcMintWithYycrv(inAmount), msg.sender);
+    function mintWithYusd(uint inAmount) external {
+        yUSD.safeTransferFrom(msg.sender, address(controller), inAmount);
+        core.mint(calcMintWithYusd(inAmount), msg.sender);
     }
 
-    function calcMintWithYycrv(uint inAmount) public view returns (uint dusdAmount) {
-        return inAmount.mul(yyCrvToUsd()).div(1e18);
+    function calcMintWithYusd(uint inAmount) public view returns (uint dusdAmount) {
+        return inAmount.mul(yUSDToUsd()).div(1e18);
     }
 
-    function redeemInYycrv(uint dusdAmount, uint minOut) external {
+    function redeemInYusd(uint dusdAmount, uint minOut) external {
         core.redeem(dusdAmount, msg.sender);
-        uint r = dusdAmount.mul(1e18).div(yyCrvToUsd());
-        // there should be no reason that this contracts has yyCrv, however being safe doesn't hurt
-        uint b = yyCrv.balanceOf(address(this));
+        uint r = dusdAmount.mul(1e18).div(yUSDToUsd());
+        // there should be no reason that this contracts has yUSD, however being safe doesn't hurt
+        uint b = yUSD.balanceOf(address(this));
         if (b < r) {
-            controller.withdraw(yyCrv, r.sub(b));
-            r = yyCrv.balanceOf(address(this));
+            controller.withdraw(yUSD, r.sub(b));
+            r = yUSD.balanceOf(address(this));
         }
         require(r >= minOut, ERR_INSUFFICIENT_FUNDS);
-        yyCrv.safeTransfer(msg.sender, r);
+        yUSD.safeTransfer(msg.sender, r);
     }
 
-    function calcRedeemWithYycrv(uint dusdAmount) public view returns (uint) {
-        uint r = dusdAmount.mul(1e18).div(yyCrvToUsd());
+    function calcRedeemWithYusd(uint dusdAmount) public view returns (uint) {
+        uint r = dusdAmount.mul(1e18).div(yUSDToUsd());
         return r.min(
-            yyCrv.balanceOf(address(this))
-            .add(yyCrv.balanceOf(address(controller))));
+            yUSD.balanceOf(address(this))
+            .add(yUSD.balanceOf(address(controller))));
     }
 
-    function yyCrvToUsd() public view returns (uint) {
-        return controller.getPricePerFullShare(address(yUsd)) // # yUsd
-            .mul(yUsdToUsd()) // USD price
+    function yUSDToUsd() public view returns (uint) {
+        return controller.getPricePerFullShare(address(yCrv)) // # yCrv
+            .mul(yCrvToUsd()) // USD price
             .div(1e18);
     }
 
-    function yUsdToUsd() public view returns (uint) {
-        return yPool.get_virtual_price();
+    function yCrvToUsd() public view returns (uint) {
+        return ySwap.get_virtual_price();
     }
 
     function portfolioValue() external view returns(uint) {
-        (uint here, uint there) = yUsdDistribution();
-        return here.add(there).mul(yUsdToUsd());
+        (uint here, uint there) = yCrvDistribution();
+        return here.add(there).mul(yCrvToUsd());
     }
 
     function setMin(uint _min) external onlyOwner {
@@ -132,16 +132,16 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
 
     function vars() public view returns(
         address _core,
-        address _yPool,
-        address _yUsd,
-        address _yyCrv,
+        address _ySwap,
+        address _yCrv,
+        address _yUSD,
         uint _min
     ) {
         return(
             address(core),
-            address(yPool),
-            address(yUsd),
-            address(yyCrv),
+            address(ySwap),
+            address(yCrv),
+            address(yUSD),
             min
         );
     }
