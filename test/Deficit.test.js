@@ -8,7 +8,7 @@ const MAX = web3.utils.toTwosComplement(-1);
 const n_coins = 4
 let _artifacts
 
-contract('Deficit flow (staked funds cover deficit)', async (accounts) => {
+contract.skip('Deficit flow (staked funds cover deficit)', async (accounts) => {
 	const alice = accounts[0]
     const bob = accounts[1]
 
@@ -106,7 +106,7 @@ contract('Deficit flow (staked funds cover deficit)', async (accounts) => {
     })
 })
 
-contract('Deficit flow (staked funds don\'t cover deficit)', async (accounts) => {
+contract.skip('Deficit flow (staked funds don\'t cover deficit)', async (accounts) => {
     const [ alice, bob, charlie ] = accounts
 
     before(async () => {

@@ -21,8 +21,8 @@ module.exports = async function(deployer, network, accounts) {
     const config = { contracts: { tokens: { DUSD: { address: DUSD.address, decimals: 18 } } } }
 
     // initialize system with 4 coins
-    const tickerSymbols = ['DAI', 'USDC', 'USDT', 'sUSD']
-    const decimals = [18, 6, 6, 18]
+    const tickerSymbols = ['DAI', 'USDC', 'USDT', 'sUSD', 'TUSD']
+    const decimals = [18, 6, 6, 18, 18]
     const reserves = []
     const tokens = []
     for(let i = 0; i < tickerSymbols.length; i++) {
@@ -77,7 +77,7 @@ module.exports = async function(deployer, network, accounts) {
         ).encodeABI()
     )
     await core.whitelistTokens(tokens)
-    await core.syncSystem()
+    // await core.syncSystem()
 
     config.contracts.base = CoreProxy.address
     config.contracts.valley = StakeLPTokenProxy.address

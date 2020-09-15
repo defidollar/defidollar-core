@@ -6,13 +6,20 @@ const Oracle = artifacts.require("Oracle");
 const Aggregator = artifacts.require("MockAggregator");
 const StakeLPTokenProxy = artifacts.require("StakeLPTokenProxy");
 const StakeLPToken = artifacts.require("StakeLPToken");
+
 const CurveSusdPeak = artifacts.require("CurveSusdPeak");
 const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
 const MockSusdToken = artifacts.require("MockSusdToken");
 const ICurve = artifacts.require("ICurve");
 const ICurveDeposit = artifacts.require("ICurveDeposit");
 
-const n_coins = 4
+const YVaultPeak = artifacts.require("YVaultPeak");
+const YVaultPeakProxy = artifacts.require("YVaultPeakProxy");
+const YVaultZap = artifacts.require("YVaultZapTest");
+const Controller = artifacts.require("Controller");
+const MockYvault = artifacts.require("MockYvault");
+
+const n_coins = 5
 const toBN = web3.utils.toBN
 const fromWei = web3.utils.fromWei
 
@@ -29,27 +36,36 @@ async function getArtifacts() {
         reserves.push(await Reserve.at((await core.systemCoins(i))))
 		decimals.push(await reserves[i].decimals())
 		scaleFactor.push(toBN(10 ** decimals[i]))
-		aggregators.push(await Aggregator.at(await oracle.refs(i)))
+		if (i < 4) {
+			aggregators.push(await Aggregator.at(await oracle.refs(i)))
+		}
     }
 	const stakeLPTokenProxy = await StakeLPTokenProxy.deployed()
-	const curveSusdPeakProxy = await CurveSusdPeakProxy.deployed()
     const res = {
-        core,
-        dusd,
-        reserves,
+		core,
+		dusd,
+		reserves,
 		decimals,
 		scaleFactor,
 		aggregators,
 		ethAggregator: await Aggregator.at(await oracle.ethUsdAggregator()),
 		oracle,
-        stakeLPToken: await StakeLPToken.at(stakeLPTokenProxy.address),
+		stakeLPToken: await StakeLPToken.at(stakeLPTokenProxy.address),
 
-        curveSusdPeak: await CurveSusdPeak.at(curveSusdPeakProxy.address),
-        curveToken: await MockSusdToken.deployed(),
+		curveSusdPeak: await CurveSusdPeak.at(CurveSusdPeakProxy.address),
+		curveToken: await MockSusdToken.deployed(),
+
+		yVaultPeak: await YVaultPeak.at(YVaultPeakProxy.address),
+		yVaultZap: await YVaultZap.deployed(),
+		yVault: await MockYvault.deployed()
 	}
 	const { _curveDeposit, _curve } = await res.curveSusdPeak.vars()
 	res.curveSusd = await ICurve.at(_curve)
 	res.curveDeposit = await ICurveDeposit.at(_curveDeposit)
+
+	const { _yCrv, _controller } = await res.yVaultPeak.vars()
+	res.yCrv = await MockSusdToken.at(_yCrv)
+	res.controller = await Controller.at(_controller)
 	return res
 }
 

@@ -67,8 +67,6 @@ contract StakeLPToken is OwnableProxy, Initializable, LPTokenWrapper {
     }
 
     modifier updateReward(address account) {
-        updateProtocolIncome();
-        emit RewardPerTokenUpdated(rewardPerTokenStored, block.timestamp);
         if (account != address(0)) {
             rewards[account] = _earned(rewardPerTokenStored, account);
             userRewardPerTokenPaid[account] = rewardPerTokenStored;
@@ -76,19 +74,9 @@ contract StakeLPToken is OwnableProxy, Initializable, LPTokenWrapper {
         _;
     }
 
-    function updateProtocolIncome() public returns(uint) {
-        require(!isPaused, "Staking is paused");
-        bool shouldDistribute;
-        if (totalSupply > 0) {
-            shouldDistribute = true;
-        }
-        uint income = core.rewardDistributionCheckpoint(shouldDistribute);
-        rewardPerTokenStored = _rewardPerToken(income);
-        return rewardPerTokenStored;
-    }
-
     // stake visibility is public as overriding LPTokenWrapper's stake() function
     function stake(uint amount) public updateReward(msg.sender) {
+        require(!isPaused, "Staking is paused");
         require(amount > 0, "Cannot stake 0");
         super.stake(amount);
         emit Staked(msg.sender, amount);
@@ -113,28 +101,13 @@ contract StakeLPToken is OwnableProxy, Initializable, LPTokenWrapper {
         }
     }
 
-    function notify(uint _deficit) external onlyCore {
-        deficit = _deficit;
-        emit DeficitUpdated(_deficit);
-    }
-
     // View Functions
     function earned(address account) public view returns (uint) {
-        (,uint income,) = core.lastPeriodIncome();
-        return _earned(_rewardPerToken(income), account);
+        return _earned(rewardPerTokenStored, account);
     }
 
     function withdrawAble(address account) public view returns(uint) {
-        (,uint _deficit,) = core.currentSystemState();
-        uint balance = balanceOf(account);
-        if (totalSupply == 0 || _deficit == 0) {
-            return balance;
-        }
-        uint deficitShare = balance.mul(_deficit).div(totalSupply);
-        if (deficitShare >= balance) {
-            return 0;
-        }
-        return balance.sub(deficitShare);
+        return balanceOf(account);
     }
 
     function toggleIsPaused(bool _isPaused) external onlyOwner {
@@ -150,38 +123,12 @@ contract StakeLPToken is OwnableProxy, Initializable, LPTokenWrapper {
                 .add(rewards[account]);
     }
 
-    function _rewardPerToken(uint income) internal view returns(uint) {
-        if (totalSupply == 0 || income == 0) {
-            return rewardPerTokenStored;
-        }
-        return rewardPerTokenStored.add(
-            income
-            .mul(1e18)
-            .div(totalSupply)
-        );
-    }
-
     function _withdraw(uint amount) internal {
         if (amount == 0) {
             // there might be case where user has 0 staked funds, but called getReward()
             return;
         }
-        uint deficitShare = amount.mul(deficit).div(totalSupply);
         super.withdraw(amount);
-        if (deficitShare > 0) {
-            if (deficitShare < amount) {
-                amount = amount.sub(deficitShare);
-            } else {
-                deficitShare = amount;
-                amount = 0;
-            }
-            // burning user's deficitShare will reduce the overall deficit in the system,
-            // since dusd.totalSupply() decreases
-            IDUSD(address(dusd)).burnForSelf(deficitShare);
-            deficit = deficit.sub(deficitShare);
-        }
-        if (amount > 0) {
-            dusd.safeTransfer(msg.sender, amount);
-        }
+        dusd.safeTransfer(msg.sender, amount);
     }
 }

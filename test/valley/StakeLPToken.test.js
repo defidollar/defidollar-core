@@ -10,7 +10,7 @@ const toBN = web3.utils.toBN
 const n_coins = 4
 let _artifacts
 
-contract('StakeLPToken', async (accounts) => {
+contract.skip('StakeLPToken', async (accounts) => {
 	const alice = accounts[0]
 	const bob = accounts[1]
 
