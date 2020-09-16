@@ -24,7 +24,7 @@ module.exports = async function(deployer, network, accounts) {
     const config = utils.getContractAddresses()
     const peak = {
         coins: ["DAI", "USDC", "USDT", "TUSD"],
-        native: "yCRV"
+        native: ["yCRV", "yUSD"]
     }
     // TUSD
     const coreProxy = await CoreProxy.deployed()
@@ -73,7 +73,12 @@ module.exports = async function(deployer, network, accounts) {
     const controller = await Controller.at(controllerProxy.address)
 
     const yVault = await deployer.deploy(MockYvault, yCrv.address, '0x0000000000000000000000000000000000000000')
-
+    config.contracts.tokens['yUSD'] = {
+        address: yVault.address,
+        decimals: 18,
+        name: "Yvault-LP-YCurve",
+        peak: "yVaultPeak"
+    }
     await deployer.deploy(YVaultPeak)
     const yVaultPeakProxy = await deployer.deploy(YVaultPeakProxy)
     const yVaultPeak = await YVaultPeak.at(YVaultPeakProxy.address)
@@ -82,14 +87,17 @@ module.exports = async function(deployer, network, accounts) {
         yVaultPeak.contract.methods.initialize(controller.address).encodeABI()
     )
     const yVaultZap = await deployer.deploy(YVaultZap, yVaultPeak.address)
+    peak.zap = yVaultZap.address
     await Promise.all([
         controller.addPeak(yVaultPeak.address),
         controller.addVault(yCrv.address, yVault.address),
         core.whitelistPeak(yVaultPeakProxy.address, [0, 1, 2, 4], toWei('1234567'), true),
         yVaultZap.setDeps(
             curveDeposit.options.address,
+            curve.options.address,
             yCrv.address,
             DUSD.address,
+            tokens,
             tokens
         ),
         yVaultPeak.setDeps(
@@ -102,7 +110,6 @@ module.exports = async function(deployer, network, accounts) {
     peak.address = yVaultPeakProxy.address,
     config.contracts.peaks = config.contracts.peaks || {}
     config.contracts.peaks['yVaultPeak'] = peak
-    utils.writeContractAddresses(config)
 
     // todo fix
     if (process.env.INITIALIZE === 'true') {
@@ -114,9 +121,13 @@ module.exports = async function(deployer, network, accounts) {
         for (let i = 0; i < 4; i++) {
             amounts[i] = toBN(amounts[i]).mul(toBN(10 ** decimals[i])).toString()
             tasks.push(reserves[i].mint(charlie, amounts[i]))
-            tasks.push(reserves[i].approve(curve.options.address, amounts[i], { from: charlie }))
+            tasks.push(reserves[i].approve(curveDeposit.options.address, amounts[i], { from: charlie }))
         }
         await Promise.all(tasks)
-        await curve.methods.add_liquidity(amounts, '400').send({ from: charlie, gas: 10000000 })
+        await curveDeposit.methods.add_liquidity(amounts, '400').send({ from: charlie, gas: 10000000 })
+
+        // delete sUSD token from config
+        delete config.contracts.tokens.sUSD
     }
+    utils.writeContractAddresses(config)
 }

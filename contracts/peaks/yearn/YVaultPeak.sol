@@ -94,7 +94,7 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
         yCrv.safeTransfer(msg.sender, r);
     }
 
-    function calcRedeemWithYcrv(uint dusdAmount) public view returns (uint) {
+    function calcRedeemInYcrv(uint dusdAmount) public view returns (uint) {
         uint r = dusdAmount.mul(1e18).div(yCrvToUsd());
         (uint here, uint there) = yCrvDistribution();
         return r.min(here.add(there));
@@ -124,7 +124,7 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
         yUSD.safeTransfer(msg.sender, r);
     }
 
-    function calcRedeemWithYusd(uint dusdAmount) public view returns (uint) {
+    function calcRedeemInYusd(uint dusdAmount) public view returns (uint) {
         uint r = dusdAmount.mul(1e18).div(yUSDToUsd());
         return r.min(
             yUSD.balanceOf(address(this))

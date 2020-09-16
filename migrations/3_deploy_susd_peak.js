@@ -21,7 +21,7 @@ module.exports = async function(deployer, network, accounts) {
     const config = utils.getContractAddresses()
     const peak = {
         coins: ["DAI", "USDC", "USDT", "sUSD"],
-        native: "crvPlain3andSUSD"
+        native: ["crvPlain3andSUSD"]
     }
 
     const coreProxy = await CoreProxy.deployed()
@@ -89,20 +89,20 @@ module.exports = async function(deployer, network, accounts) {
     peak.address = CurveSusdPeakProxy.address,
     config.contracts.peaks = config.contracts.peaks || {}
     config.contracts.peaks['curveSUSDPool'] = peak
-    utils.writeContractAddresses(config)
+    // utils.writeContractAddresses(config)
 
-    if (process.env.INITIALIZE === 'true') {
-        // seed initial liquidity
-        const charlie = accounts[3]
-        const amounts = [100, 100, 100, 100]
-        const decimals = [18,6,6,18]
-        const tasks = []
-        for (let i = 0; i < 4; i++) {
-            amounts[i] = toBN(amounts[i]).mul(toBN(10 ** decimals[i])).toString()
-            tasks.push(reserves[i].mint(charlie, amounts[i]))
-            tasks.push(reserves[i].approve(curve.options.address, amounts[i], { from: charlie }))
-        }
-        await Promise.all(tasks)
-        await curve.methods.add_liquidity(amounts, '400').send({ from: charlie, gas: 10000000 })
-    }
+    // if (process.env.INITIALIZE === 'true') {
+    //     // seed initial liquidity
+    //     const charlie = accounts[3]
+    //     const amounts = [100, 100, 100, 100]
+    //     const decimals = [18,6,6,18]
+    //     const tasks = []
+    //     for (let i = 0; i < 4; i++) {
+    //         amounts[i] = toBN(amounts[i]).mul(toBN(10 ** decimals[i])).toString()
+    //         tasks.push(reserves[i].mint(charlie, amounts[i]))
+    //         tasks.push(reserves[i].approve(curve.options.address, amounts[i], { from: charlie }))
+    //     }
+    //     await Promise.all(tasks)
+    //     await curve.methods.add_liquidity(amounts, '400').send({ from: charlie, gas: 10000000 })
+    // }
 }
