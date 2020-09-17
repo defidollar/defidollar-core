@@ -34,6 +34,35 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     IMintr mintr;
     ICore core;
 
+    function migrate(address destination) public onlyOwner {
+        // withdraw from gauge
+        uint sCrv = gauge.balanceOf(address(this));
+        gauge.withdraw(sCrv, false);
+
+        // remove liquidity from sPool
+        sCrv = curveToken.balanceOf(address(this));
+        curve.remove_liquidity(sCrv, ZEROES);
+
+        // swap sUSD for tether
+        uint sUSD = IERC20(underlyingCoins[3]).balanceOf((address(this)));
+        IERC20(underlyingCoins[3]).safeApprove(address(curve), 0);
+        IERC20(underlyingCoins[3]).safeApprove(address(curve), sUSD);
+        curve.exchange(int128(3), int128(2), sUSD, 0);
+
+        // Add liquidity to yPool
+        ICurveDeposit y = ICurveDeposit(0xbBC81d23Ea2c3ec7e56D39296F0cbB648873a5d3);
+        uint[4] memory amounts;
+        for (uint i = 0; i < 3; i++) {
+            amounts[i] = IERC20(underlyingCoins[i]).balanceOf((address(this)));
+            IERC20(underlyingCoins[i]).safeApprove(address(y), 0);
+            IERC20(underlyingCoins[i]).safeApprove(address(y), amounts[i]);
+        }
+        y.add_liquidity(amounts, 0);
+        IERC20 yCrv = IERC20(0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8);
+        uint bal = yCrv.balanceOf(address(this));
+        yCrv.safeTransfer(destination, bal);
+    }
+
     function initialize(
         ICurveDeposit _curveDeposit,
         ICurve _curve,

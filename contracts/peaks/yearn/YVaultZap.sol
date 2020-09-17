@@ -55,6 +55,7 @@ contract YVaultZap {
         }
         yDeposit.add_liquidity(inAmounts, 0);
         uint inAmount = yCrv.balanceOf(address(this));
+        yCrv.safeApprove(address(yVaultPeak), 0);
         yCrv.safeApprove(address(yVaultPeak), inAmount);
         dusdAmount = yVaultPeak.mintWithYcrv(inAmount);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);

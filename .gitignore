@@ -3,3 +3,4 @@ build
 venv
 *.env
 deployments/development.json
+deployments/mainnetY.json
