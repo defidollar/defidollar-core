@@ -150,7 +150,7 @@ contract Core is OwnableProxy, Initializable, ICore {
 
     /* ##### Admin functions ##### */
 
-    function collectRewards(address destination) external onlyOwner {
+    function collectProtocolIncome(address destination) external onlyOwner {
         totalAssets = totalSystemAssets();
         uint supply = dusd.totalSupply();
         if (totalAssets > supply) {

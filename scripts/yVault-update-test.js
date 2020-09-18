@@ -48,14 +48,20 @@ async function execute() {
     const accounts = await web3.eth.getAccounts()
     from = accounts[0]
     const {
-        dai, susdPeak, yPeak, yZap
+        dai, dusd, susdPeak, yPeak, yZap, core
     } = _artifacts
 
     await printTokenBalances(_artifacts)
 
-    // 1. Migrate Liquidity
+    // Migrate Liquidity
     await susdPeak.methods.migrate(yPeak.options.address).send({ from: owner, gas: 3000000 })
     await printTokenBalances(_artifacts)
+
+    // Collect Protocol Income
+    const before = toBN(await dusd.methods.balanceOf(owner).call())
+    await core.methods.collectProtocolIncome(owner).send({ from: owner, gas: 3000000 })
+    const after = toBN(await dusd.methods.balanceOf(owner).call())
+    console.log({ income: fromWei(after.sub(before)) })
 
     let amount = toWei('10001')
     let res, tx
