@@ -105,7 +105,8 @@ module.exports = async function(deployer, network, accounts) {
             curve.options.address,
             yCrv.address,
             yVault.address
-        )
+        ),
+        yVaultPeak.setParams(500, 10000)
     ])
     peak.address = yVaultPeakProxy.address,
     config.contracts.peaks = config.contracts.peaks || {}

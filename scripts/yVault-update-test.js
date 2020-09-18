@@ -98,19 +98,19 @@ async function printTokenBalances(_artifacts) {
         dusd: fromWei(_dusd)
     }
 
-    const [ _scrv, __ycrv, __yusd /*, totalSupply, totalSystemAssets*/ ] = await Promise.all([
+    const [ _scrv, __ycrv, __yusd, totalSupply, totalSystemAssets ] = await Promise.all([
         susdPeak.methods.sCrvBalance().call(),
         yCRV.methods.balanceOf(yPeak.options.address).call(),
         yUSD.methods.balanceOf(controller.options.address).call(),
-        // dusd.methods.totalSupply().call(),
-        // core.methods.totalSystemAssets().call()
+        dusd.methods.totalSupply().call(),
+        core.methods.totalSystemAssets().call()
     ])
     res.system = {
         sCRV: fromWei(_scrv),
         yCRV: fromWei(__ycrv),
         yUSD: fromWei(__yusd),
-        // totalSupply: fromWei(totalSupply),
-        // totalSystemAssets: fromWei(totalSystemAssets)
+        totalSupply: fromWei(totalSupply),
+        totalSystemAssets: fromWei(totalSystemAssets)
     }
     console.log(res)
     return res

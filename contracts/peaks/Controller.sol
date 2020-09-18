@@ -1,7 +1,7 @@
 pragma solidity 0.5.17;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
+import {SafeERC20, SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {Math} from "@openzeppelin/contracts/math/Math.sol";
 import {Address} from "@openzeppelin/contracts/utils/Address.sol";
 
@@ -10,9 +10,13 @@ import {OwnableProxy} from "../common/OwnableProxy.sol";
 
 contract Controller is OwnableProxy {
     using SafeERC20 for IERC20;
+    using SafeMath for uint;
     using Math for uint;
 
+    // whether a peak is whitelisted
     mapping(address => bool) public peaks;
+
+    // token => vault that accepts the said token
     mapping (address => IVault) public vaults;
 
     // Reserved storage space to allow for layout changes in the future.
@@ -23,6 +27,9 @@ contract Controller is OwnableProxy {
         _;
     }
 
+    /**
+    * @dev Send monies to vault to start earning on it
+    */
     function earn(IERC20 token) public {
         IVault vault = vaults[address(token)];
         uint b = token.balanceOf(address(this));
@@ -33,12 +40,23 @@ contract Controller is OwnableProxy {
         }
     }
 
+    /**
+    * @dev Withdraw from vault
+    * @param _shares Shares to withdraw
+    */
     function vaultWithdraw(IERC20 token, uint _shares) public onlyPeak {
         IVault vault = vaults[address(token)];
+        // withdraw as much as humanly possible
+        _shares = _shares.min(vault.balanceOf(address(this)));
+        uint here = token.balanceOf(address(this));
         vault.withdraw(_shares);
-        token.safeTransfer(msg.sender, token.balanceOf(address(this)));
+        token.safeTransfer(msg.sender, token.balanceOf(address(this)).sub(here));
     }
 
+    /**
+    * @dev Peak may request withdrawl of any token.
+    * This may also be used to withdraw all liquidity when deprecating the controller
+    */
     function withdraw(IERC20 token, uint amount) public onlyPeak {
         amount = amount.min(token.balanceOf(address(this)));
         token.safeTransfer(msg.sender, amount);
@@ -49,8 +67,11 @@ contract Controller is OwnableProxy {
         if (vault.totalSupply() == 0) {
             return 1e18;
         }
+        // reverts on totalSupply == 0
         return vault.getPricePerFullShare();
     }
+
+    // Privileged methods
 
     function addPeak(address peak) external onlyOwner {
         require(Address.isContract(peak), "peak is !contract");
