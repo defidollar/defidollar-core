@@ -48,14 +48,20 @@ async function execute() {
     const accounts = await web3.eth.getAccounts()
     from = accounts[0]
     const {
-        dai, susdPeak, yPeak, yZap
+        dai, dusd, susdPeak, yPeak, yZap, core
     } = _artifacts
 
     await printTokenBalances(_artifacts)
 
-    // 1. Migrate Liquidity
+    // Migrate Liquidity
     await susdPeak.methods.migrate(yPeak.options.address).send({ from: owner, gas: 3000000 })
     await printTokenBalances(_artifacts)
+
+    // Collect Protocol Income
+    const before = toBN(await dusd.methods.balanceOf(owner).call())
+    await core.methods.collectProtocolIncome(owner).send({ from: owner, gas: 3000000 })
+    const after = toBN(await dusd.methods.balanceOf(owner).call())
+    console.log({ income: fromWei(after.sub(before)) })
 
     let amount = toWei('10001')
     let res, tx
@@ -98,19 +104,19 @@ async function printTokenBalances(_artifacts) {
         dusd: fromWei(_dusd)
     }
 
-    const [ _scrv, __ycrv, __yusd /*, totalSupply, totalSystemAssets*/ ] = await Promise.all([
+    const [ _scrv, __ycrv, __yusd, totalSupply, totalSystemAssets ] = await Promise.all([
         susdPeak.methods.sCrvBalance().call(),
         yCRV.methods.balanceOf(yPeak.options.address).call(),
         yUSD.methods.balanceOf(controller.options.address).call(),
-        // dusd.methods.totalSupply().call(),
-        // core.methods.totalSystemAssets().call()
+        dusd.methods.totalSupply().call(),
+        core.methods.totalSystemAssets().call()
     ])
     res.system = {
         sCRV: fromWei(_scrv),
         yCRV: fromWei(__ycrv),
         yUSD: fromWei(__yusd),
-        // totalSupply: fromWei(totalSupply),
-        // totalSystemAssets: fromWei(totalSystemAssets)
+        totalSupply: fromWei(totalSupply),
+        totalSystemAssets: fromWei(totalSystemAssets)
     }
     console.log(res)
     return res
