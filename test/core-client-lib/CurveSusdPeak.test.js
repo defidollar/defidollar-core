@@ -10,7 +10,7 @@ const toBN = web3.utils.toBN
 const MAX = web3.utils.toTwosComplement(-1);
 const n_coins = 4
 
-contract('core-client-lib: CurveSusdPeak', async (accounts) => {
+contract.skip('core-client-lib: CurveSusdPeak', async (accounts) => {
     let alice = accounts[0]
 
     before(async () => {

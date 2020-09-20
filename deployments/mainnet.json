@@ -26,6 +26,18 @@
             "DUSD": {
                 "address": "0x5BC25f649fc4e26069dDF4cF4010F9f706c23831",
                 "decimals": 18
+            },
+            "TUSD": {
+                "address": "0x0000000000085d4780B73119b644AE5ecd22b376",
+                "decimals": 18
+            },
+            "yCRV": {
+                "address": "0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8",
+                "decimals": 18
+            },
+            "yUSD": {
+                "address": "0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c",
+                "decimals": 18
             }
         },
         "curve": {
@@ -36,6 +48,10 @@
                 "swap": "0xA5407eAE9Ba41422680e2e00537571bcC53efBfD",
                 "deposit": "0xFCBa3E75865d2d561BE8D220616520c171F12851",
                 "gauge": "0xA90996896660DEcC6E997655E065b23788857849"
+            },
+            "ypool": {
+                "swap": "0x45F783CCE6B7FF23B2ab2D70e416cdb7D6055f51",
+                "deposit": "0xbBC81d23Ea2c3ec7e56D39296F0cbB648873a5d3"
             }
         },
         "chainlink": {
@@ -54,8 +70,20 @@
                     "USDT",
                     "sUSD"
                 ],
-                "native": "crvPlain3andSUSD"
-            }
+                "native": ["crvPlain3andSUSD"]
+            },
+            "yVaultPeak": {
+                "coins": [
+                  "DAI",
+                  "USDC",
+                  "USDT",
+                  "TUSD"
+                ],
+                "native": [
+                  "yCRV",
+                  "yUSD"
+                ]
+              }
         },
         "oracle": "0x4EaC4c4e9050464067D673102F8E24b2FccEB350",
         "base": "0xE449Ca7d10b041255E7e989D158Bee355d8f88d3",

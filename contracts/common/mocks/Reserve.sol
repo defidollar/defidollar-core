@@ -25,4 +25,9 @@ contract Reserve is ERC20Detailed, ERC20Mintable {
         _burn(account, amount);
         return true;
     }
+
+    function getPricePerFullShare() external view returns(uint) {
+        msg.sender; // hack to avoid pure function warning
+        return 1e18;
+    }
 }
