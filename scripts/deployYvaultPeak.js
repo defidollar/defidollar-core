@@ -61,6 +61,7 @@ async function execute() {
 
     // Update sPeak
     const curveSusdPeakProxy = await CurveSusdPeakProxy.at(config.contracts.peaks.curveSUSDPool.address)
+    await curveSusdPeakProxy.transferOwnership(from, { from: '0x511ed30E9404CBeC4bB06280395B74Da5f876D47' })
     const sPeak = await CurveSusdPeak.new()
     await curveSusdPeakProxy.updateImplementation(sPeak.address, { from })
 }

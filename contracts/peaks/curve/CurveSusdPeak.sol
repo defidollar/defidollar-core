@@ -34,7 +34,7 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     IMintr mintr;
     ICore core;
 
-    function migrate(address destination) public onlyOwner {
+    function migrate(address destinationPeak) public onlyOwner {
         // withdraw from gauge
         uint sCrv = gauge.balanceOf(address(this));
         gauge.withdraw(sCrv, false);
@@ -60,7 +60,9 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
         y.add_liquidity(amounts, 0);
         IERC20 yCrv = IERC20(0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8);
         uint bal = yCrv.balanceOf(address(this));
-        yCrv.safeTransfer(destination, bal);
+        (,,uint8 state) = core.peaks(destinationPeak);
+        require(state == 1, "Not a valid peak");
+        yCrv.safeTransfer(destinationPeak, bal);
     }
 
     function initialize(

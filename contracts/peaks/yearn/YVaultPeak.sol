@@ -41,8 +41,10 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
         ySwap = ICurve(0x45F783CCE6B7FF23B2ab2D70e416cdb7D6055f51);
         yCrv = IERC20(0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8);
         yUSD = IERC20(0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c);
-        min = 500; // 500.div(10000) implies to keep 5% of yCRV in the contract
-        redeemMultiplier = 9997; // 9997.div(10000) implies a redeem fee of .03%
+        _setParams(
+            500, // 500.div(10000) implies to keep 5% of yCRV in the contract
+            9997 // 9997.div(10000) implies a redeem fee of .03%
+        );
     }
 
     function mintWithYcrv(uint inAmount) external returns(uint dusdAmount) {
@@ -84,7 +86,7 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
         _yCrv = dusdAmount.mul(1e18).div(yCrvToUsd()).mul(redeemMultiplier).div(MAX);
         uint here = yCrv.balanceOf(address(this));
         if (here < _yCrv) {
-            // withdraw only as much as needed from vault
+            // withdraw only as much as needed from the vault
             uint _withdraw = _yCrv.sub(here).mul(1e18).div(controller.getPricePerFullShare(address(yCrv)));
             controller.vaultWithdraw(yCrv, _withdraw);
             _yCrv = yCrv.balanceOf(address(this));
@@ -168,6 +170,10 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
     // Privileged methods
 
     function setParams(uint _min, uint _redeemMultiplier) external onlyOwner {
+        _setParams(_min, _redeemMultiplier);
+    }
+
+    function _setParams(uint _min, uint _redeemMultiplier) internal {
         require(min <= MAX && redeemMultiplier <= MAX, "Invalid");
         min = _min;
         redeemMultiplier = _redeemMultiplier;

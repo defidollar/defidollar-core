@@ -48,17 +48,19 @@ async function execute() {
     const accounts = await web3.eth.getAccounts()
     from = accounts[0]
     const {
-        dai, dusd, susdPeak, yPeak, yZap, core
+        dai, dusd, susdPeak, yPeak, yZap, core, yUSD
     } = _artifacts
 
     await printTokenBalances(_artifacts)
 
     // Migrate Liquidity
+    console.log('Migrating liquidity...')
     await susdPeak.methods.migrate(yPeak.options.address).send({ from: owner, gas: 3000000 })
     await printTokenBalances(_artifacts)
 
     // Collect Protocol Income
     const before = toBN(await dusd.methods.balanceOf(owner).call())
+    console.log('collectProtocolIncome...')
     await core.methods.collectProtocolIncome(owner).send({ from: owner, gas: 3000000 })
     const after = toBN(await dusd.methods.balanceOf(owner).call())
     console.log({ income: fromWei(after.sub(before)) })
@@ -75,8 +77,34 @@ async function execute() {
     console.log(`approving ${fromWei(amount)} dai...`)
     await dai.methods.approve(yZap.options.address, amount).send({ from })
 
-    console.log(`minting dusd with ${fromWei(amount)} dai...`)
+    console.log(`yVaultZap.mint with ${fromWei(amount)} dai...`)
     tx = await yZap.methods.mint([amount, 0, 0, 0],0).send({ from, gas: 3000000 })
+    console.log({ gasUsed: tx.gasUsed })
+    res = await printTokenBalances(_artifacts)
+
+    let _dusd = toWei((parseInt(res.dusd) / 2).toString())
+    console.log(`redeem ${fromWei(_dusd)} in yUSD...`)
+    tx = await yPeak.methods.redeemInYusd(_dusd,0).send({ from, gas: 3000000 })
+    console.log({ gasUsed: tx.gasUsed })
+    res = await printTokenBalances(_artifacts)
+
+    let _yUSD = toWei((parseInt(res.yUSD) / 2).toString())
+    console.log(`mint dusd with ${fromWei(_yUSD)}... yUSD`)
+    await yUSD.methods.approve(yPeak.options.address, _yUSD).send({ from })
+    tx = await yPeak.methods.mintWithYusd(_yUSD).send({ from, gas: 3000000 })
+    console.log({ gasUsed: tx.gasUsed })
+    res = await printTokenBalances(_artifacts)
+
+    await dusd.methods.approve(yZap.options.address, toWei(res.dusd)).send({ from })
+    _dusd = toWei((parseInt(res.dusd) / 2).toString())
+    console.log(`redeem ${fromWei(_dusd)} dusd in all coins...`)
+    tx = await yZap.methods.redeem(_dusd,[0,0,0,0]).send({ from, gas: 3000000 })
+    console.log({ gasUsed: tx.gasUsed })
+    res = await printTokenBalances(_artifacts)
+
+    _dusd = res.dusd
+    console.log(`redeem ${_dusd} dusd in TUSD...`)
+    tx = await yZap.methods.redeemInSingleCoin(toWei(_dusd),3,0).send({ from, gas: 3000000 })
     console.log({ gasUsed: tx.gasUsed })
     res = await printTokenBalances(_artifacts)
 }
