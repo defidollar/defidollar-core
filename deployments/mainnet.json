@@ -70,20 +70,25 @@
                     "USDT",
                     "sUSD"
                 ],
-                "native": ["crvPlain3andSUSD"]
+                "native": [
+                    "crvPlain3andSUSD"
+                ]
             },
             "yVaultPeak": {
                 "coins": [
-                  "DAI",
-                  "USDC",
-                  "USDT",
-                  "TUSD"
+                    "DAI",
+                    "USDC",
+                    "USDT",
+                    "TUSD"
                 ],
                 "native": [
-                  "yCRV",
-                  "yUSD"
-                ]
-              }
+                    "yCRV",
+                    "yUSD"
+                ],
+                "address": "0xA89BD606d5DadDa60242E8DEDeebC95c41aD8986",
+                "zap": "0xed373A23F7e69c2d7dBD0eE4e744a10Ce4D2602D",
+                "controller": "0x88fF54ED47402A97F6e603737f26Bb9e4E6cb03d"
+            }
         },
         "oracle": "0x4EaC4c4e9050464067D673102F8E24b2FccEB350",
         "base": "0xE449Ca7d10b041255E7e989D158Bee355d8f88d3",

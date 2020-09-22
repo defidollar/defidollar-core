@@ -42,8 +42,8 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
         yCrv = IERC20(0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8);
         yUSD = IERC20(0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c);
         _setParams(
-            500, // 500.div(10000) implies to keep 5% of yCRV in the contract
-            9997 // 9997.div(10000) implies a redeem fee of .03%
+            200, // 200.div(10000) implies to keep 2% of yCRV in the contract
+            9998 // 9998.div(10000) implies a redeem fee of .02%
         );
     }
 
