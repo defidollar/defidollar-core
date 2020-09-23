@@ -34,9 +34,11 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     IMintr mintr;
     ICore core;
 
-    function migrate(address destinationPeak) public onlyOwner {
+    function migrate(address destinationPeak, uint sCrv) public onlyOwner {
+        if (sCrv == 0) {
+            sCrv = gauge.balanceOf(address(this));
+        }
         // withdraw from gauge
-        uint sCrv = gauge.balanceOf(address(this));
         gauge.withdraw(sCrv, false);
 
         // remove liquidity from sPool
@@ -180,16 +182,6 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
         _stake(curveToken.balanceOf(address(this)));
     }
 
-    function updateFeed(uint[] calldata _feed)
-        external
-        returns(uint /* portfolio */)
-    {
-        require(msg.sender == address(core), "ERR_NOT_AUTH");
-        require(_feed.length == N_COINS, "ERR_INVALID_UPDATE");
-        feed = _processFeed(_feed);
-        return portfolioValue();
-    }
-
     // thank you Andre :)
     function harvest(bool shouldClaim, uint minDusdAmount) external onlyOwner returns(uint) {
         if (shouldClaim) {
@@ -315,10 +307,6 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
         return _sCrvToUsd(sCrvBal, feed);
     }
 
-    function portfolioValueWithFeed(uint[] calldata _feed) external view returns(uint) {
-        return _sCrvToUsd(sCrvBalance(), _processFeed(_feed));
-    }
-
     function sCrvBalance() public view returns(uint) {
         return curveToken.balanceOf(address(this))
             .add(gauge.balanceOf(address(this)));
@@ -360,16 +348,6 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     function _secureFunding(uint usd) internal returns(uint sCrv) {
         sCrv = usdToScrv(usd).min(sCrvBalance()); // in an extreme scenario there might not be enough sCrv to redeem
         gauge.withdraw(sCrv, false);
-    }
-
-    function _processFeed(uint[] memory _feed)
-        internal
-        pure
-        returns(uint[N_COINS] memory _processedFeed)
-    {
-        for (uint i = 0; i < N_COINS; i++) {
-            _processedFeed[i] = _feed[i].min(1e18);
-        }
     }
 
     function _stake(uint amount) internal {

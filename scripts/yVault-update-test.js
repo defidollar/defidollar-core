@@ -1,22 +1,21 @@
 const fs = require('fs')
-const assert = require('assert')
 
 const toWei = web3.utils.toWei
 const fromWei = web3.utils.fromWei
 const toBN = web3.utils.toBN
 const MAX = web3.utils.toTwosComplement(-1);
-const n_coins = 4
 
 const CurveSusdPeak = artifacts.require("CurveSusdPeak");
+const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
 const YVaultPeak = artifacts.require("YVaultPeak");
 const YVaultZap = artifacts.require("YVaultZap");
 const Controller = artifacts.require("Controller");
 const Core = artifacts.require("Core");
+const CoreProxy = artifacts.require("CoreProxy");
 const DUSD = artifacts.require("DUSD");
-const IERC20 = artifacts.require("IERC20");
 
 const daiABI = require('../test/abi/dai.json');
-const { contracts } = JSON.parse(fs.readFileSync(`../deployments/mainnetY.json`).toString())
+const { contracts } = JSON.parse(fs.readFileSync(`../deployments/mainnet.json`).toString())
 
 // userAddress must be unlocked using --unlock ADDRESS
 const userAddress = '0x3dfd23a6c5e8bbcfc9581d2e864a68feb6a076d3'
@@ -42,20 +41,26 @@ const _artifacts = {
 }
 
 let from
-const owner = '0x08F7506E0381f387e901c9D0552cf4052A0740a4'
+const owner = '0x5b5cf8620292249669e1dcc73b753d01543d6ac7'
 
 async function execute() {
     const accounts = await web3.eth.getAccounts()
     from = accounts[0]
     const {
-        dai, dusd, susdPeak, yPeak, yZap, core, yUSD
+        dai, dusd, susdPeak, yPeak, yZap, core, yUSD, yCRV
     } = _artifacts
+
 
     await printTokenBalances(_artifacts)
 
     // Migrate Liquidity
-    console.log('Migrating liquidity...')
-    await susdPeak.methods.migrate(yPeak.options.address).send({ from: owner, gas: 3000000 })
+    console.log('Migrating liquidity...', yPeak.options.address)
+    await susdPeak.methods.migrate(yPeak.options.address, 0).send({ from: owner, gas: 3000000 })
+    await printTokenBalances(_artifacts)
+
+    console.log('Harvesting...')
+    await susdPeak.methods.harvest(true, 0).send({ from: owner, gas: 3000000 })
+    console.log(core.methods.setPeakStatus('0x80db6e1a3f6dc0D048026f3BeDb39807843366e4', '0', 2).encodeABI())
     await printTokenBalances(_artifacts)
 
     // Collect Protocol Income
@@ -67,10 +72,9 @@ async function execute() {
 
     let amount = toWei('10001')
     let res, tx
+
     // get Dai
-    tx = await dai.methods
-        .transfer(from, amount)
-        .send({ from: userAddress, gasLimit: 800000 });
+    tx = await dai.methods.transfer(from, amount).send({ from: userAddress, gasLimit: 800000 });
     await printTokenBalances(_artifacts)
 
     // Mint DUSD
@@ -102,9 +106,22 @@ async function execute() {
     console.log({ gasUsed: tx.gasUsed })
     res = await printTokenBalances(_artifacts)
 
-    _dusd = res.dusd
-    console.log(`redeem ${_dusd} dusd in TUSD...`)
-    tx = await yZap.methods.redeemInSingleCoin(toWei(_dusd),3,0).send({ from, gas: 3000000 })
+    _dusd = toWei((parseInt(res.dusd) / 2).toString())
+    console.log(`redeem ${fromWei(_dusd)} dusd in TUSD...`)
+    tx = await yZap.methods.redeemInSingleCoin(_dusd,3,0).send({ from, gas: 3000000 })
+    console.log({ gasUsed: tx.gasUsed })
+    res = await printTokenBalances(_artifacts)
+
+    _dusd = toWei(res.dusd)
+    console.log(`redeem ${fromWei(_dusd)} dusd in yCRV...`)
+    tx = await yPeak.methods.redeemInYcrv(_dusd,0).send({ from, gas: 3000000 })
+    console.log({ gasUsed: tx.gasUsed })
+    res = await printTokenBalances(_artifacts)
+
+    let _yCRV = toWei(res.yCRV)
+    console.log(`mint dusd with ${fromWei(_yCRV)}... yCRV`)
+    await yCRV.methods.approve(yPeak.options.address, _yCRV).send({ from })
+    tx = await yPeak.methods.mintWithYcrv(_yCRV).send({ from, gas: 3000000 })
     console.log({ gasUsed: tx.gasUsed })
     res = await printTokenBalances(_artifacts)
 }
@@ -129,7 +146,8 @@ async function printTokenBalances(_artifacts) {
         tusd: fromWei(_tusd),
         yCRV: fromWei(_ycrv),
         yUSD: fromWei(_yusd),
-        dusd: fromWei(_dusd)
+        dusd: fromWei(_dusd),
+        owner_dusd: fromWei(await dusd.methods.balanceOf(owner).call())
     }
 
     const [ _scrv, __ycrv, __yusd, totalSupply, totalSystemAssets ] = await Promise.all([
