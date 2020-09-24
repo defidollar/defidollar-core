@@ -7,6 +7,17 @@ const toBN = web3.utils.BN
 const MAX = web3.utils.toTwosComplement(-1);
 const n_coins = 4
 
+/*
+Problems need to be solved
+
+1) How to populate controller with x amount of yCRV
+2) { from: this.yVaultPeak.address } => Error: sender not recognised
+    - Cannot have ganache account be a peak due to Address.isContract()
+    - How to test onlyPeak() if private key is not accessible
+3) assert.equal() for controller, peak and yVault should be simple after 1) is solved
+
+*/
+
 contract('YVaultController', async (accounts) => {
 
     before(async () => {
@@ -48,26 +59,25 @@ contract('YVaultController', async (accounts) => {
 
     // Controller token transfer to yVault test
     it('Earn', async () => {
-        let reverted = false
-        try {
-            const yCRV = await this.yVaultPeak.vars()
-            await this.controller.earn(yCRV[2])
-        }
-        catch (e) {
-            reverted = true
-            console.log(e)
-        }
-        // Check balance of yCRV at controller and vault
-        assert.equal(reverted, false, "Error: earn() reverted")
-        /*
-        Add extra assertions for yCRV balance of controller and yVault
-        to ensure all controller balance was transferred to the 
-        vault 
-        */
+       let reverted = false
+       try {
+           const yCRV = await this.yVaultPeak.vars()
+           await this.controller.earn(yCRV[2])
+       }
+       catch (e) {
+           reverted = true
+           console.log(e)
+       }
+       assert.equal(reverted, false, "Error: earn() reverted")
+       /*
+       assert.equal() for controller and vault balance
+       */
     })
 
+    
     // Peak tests
     describe('Only Peak', async () => {
+
         it('Peak Vault Withdraw', async () => {
             let reverted = false
             let amount = toWei('0')
@@ -90,21 +100,16 @@ contract('YVaultController', async (accounts) => {
             
             const peak_balance = fromWei(await this.yCRV.balanceOf(this.yVaultPeak.address))
             const vault_balance = fromWei(await this.yCRV.balanceOf(this.yVault.address))
-
-            Cannot access yCRV address directly so go through yVaultPeak.vars()
             */
         })
 
+        // Withdraw controller balance when depreciating
         it('Peak Withdraw', async () => {
             let reverted = false
             let amount = toWei('0') // Change to actual amount
             try {
                 const yCRV = await this.yVaultPeak.vars()
                 await this.controller.withdraw(yCRV[2], amount, {from: this.yVaultPeak.address})
-                /*
-                Error: sender account not recognised
-                Reason: Ganache does not know private key of peak address
-                */
             }
             catch (e) {
                 reverted = true
@@ -117,8 +122,6 @@ contract('YVaultController', async (accounts) => {
             
             const controller_balance = fromWei(await this.yCRV.balanceOf(this.controller.address))
             const vault_balance = fromWei(await this.yCRV.balanceOf(this.yVault.address))
-
-            Cannot access yCRV address directly so go through yVaultPeak.vars()
             */
         })
     })
