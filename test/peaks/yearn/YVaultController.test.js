@@ -3,30 +3,28 @@ const utils = require('../../utils.js')
 
 const toWei = web3.utils.toWei
 const fromWei = web3.utils.fromWei
-const toBN = web3.utils.BN
+const toBN = web3.utils.toBN
 const MAX = web3.utils.toTwosComplement(-1);
 const n_coins = 4
 
-/*
-Problems need to be solved
-
-1) How to populate controller with x amount of yCRV
-2) { from: this.yVaultPeak.address } => Error: sender not recognised
-    - Cannot have ganache account be a peak due to Address.isContract()
-    - How to test onlyPeak() if private key is not accessible
-3) assert.equal() for controller, peak and yVault should be simple after 1) is solved
-
-*/
 
 contract('YVaultController', async (accounts) => {
+
+    let user = accounts[1]
 
     before(async () => {
         const artifacts = await utils.getArtifacts()
         Object.assign(this, artifacts)
         this.owner = accounts[0]
-        /*
-        Init controller with 20 yCRV
-        */
+
+        this.amounts = [200, 200, 200, 200] // dai, usdc, usdt, tusd
+        this.reserves = this.reserves.slice(0, 3).concat([this.reserves[4]])
+        const tasks = []
+        for (let i = 0; i < n_coins; i++) {
+            this.amounts[i] = toBN(this.amounts[i]).mul(toBN(10 ** this.decimals[i])) // convert amounts
+            tasks.push(this.reserves[i].mint(user, this.amounts[i])) // mint user
+        }
+        await Promise.all(tasks)
     })
 
     // Owner tests
@@ -38,7 +36,8 @@ contract('YVaultController', async (accounts) => {
             }
             catch (e) {
                 reverted = true
-                console.log(e)
+                assert.equal(e.reason, 'ERR_PEAK')
+
             }
             assert.equal(reverted, false, "Error: Owner could not add peak")
         })
@@ -51,7 +50,7 @@ contract('YVaultController', async (accounts) => {
             }
             catch (e) {
                 reverted = true
-                console.log(e)
+                assert.equal(e.reason, 'ERR_VAULT')
             }
             assert.equal(reverted, false, "Error: Owner could not add vault")
         })
@@ -59,71 +58,72 @@ contract('YVaultController', async (accounts) => {
 
     // Controller token transfer to yVault test
     it('Earn', async () => {
+       /*
+       ROUTE
+
+       yVaultZap.mint()
+
+       - msg.sender [dai, usdc, usdt, tusd] => yVaultZap.address
+       - yVaultZap [dai, usdc, usdt, tusd] => yDeposit => yVaultZap.address yCRV
+       - yVaultPeak.mintWithyCRV() => yVaultPeak.address (yCRV transfer)
+       - yVaultPeak yCRV => controller.address
+       - controller.earn() => yCRV vault deposit
+
+       */
        let reverted = false
+       // yVaultZap.mint()
+       this.amounts = [50, 50, 50, 50]
+       const tasks = []
+       for (let i = 0; i < n_coins; i++) {
+           this.amounts[i] = toBN(this.amounts[i]).mul(toBN(10 ** this.decimals[i]))
+           tasks.push(this.reserves[i].approve(this.yVaultZap.address, this.amounts[i]))
+        }
+       await Promise.all(tasks)
        try {
-           const yCRV = await this.yVaultPeak.vars()
-           await this.controller.earn(yCRV[2])
+           await this.yVaultZap.mint(this.amounts, '0') // Error?
        }
        catch (e) {
            reverted = true
-           console.log(e)
+           assert.equal(e.reason, 'ERR_EARN')
        }
-       assert.equal(reverted, false, "Error: earn() reverted")
-       /*
-       assert.equal() for controller and vault balance
-       */
+       // Assert statements controller yCRV => yVault
+       // All controller yCRV will be deposited into vault
+       assert.equal(fromWei(await this.yCRV.balanceOf(this.controller.address)), '0')
+       assert.equal(fromWei(await this.yVault.balanceOf(this.controller.address)), '') // yCRV transferred
+       assert.equal(reverted, false, 'Error: earn() reverted')
     })
 
-    
     // Peak tests
     describe('Only Peak', async () => {
 
         it('Peak Vault Withdraw', async () => {
-            let reverted = false
-            let amount = toWei('0')
-            try {
-                const yCRV = await this.yVaultPeak.vars()
-                await this.controller.vaultWithdraw(yCRV[2], amount, {from: this.yVaultPeak.address})
-                /*
-                Error: sender account not recognised
-                Reason: Ganache does not know private key of peak address
-                */
-            }
-            catch (e) {
-                reverted = true
-                console.log(e)
-            }
-            assert.equal(reverted, false, "Error: vaultWithdraw() reverted")
-            /*
-            Additional assert statements to verify yCRV was withdrawn
-            to peak from yVault.
-            
-            const peak_balance = fromWei(await this.yCRV.balanceOf(this.yVaultPeak.address))
-            const vault_balance = fromWei(await this.yCRV.balanceOf(this.yVault.address))
-            */
-        })
+            /* 
+            ROUTE
 
-        // Withdraw controller balance when depreciating
-        it('Peak Withdraw', async () => {
+            yVaultZap.redeemInYCRV()
+
+            - Calc yCRV based on DUSD input
+            - If balance Peak > redeem safeTransfer
+            - Else controller.vaultWithdraw()
+            - vaultWithdraw() calls withdraw()
+            */
             let reverted = false
-            let amount = toWei('0') // Change to actual amount
+            const dusd = toWei('100')
             try {
-                const yCRV = await this.yVaultPeak.vars()
-                await this.controller.withdraw(yCRV[2], amount, {from: this.yVaultPeak.address})
+                await this.dusd.approve(this.yVaultZap.address, dusd)
+                await this.yVaultZap.redeem(dusd, [0,0,0,0])
             }
             catch (e) {
                 reverted = true
-                console.log(e)
+                assert.equal(e.reason, 'ERR_WITHDRAW')
             }
-            assert.equal(reverted, false, "Error: withdraw() by Peak reverted")
-            /*
-            Additional assert statements to verify yCRV was withdraw
-            to peak from controller.
-            
-            const controller_balance = fromWei(await this.yCRV.balanceOf(this.controller.address))
-            const vault_balance = fromWei(await this.yCRV.balanceOf(this.yVault.address))
-            */
+            // User dusd balance - dusd amount
+            // Peak amount redeemed
+            // Controller amount redeemed (calc)
+            // vault amount redeemed (calc)
+            assert.equal(fromWei(await this.yCRV.balanceOf(this.yVaultPeak.address)), '0') // 0 as yCRV is withdrawn from vault
+            assert.equal(fromWei(await this.yCRV.balanceOf(this.controller.address)), '')
+            assert.equal(fromWei(await this.yVault.balanceOf(this.controller.address)), '')
         })
     })
-
 })
