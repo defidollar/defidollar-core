@@ -10,8 +10,6 @@ const n_coins = 4
 
 contract('YVaultController', async (accounts) => {
 
-    let user = accounts[1]
-
     before(async () => {
         const artifacts = await utils.getArtifacts()
         Object.assign(this, artifacts)
@@ -22,7 +20,7 @@ contract('YVaultController', async (accounts) => {
         const tasks = []
         for (let i = 0; i < n_coins; i++) {
             this.amounts[i] = toBN(this.amounts[i]).mul(toBN(10 ** this.decimals[i])) // convert amounts
-            tasks.push(this.reserves[i].mint(user, this.amounts[i])) // mint user
+            tasks.push(this.reserves[i].mint(this.owner, this.amounts[i])) // mint user
         }
         await Promise.all(tasks)
     })
@@ -37,7 +35,6 @@ contract('YVaultController', async (accounts) => {
             catch (e) {
                 reverted = true
                 assert.equal(e.reason, 'ERR_PEAK')
-
             }
             assert.equal(reverted, false, "Error: Owner could not add peak")
         })
@@ -68,19 +65,17 @@ contract('YVaultController', async (accounts) => {
        - yVaultPeak.mintWithyCRV() => yVaultPeak.address (yCRV transfer)
        - yVaultPeak yCRV => controller.address
        - controller.earn() => yCRV vault deposit
-
        */
        let reverted = false
-       // yVaultZap.mint()
-       this.amounts = [50, 50, 50, 50]
+       this.amounts = [100, 100, 100, 100]
        const tasks = []
        for (let i = 0; i < n_coins; i++) {
            this.amounts[i] = toBN(this.amounts[i]).mul(toBN(10 ** this.decimals[i]))
            tasks.push(this.reserves[i].approve(this.yVaultZap.address, this.amounts[i]))
-        }
+       }
        await Promise.all(tasks)
        try {
-           await this.yVaultZap.mint(this.amounts, '0') // Error?
+           await this.yVaultZap.mint(this.amounts, '0')
        }
        catch (e) {
            reverted = true
@@ -88,16 +83,17 @@ contract('YVaultController', async (accounts) => {
        }
        // Assert statements controller yCRV => yVault
        // All controller yCRV will be deposited into vault
-       assert.equal(fromWei(await this.yCRV.balanceOf(this.controller.address)), '0')
-       assert.equal(fromWei(await this.yVault.balanceOf(this.controller.address)), '') // yCRV transferred
-       assert.equal(reverted, false, 'Error: earn() reverted')
+       assert.equal(fromWei(await this.yCrv.balanceOf(this.controller.address)), '0')
+       assert.equal(fromWei(await this.yVault.balanceOf(this.controller.address)), '380')
+       assert.equal(reverted, false, "Error: earn() reverted")
     })
+
 
     // Peak tests
     describe('Only Peak', async () => {
 
         it('Peak Vault Withdraw', async () => {
-            /* 
+            /*
             ROUTE
 
             yVaultZap.redeemInYCRV()
