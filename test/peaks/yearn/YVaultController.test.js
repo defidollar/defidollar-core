@@ -114,12 +114,11 @@ contract('YVaultController', async (accounts) => {
                 assert.equal(e.reason, 'ERR_WITHDRAW')
             }
             // User dusd balance - dusd amount
-            // Peak amount redeemed
-            // Controller amount redeemed (calc)
-            // vault amount redeemed (calc)
-            assert.equal(fromWei(await this.yCRV.balanceOf(this.yVaultPeak.address)), '0') // 0 as yCRV is withdrawn from vault
-            assert.equal(fromWei(await this.yCRV.balanceOf(this.controller.address)), '')
-            assert.equal(fromWei(await this.yVault.balanceOf(this.controller.address)), '')
+            // Peak amount redeemed (All peak balance redeemed)
+            // vault amount redeemed (controller.vaultWithdraw() -> withdraw())
+            assert.equal(fromWei(await this.yCrv.balanceOf(this.yVaultPeak.address)), '0')
+            assert.equal(fromWei(await this.yVault.balanceOf(this.controller.address)), '300')
+            assert.equal(reverted, false, "Error: vaultWithdraw() reverted")
         })
     })
 })
