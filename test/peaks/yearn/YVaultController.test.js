@@ -108,15 +108,32 @@ contract('YVaultController', async (accounts) => {
         except *revert ERC20: burn amlunt exceeds balance*
 
         */
-        
-        // TODO
         it('withdraw(): peak withdraw amount from controller', async () => {
-            
-          
+            const dusd = toWei('10') 
+            await this.yVaultPeak.redeemInYusd(dusd, '0')
+            const dusd_balance = await this.dusd.balanceOf(this.owner)
+            const yUSD_balance = await this.yVault.balanceOf(this.owner)
+            const controller_balance = await this.yVault.balanceOf(this.controller.address)
+            console.log('DUSD: ' + fromWei(dusd_balance))
+            console.log('yUSD: ' + fromWei(yUSD_balance))
+            console.log('Controller: ' + fromWei(controller_balance))
+            assert.equal(fromWei(dusd_balance), '390')
+            assert.equal(fromWei(yUSD_balance), '10')
+            assert.equal(fromWei(controller_balance), '370')
         })
 
         it('withdraw(): peak withdraw entire controller balance', async () => {
-            
-        })
+            const dusd = toWei('390')
+            await this.yVaultPeak.redeemInYusd(dusd, '0')
+            const dusd_balance = await this.dusd.balanceOf(this.owner)
+            const yUSD_balance = await this.yVault.balanceOf(this.owner)
+            const controller_balance = await this.yVault.balanceOf(this.controller.address)
+            console.log('DUSD: ' + fromWei(dusd_balance))
+            console.log('yUSD: ' + fromWei(yUSD_balance))
+            console.log('Controller: ' + fromWei(controller_balance))
+            assert.equal(fromWei(dusd_balance), '0')
+            assert.equal(fromWei(yUSD_balance), '380')
+            assert.equal(fromWei(controller_balance), '0')
+        })         
     })
 })
