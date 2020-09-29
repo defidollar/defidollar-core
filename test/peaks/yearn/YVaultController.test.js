@@ -128,7 +128,6 @@ contract('YVaultController', async (accounts) => {
             const yVault_balance = await this.yVault.balanceOf(this.controller.address)
             const yCRV_balance = await this.yCrv.balanceOf(this.owner)
             const peak_balance = await this.yCrv.balanceOf(this.yVaultPeak.address)
-            console.log(fromWei(await this.yVault.balanceOf(this.controller.address)))
             console.log('yUSD: ' + fromWei(yVault_balance))
             console.log('yCRV: ' + fromWei(yCRV_balance))
             // Balances check
