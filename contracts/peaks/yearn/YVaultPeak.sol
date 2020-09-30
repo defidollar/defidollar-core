@@ -116,6 +116,7 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
         return inAmount.mul(yUSDToUsd()).div(1e18);
     }
 
+    // Bug - convert peak yCRV into yUSD on redeem
     function redeemInYusd(uint dusdAmount, uint minOut) external {
         core.redeem(dusdAmount, msg.sender);
         uint r = dusdAmount.mul(1e18).div(yUSDToUsd()).mul(redeemMultiplier).div(MAX);
@@ -127,6 +128,33 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
         }
         require(r >= minOut, ERR_INSUFFICIENT_FUNDS);
         yUSD.safeTransfer(msg.sender, r);
+    }
+
+    // Not finished
+    function excess() internal {
+        /*
+        1 - Transfer peak yCRV to controller
+        2 - Controller deposit yCRV into vault for yUSD
+        3 - call withdraw() to withdraw yUSD from controller to peak
+        4 - Transfer remaining yUSD to redeemer
+
+        TODO:
+
+        - Replace entire peak balance with amount deficient amount 
+        
+        */
+        // 1 - Peak yCRV transfer
+        uint peak_Ycrv = yCrv.balanceOf(address(this)); // Don't transfer entire balance
+        if (peak_Ycrv > 0) {
+            yCrv.safeTransfer(address(controller), peak_Ycrv);
+        }
+        uint controller_Ycrv = yCrv.balanceOf(address(controller));
+        // 2 - Vault deposit
+        controller.earn(address(yCrv));
+        // 3 - Transfer yUSD to peak
+        controller.withdraw(yUSD, controller_Ycrv);
+        // 4 - Transfer yUSD
+        yUSD.safeTransfer(msg.sender, peak_Ycrv);
     }
 
     function calcRedeemInYusd(uint dusdAmount) public view returns (uint) {

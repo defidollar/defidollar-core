@@ -101,7 +101,7 @@ contract('YVaultController', async (accounts) => {
             const controller_balance = await this.yVault.balanceOf(this.controller.address)
             const peak_balance = await this.yCrv.balanceOf(this.yVaultPeak.address)
             assert.equal(fromWei(dusd_balance), '0')
-            assert.equal(fromWei(yUSD_balance), '380')
+            assert.equal(fromWei(yUSD_balance), '380') // Should mint 400 to solve bug
             assert.equal(fromWei(controller_balance), '0')
             assert.equal(fromWei(peak_balance), '20')
         }) 
