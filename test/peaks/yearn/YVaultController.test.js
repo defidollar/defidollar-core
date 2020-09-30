@@ -75,50 +75,38 @@ contract('YVaultController', async (accounts) => {
         }
         await Promise.all(tasks)
         await this.yVaultZap.mint(this.amounts, '0')
-        assert.equal(fromWei(await this.dusd.balanceOf(this.owner)), '400')
-        assert.equal(fromWei(await this.yCrv.balanceOf(this.controller.address)), '0')
-        assert.equal(fromWei(await this.yVault.balanceOf(this.controller.address)), '380')
-        console.log(fromWei(await this.yVault.balanceOf(this.controller.address)))
     })
 
     // Peak tests
     describe('Only Peak', async () => {
 
-        it('withdraw(): peak withdraw amount from controller', async () => {
+        it('redeem in Yusd', async () => {
             const dusd = toWei('10') 
             await this.yVaultPeak.redeemInYusd(dusd, '0')
             const dusd_balance = await this.dusd.balanceOf(this.owner)
             const yUSD_balance = await this.yVault.balanceOf(this.owner)
             const controller_balance = await this.yVault.balanceOf(this.controller.address)
             const peak_balance = await this.yCrv.balanceOf(this.yVaultPeak.address)
-            console.log('DUSD: ' + fromWei(dusd_balance))
-            console.log('yUSD: ' + fromWei(yUSD_balance))
-            console.log('Controller: ' + fromWei(controller_balance))
-            console.log('Peak: ' + fromWei(peak_balance))
             assert.equal(fromWei(dusd_balance), '390')
             assert.equal(fromWei(yUSD_balance), '10')
             assert.equal(fromWei(controller_balance), '370')
             assert.equal(fromWei(peak_balance), '20')
         })
 
-        it('withdraw(): peak withdraw entire controller balance', async () => {
+        it('redeem entire balance in Yusd', async () => {
             const dusd = toWei('390')
             await this.yVaultPeak.redeemInYusd(dusd, '0')
             const dusd_balance = await this.dusd.balanceOf(this.owner)
             const yUSD_balance = await this.yVault.balanceOf(this.owner)
             const controller_balance = await this.yVault.balanceOf(this.controller.address)
             const peak_balance = await this.yCrv.balanceOf(this.yVaultPeak.address)
-            console.log('DUSD: ' + fromWei(dusd_balance))
-            console.log('yUSD: ' + fromWei(yUSD_balance))
-            console.log('Controller: ' + fromWei(controller_balance))
-            console.log('Peak: ' + fromWei(peak_balance))
             assert.equal(fromWei(dusd_balance), '0')
             assert.equal(fromWei(yUSD_balance), '380')
             assert.equal(fromWei(controller_balance), '0')
             assert.equal(fromWei(peak_balance), '20')
         }) 
         
-        it('vaultWithdraw(): peak withdraws shares', async () => {
+        it('redeem in Ycrv', async () => {
             // Restore balances
             this.amounts = [100, 100, 100, 100]
             const tasks = []
@@ -135,27 +123,19 @@ contract('YVaultController', async (accounts) => {
             const yVault_balance = await this.yVault.balanceOf(this.controller.address)
             const yCRV_balance = await this.yCrv.balanceOf(this.owner)
             const peak_balance = await this.yCrv.balanceOf(this.yVaultPeak.address) 
-            console.log('DUSD: ' + fromWei(dusd_balance))
-            console.log('yVault: ' + fromWei(yVault_balance))
-            console.log('yCRV: ' + fromWei(yCRV_balance))
-            console.log('Peak: ' + fromWei(peak_balance))
             assert.equal(fromWei(dusd_balance), '300') // 400 - 100
             assert.equal(fromWei(yCRV_balance), '100')
             assert.equal(fromWei(yVault_balance), '320') // 400 - (100-20)
             assert.equal(fromWei(peak_balance), '0') // yCRV Peak drained
         })
 
-        it('vaultWithdraw(): peak withdraws entire vault balance', async () => {
+        it('redeem entire balance in Ycrv', async () => {
             const dusd = toWei('300') 
             await this.yVaultPeak.redeemInYcrv(dusd, '0')
             const dusd_balance = await this.dusd.balanceOf(this.owner)
             const yVault_balance = await this.yVault.balanceOf(this.controller.address)
             const yCRV_balance = await this.yCrv.balanceOf(this.owner)
             const peak_balance = await this.yCrv.balanceOf(this.yVaultPeak.address)
-            console.log('DUSD: ' + fromWei(dusd_balance))
-            console.log('yUSD: ' + fromWei(yVault_balance))
-            console.log('yCRV: ' + fromWei(yCRV_balance))
-            console.log('Peak: ' + fromWei(peak_balance))
             assert.equal(fromWei(dusd_balance), '0')
             assert.equal(fromWei(yCRV_balance), '400') 
             assert.equal(fromWei(yVault_balance), '20') // Remaining yCRV (20 yCRV from peak used)
