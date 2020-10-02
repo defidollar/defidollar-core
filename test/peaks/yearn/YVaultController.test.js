@@ -101,9 +101,9 @@ contract('YVaultController', async (accounts) => {
             const controller_balance = await this.yVault.balanceOf(this.controller.address)
             const peak_balance = await this.yCrv.balanceOf(this.yVaultPeak.address)
             assert.equal(fromWei(dusd_balance), '0')
-            assert.equal(fromWei(yUSD_balance), '380') // Should mint 400 to solve bug
+            assert.equal(fromWei(yUSD_balance), '400') // Should mint 400 to solve bug
             assert.equal(fromWei(controller_balance), '0')
-            assert.equal(fromWei(peak_balance), '20')
+            assert.equal(fromWei(peak_balance), '0')
         }) 
         
         it('redeem in Ycrv', async () => {
@@ -125,7 +125,7 @@ contract('YVaultController', async (accounts) => {
             const peak_balance = await this.yCrv.balanceOf(this.yVaultPeak.address) 
             assert.equal(fromWei(dusd_balance), '300') // 400 - 100
             assert.equal(fromWei(yCRV_balance), '100')
-            assert.equal(fromWei(yVault_balance), '320') // 400 - (100-20)
+            assert.equal(fromWei(yVault_balance), '300') // 400 - (100-20)
             assert.equal(fromWei(peak_balance), '0') // yCRV Peak drained
         })
 
@@ -138,7 +138,7 @@ contract('YVaultController', async (accounts) => {
             const peak_balance = await this.yCrv.balanceOf(this.yVaultPeak.address)
             assert.equal(fromWei(dusd_balance), '0')
             assert.equal(fromWei(yCRV_balance), '400') 
-            assert.equal(fromWei(yVault_balance), '20') // Remaining yCRV (20 yCRV from peak used)
+            assert.equal(fromWei(yVault_balance), '0') // Remaining yCRV (20 yCRV from peak used)
             assert.equal(fromWei(peak_balance), '0') 
         })
     })
