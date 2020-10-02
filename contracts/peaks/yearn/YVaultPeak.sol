@@ -116,22 +116,27 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
         return inAmount.mul(yUSDToUsd()).div(1e18);
     }
 
-    // Bug - convert peak yCRV into yUSD on redeem
     function redeemInYusd(uint dusdAmount, uint minOut) external {
         core.redeem(dusdAmount, msg.sender);
         uint r = dusdAmount.mul(1e18).div(yUSDToUsd()).mul(redeemMultiplier).div(MAX);
         // there should be no reason that this contracts has yUSD, however being safe doesn't hurt
-        uint b = yUSD.balanceOf(address(this));
-        if (b < r) {
-            controller.withdraw(yUSD, r.sub(b));
-            uint peak_yUSD = yUSD.balanceOf(address(this));
-            if (r > peak_yUSD) {
-                uint amount = r.sub(peak_yUSD);
-                uint peak_yCrv = yCrv.balanceOf(address(this));
-                if (peak_yCrv > 0) {
+        uint peakYusd = yUSD.balanceOf(address(this));
+        if (peakYusd < r) {
+            controller.withdraw(yUSD, r.sub(peakYusd));
+            uint peakYusd = yUSD.balanceOf(address(this));
+            // Insufficient yUSD. Convert yCRV => yUSD.
+            if (peakYusd < r) {
+                uint amount = r.sub(peakYusd);
+                uint peakYcrv = yCrv.balanceOf(address(this));
+                if (peakYcrv >= amount) {
                     yCrv.safeTransfer(address(controller), amount);
                     controller.earn(address(yCrv));
                     controller.withdraw(yUSD, amount);
+                }
+                else {
+                    yCrv.safeTransfer(address(controller), peakYcrv);
+                    controller.earn(address(yCrv));
+                    controller.withdraw(yUSD, peakYcrv);
                 }
             }
             r = yUSD.balanceOf(address(this));
