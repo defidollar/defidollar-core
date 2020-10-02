@@ -133,8 +133,8 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
                     controller.earn(address(yCrv));
                     controller.withdraw(yUSD, amount);
                 }
-                r = yUSD.balanceOf(address(this));
             }
+            r = yUSD.balanceOf(address(this));
         }
         require(r >= minOut, ERR_INSUFFICIENT_FUNDS);
         yUSD.safeTransfer(msg.sender, r);
