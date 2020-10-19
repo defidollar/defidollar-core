@@ -8,7 +8,13 @@ const DUSD = artifacts.require("DUSD")
 
 const Reserve = artifacts.require("Reserve")
 
+// Mint with single reserve asset
+const susdCurveABI = require('../scripts/abis/susdCurve.json')
+const susdCurveDepositABI = require('../scripts/abis/susdCurveDeposit.json')
 const utils = require('./utils')
+
+const toBN = web3.utils.toBN
+const toWei = web3.utils.toWei
 
 module.exports = async function(deployer, network, accounts) {
     const config = utils.getContractAddresses()
@@ -26,5 +32,7 @@ module.exports = async function(deployer, network, accounts) {
     const tokens = reserves.map(r => r.address)
 
     // Contract deployments ...
-
+    await deployer.deploy(StableIndexPeak)
+    const stableIndexPeakProxy = await deployer.deploy(StableIndexPeakProxy)
+    const stableIndexPeak = await StableIndexPeak.at(stableIndexPeakProxy.address)
 }

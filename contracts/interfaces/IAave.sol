@@ -16,3 +16,9 @@ interface LendingPoolAddressProvider {
     function getLendingPool() external;
     function getLendingPoolCore() external;
 }
+
+interface PriceOracleGetter {
+    function getAssetPrice(address _asset) external view returns (uint256);
+    function getAssetPrices(address[] calldata _assets) external view returns (uint256[] memory);
+    function getFallbackOracle() external view returns (address);
+}

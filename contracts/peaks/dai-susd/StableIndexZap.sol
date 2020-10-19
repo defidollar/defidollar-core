@@ -50,27 +50,7 @@ contract StableIndexZap {
     }
 
     function mint(uint[index] calldata inAmounts, uint minDusdAmount) external returns (uint dusdAmount) {
-        /** 
-        1 - Take in DAI and sUSD amounts 
-            => safeTransfer(address(this), amount)
-        2 - Deposit into correct lending pool
-            => LendingPoolAddressesProvider + getLendingPool()
-            => IERC20(DAI).approve(provider.getLendingPoolCore(), amount) x2
-            => lendingPool.deposit(DAI, amount, referral) x2
-        3 - Mint and transfer DUSD to msg.sender
-            => core.mint()
-            => dusd.safeTransfer()
-        4 - Trigger peak contract joinPool() to LP BPool
-            => approve() aDAI/aSUSD w/ CRP
-            => crp.joinPool(uint poolAmountOut, uint[] calldata maxAmountsIn)
-        */
-
-        // NOTE: aToken:stablecoin => 1:1 in value
-        // NOTE: Ignore routing aTokens to BPool for now
-        // NOTE: Keep track of peak portfolioValue()
-
-        // 1 - Transfer DAI/sUSD to Zap
-        // 2 - Deposit _reserve into Lending Pool
+        // Deposit => aToken conversion
         address[index] memory _reserveTokens = reserveTokens;
         for (uint i = 0; i < index; i++) {
             if (inAmounts[i] > 0) {
@@ -79,60 +59,41 @@ contract StableIndexZap {
                 lendingPool.deposit(_reserveTokens[i], inAmounts[i], referral);
             }
         }
-        // 3 - Mint DUSD & transfer to owner based on deposit
-        // 4 - Trigger aToken => BPool
-        dusdAmount = stableIndexPeak.mint(inAmounts[i], minDusdAmount);
-        dusd.safeTransfer(msg.sender, dusdAmount);
+        stableIndexPeak.mint(inAmounts[i], minDusdAmount);
     }
 
     function redeem(uint dusdAmount, uint[] calldata minAmounts) external {
-        /** 
-        1 - Transfer dusd to Zap
-            => safeTransfer(msg.sender, address(this), dusdAmount)
-        2 - Trigger peak contract to exit BPool
-            => crp.exitPool(uint poolAmountIn, uint[] calldata minAmountsOut)
-            => *peak => Aave or Zap => Aave*
-            => How is interest from aTokens directed???
-        3 - Convert aTokens_deposits + interest => stablecoins
-            => aToken.redeem(uint256 _amount) (amount = deposit + interest)
-        4 - Transfer stablecoins to user
-            => DAI.safeTransfer(address(this), msg.sender, dai_amount) x2
-        5 - Burn dusd
-        */
-
-        // NOTE: Interest must be redirected from BPool + accounted for in redeem()
-        
         // 1 - Transfer dusd to Zap
         dusd.safeTransferFrom(msg.sender, address(this), dusdAmount);
-
         // 2 - Begin Withdrawl process
-        stableIndexPeak.redeem(); // This triggers removal of LP + interest
-
+        stableIndexPeak.redeem(dusdAmount); // This triggers removal of LP + interest
         // 3 - Convert aTokens to stablecoins
         address[index] memory _interestTokens = interestTokens;
-        for (uint i = 0; i < index; i++) {
-            aToken(_interestTokens[i]).redeem(minAmounts[i]); // Double check: Rewrite for interest
-        }
-
+        uint aDai = aToken(interestToken[0]).balanceof(address(this));
+        uint aSusd = aToken(interestToken[1]).balanceOf(address(this));
+        aToken(interestToken[0]).redeem(aDai);
+        aToken(interestToken[1]).redeem(aSusd);
         // 4 - Transfer stablecoins to user
-        address[index] memory _reserveTokens = reserveTokens;
-        for (uint i = 0; i < index; i++) {
-            IERC20(_reserveTokens[i]).safeTransfer(msg.sender, minAmounts[i]); // Double check: Rewrite for interest
-        }
-
+        IERC20(reserveToken[0]).safeTransfer(msg.sender, aDai);
+        IERC20(reserveToken[1]).safeTransfer(msg.sender, aSusd);
         // 5 - Burn DUSD
         core.redeem(dusdAmount, msg.sender);
     }
 
-    function reserveSwap() external {
-        /** 
-        Purpose: Allow single stablecoin minting of DUSD
+    function calcRedeem() external {
 
-        - Deposit either DAI or sUSD
-        - Convert deposit into stablecoin ratio
-        - Use that ratio to then convert to aTokens
-        - LP thos aTokens
-        */
+    }
+
+    function redeemInSingleCoin() external {
+
+    }
+
+    function calcRedeemInSingleCoin() external {
+
+    }
+
+    function reserveSwap() external {
+        
     }
 
 }
