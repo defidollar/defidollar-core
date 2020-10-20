@@ -31,8 +31,37 @@ module.exports = async function(deployer, network, accounts) {
     }
     const tokens = reserves.map(r => r.address)
 
+    // Mock aTokens
+    const aDai = await MockaToken.new() 
+    const aSusd = await MockaToken.new()
+
+    config.contracts.tokens['aDai'] = {
+        address: aDai.address,
+        decimals: 18,
+        name: "Aave Dai",
+        peak: "stableIndexPeak"
+    }
+    config.contracts.tokens['aSusd'] = {
+        address: aSusd.address,
+        decimals: 18,
+        name: "Aave aSusd",
+        peak: "stableIndexPeak"
+    }
+
+    // Curve susd pool deployment ... (single token swap)
+
     // Contract deployments ...
     await deployer.deploy(StableIndexPeak)
     const stableIndexPeakProxy = await deployer.deploy(StableIndexPeakProxy)
     const stableIndexPeak = await StableIndexPeak.at(stableIndexPeakProxy.address)
+
+    const stableIndexZap = await deployer.deploy(StableIndexZap, stableIndexPeak.address)
+
+    // CRP deployment
+
+    // Setup peak parameters
+    await Promise.all([
+        core.whitelistPeak(stableIndexPeak.address)
+    ])
+    
 }
