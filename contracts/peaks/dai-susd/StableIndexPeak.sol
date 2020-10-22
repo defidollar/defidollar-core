@@ -8,6 +8,7 @@ import {IPeak} from "../../interfaces/IPeak.sol";
 import {ICore} from "../../interfaces/ICore.sol";
 import {aToken, PriceOracleGetter} from "../../interfaces/IAave.sol";
 import {IConfigurableRightsPool} from "../../interfaces/IConfigurableRightsPool.sol";
+// PC Token for BPT Balances
 
 import {Initializable} from "../../common/Initializable.sol";
 import {OwnableProxy} from "../../common/OwnableProxy.sol";
@@ -91,9 +92,17 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         return prices;
     }
 
+    // Return price of single asset
+    function getPrice(address token) external returns (uint price) {
+        price = priceOracle.getAssetPrice(token);
+        return price;
+    }
+
     // Oracle for Ethereum price (wei => USD)
-    function weiToUSD(uint price) internal returns (uint256 value) {
+    function weiToUSD(uint price) external returns (uint256 value) {
         // Chainlink ETHUSD value?
+        value = 
+        return value;
     }
 
     function redeem(uint dusdAmount) external {
@@ -135,6 +144,21 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         for (uint i = 0; i < index; i++) {
             aToken(_interestTokens[i]).redirectInterestStreamOf(_from, _to);
         }
+    }
+
+    function portfolioValue() external returns (uint value) {
+        // Total portfolio value of the peak
+
+        // Case 1  - Redirected Interest
+        uint aDaiInterest = IERC20(interestTokens[0]).balanceOf(address(this));
+        uint aSusdInterest = IERC20(interestTokens[1]).balanceOf(address(this));
+        uint aDaiDeposit = IERC20(interestTokens[0]).balanceOf(address(crp.bPool));
+        uint aSusdDeposit = IERC20(interestTokens[1]).balanceOf(address(crp.bPool));
+        uint sum = aDaiInterest.add(aSusdInterest)
+            .add(aDaiDeposit)
+            .add(aSusdDeposit);
+        value = weiToUSD(sum);
+        return value;
     }
 
 }
