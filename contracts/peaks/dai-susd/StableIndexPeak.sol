@@ -6,6 +6,7 @@ import {Math} from "@openzeppelin/contracts/math/Math.sol";
 
 import {IPeak} from "../../interfaces/IPeak.sol";
 import {ICore} from "../../interfaces/ICore.sol";
+import {IOracle} from "../../interfaces/IOracle.sol";
 import {aToken, PriceOracleGetter} from "../../interfaces/IAave.sol";
 import {IConfigurableRightsPool} from "../../interfaces/IConfigurableRightsPool.sol";
 // PC Token for BPT Balances
@@ -36,6 +37,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
 
     // Aave Oracle
     PriceOracleGetter priceOracle;
+    IOracle public oracle;
 
     // Core contract
     ICore core; 
@@ -49,60 +51,63 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
 
     function initialize(
         IConfigurableRightsPool _crp,
-        PriceOracleGetter _priceOracle
+        PriceOracleGetter _priceOracle,
+        IOracle _oracle
     ) public {
         // CRP
         crp = _crp;
         // Aave Price Oracle
         priceOracle = _priceOracle;
+        oracle = _oracle;
         // Tokens
         core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
         dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
     }
 
-    // mint dusd based on aTokens
-    function mint(uint[index] calldata inAmounts, uint minDusdAmount) 
-        external 
-        returns (uint dusdAmount) {
-            // aTokens Zap => Peak
-            address[index] memory _interestTokens = interestTokens;
-            for(uint i = 0; i < index; i++) {
-                aToken(_interestTokens[i]).transferFrom(msg.sender, address(this), inAmounts[i]);
-            }
-            // Mint DUSD
-            uint256[] memory prices = getPrices();
-            uint value = 0;
-            uint daiValue = inAmounts[0].div(1e18).mul(weiToUSD(prices[0].div(1e18)));
-            uint susdValue = inAmounts[1].div(1e18).mul(weiToUSD(prices[1].div(1e18)));
-            value.add(daiValue).add(susdValue);
-            // Migrate liquidity
-            joinBPool(inAmounts); // Check
-            // Mint DUSD + transfer to user
-            dusdAmount = core.mint(value, msg.sender);
-            require(dusdAmount >= minDusdAmount, "Error: Insufficient DUSD");
-            dusd.safeTransfer(msg.sender, dusdAmount);
+    // Returns ETHUSD value from chainlink feeds
+    function ethusd() public returns (uint value) {
+        uint[] memory feed = oracle.getPriceFeed();
+        for (uint i = 0; i < feed.length; i++) {
+            value.add(feed[i]);
+        }
+        return value.div(feed.length);
     }
 
-    // Return prices of reserve tokens (1:1)
-    function getPrices() internal returns (uint256[] storage prices) {
+    // Convert aToken wei value to usd
+    function weiToUSD(uint price) public returns (uint value) {
+        value = price.mul(ethusd());
+        return value;
+    }
+
+    function mint(uint[index] calldata inAmounts, uint minDusdAmount) external returns (uint dusdAmount) {
+        address[index] memory _interestTokens = interestTokens;
+        for(uint i = 0; i < index; i++) {
+            aToken(_interestTokens[i]).transferFrom(msg.sender, address(this), inAmounts[i]);
+        }
+        uint256[] memory prices = getPrices();
+        uint daiValue = inAmounts[0].div(1e18).mul(weiToUSD(prices[0].div(1e18))); // convert USD
+        uint susdValue = inAmounts[1].div(1e18).mul(weiToUSD(prices[1].div(1e18))); // convert USD
+        uint value = daiValue.add(susdValue);
+        joinBPool(inAmounts); // Migrate liquidity
+        dusdAmount = core.mint(value, msg.sender);
+        require(dusdAmount >= minDusdAmount, "Error: Insufficient DUSD");
+        dusd.safeTransfer(msg.sender, dusdAmount);
+        return dusdAmount;
+    }
+
+    // Return prices of reserve tokens 
+    function getPrices() internal returns (uint256[] memory prices) {
         address[index] memory _reserveTokens = reserveTokens;
         for (uint i = 0; i < index; i++) {
-            prices.push(priceOracle.getAssetPrice(_reserveTokens[i]));
+            prices[i] = priceOracle.getAssetPrice(_reserveTokens[i]);
         }
         return prices;
     }
 
-    // Return price of single asset
+    // Return price of a single asset
     function getPrice(address token) external returns (uint price) {
-        price = priceOracle.getAssetPrice(token);
+        price = priceOracle.getAssetPrice(token); // wei value
         return price;
-    }
-
-    // Oracle for Ethereum price (wei => USD)
-    function weiToUSD(uint price) external returns (uint256 value) {
-        // Chainlink ETHUSD value?
-        value = 
-        return value;
     }
 
     function redeem(uint dusdAmount) external {
@@ -139,7 +144,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     }
 
     // Assuming crp have provided peak with allowance
-    function redirectInterest(address _from, address _to) internal {
+    function redirectInterest(address _from, address _to) internal onlyOwner {
         address[index] memory _interestTokens = interestTokens;
         for (uint i = 0; i < index; i++) {
             aToken(_interestTokens[i]).redirectInterestStreamOf(_from, _to);
