@@ -4,7 +4,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20, SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import {ICore} from "../../interfaces/ICore.sol";
-import {aToken, LendingPool, LendingPoolAddressProvider} from "../../interfaces/IAave.sol";
+import {aToken, LendingPool, LendingPoolAddressesProvider} from "../../interfaces/IAave.sol";
 import {ICurve} from "../../interfaces/ICurve.sol";
 import {IConfigurableRightsPool} from "../../interfaces/IConfigurableRightsPool.sol";
 
@@ -16,6 +16,7 @@ contract StableIndexZap {
 
     // stablecoins and aTokens
     uint constant public index = 2; // No. of stablecoins in peak
+    string constant ERR_SLIPPAGE = "ERR_SLIPPAGE";
 
     address[index] public reserveTokens = [
         0x6B175474E89094C44Da98b954EedeAC495271d0F, // DAI
@@ -33,8 +34,8 @@ contract StableIndexZap {
     IConfigurableRightsPool crp;
     
     // Aave Lending Pools
-    uint refferal = 0;
-    LendingPoolAddressProvider provider;
+    uint16 refferal = 0;
+    LendingPoolAddressesProvider provider;
     LendingPool lendingPool;
 
     // Stable Index Peak
@@ -50,13 +51,14 @@ contract StableIndexZap {
         // Curve swap
         curve = _curve;
         // Lending Pool
-        provider = LendingPoolAddressProvider(address(0x24a42fD28C976A61Df5D00D0599C34c4f90748c8));
+        provider = LendingPoolAddressesProvider(address(0x24a42fD28C976A61Df5D00D0599C34c4f90748c8)); // mainnet address, for other addresses: https://docs.aave.com/developers/developing-on-aave/deployed-contract-instances
         lendingPool = LendingPool(provider.getLendingPool());
         // Configurable Rights Pool
         crp = _crp;
     }
 
-    function mint(uint[index] calldata inAmounts, uint minDusdAmount) external returns (uint dusdAmount) {
+    function mint(uint[] calldata inAmounts, uint minDusdAmount) external returns (uint dusdAmount) {
+        // reserve => aTokens swap
         address[index] memory _reserveTokens = reserveTokens;
         for (uint i = 0; i < index; i++) {
             if (inAmounts[i] > 0) {
@@ -65,85 +67,98 @@ contract StableIndexZap {
                 lendingPool.deposit(_reserveTokens[i], inAmounts[i], refferal);
             }
         }
-        stableIndexPeak.mint(inAmounts, minDusdAmount);
+        // mint DUSD
+        uint256[] memory prices = stableIndexPeak.getPrices(_reserveTokens);
+        uint value;
+        for(uint i = 0; i < index; i++) {
+            value.add(inAmounts[i].div(1e18).mul(stableIndexPeak.weiToUSD(prices[i].div(1e18))));
+        }
+        dusdAmount = core.mint(value, msg.sender);
+        require(dusdAmount >= minDusdAmount, "Error: Insufficient DUSD");
+        // Migrate liquidity
+        stableIndexPeak.mint(inAmounts);
+        // Transfer DUSD
+        dusd.safeTransfer(msg.sender, dusdAmount);
+        return dusdAmount;
     }
 
     function redeem(uint dusdAmount, uint[] calldata minAmounts) external {
+        // Tranfer DUSD
         dusd.safeTransferFrom(msg.sender, address(this), dusdAmount);
-        stableIndexPeak.redeem(dusdAmount); // Check function
+        // aTokens (BPool -> Peak -> Zap)
+        stableIndexPeak.redeem(dusdAmount); 
+        // aTokens -> reserve swaps
         address[index] memory _interestTokens = interestTokens;
-        uint aDai = IERC20(interestTokens[0]).balanceOf(address(this));
-        uint aSusd = IERC20(interestTokens[1]).balanceOf(address(this));
-        aToken(interestTokens[0]).redeem(aDai);
-        aToken(interestTokens[1]).redeem(aSusd);
-        IERC20(reserveTokens[0]).safeTransfer(msg.sender, aDai); 
-        IERC20(reserveTokens[1]).safeTransfer(msg.sender, aSusd);
+        address[index] memory _reserveTokens = reserveTokens;
+        for (uint i = 0; i < _interestTokens.length; i++) {
+            uint amount = IERC20(_interestTokens[i]).balanceOf(address(this));
+            require(amount >= minAmounts[i], ERR_SLIPPAGE);
+            aToken(_interestTokens[i]).redeem(amount);
+            IERC20(_reserveTokens[i]).safeTransfer(msg.sender, amount);
+        }
         core.redeem(dusdAmount, msg.sender);
     }
 
     // Single reserve token functions
     function mintWithSingleCoin(uint inAmount, uint minDusdAmount, uint i) external returns (uint dusdAmount) {
-        IERC20 token = IERC20(reserveTokens[i]);
+        // Transfer token to zap
+        address[index] memory _reserveTokens = reserveTokens;
+        IERC20 token = IERC20(_reserveTokens[i]);
         token.safeTransferFrom(msg.sender, address(this), inAmount);
         // Get weights of CRP
         uint aDaiWeight = crp.getNormalizedWeight(interestTokens[0]);
         uint aSusdWeight = crp.getNormalizedWeight(interestTokens[1]);
         uint ratio = 0; // calc
         // Faciliate curve swap
-        /** 
-        Ratio notes:
-        user = 100 Dai
-        aDaiW = 64%
-        aSusdW = 36%
-        user => 64 Dai & 36 sUsd
-        */
-        if (token == reserveTokens[0]) {
+        if (address(token) == _reserveTokens[0]) {
             uint swapAmount = 0; // calc based on ratio
-            curve.exchange_underlying(token, reserveTokens[1], swapAmount, 0);
+            // curve.exchange_underlying(address(token), _reserveTokens[1], swapAmount, 0);
         }
-        else if (token == reserveTokens[1]) {
+        else if (address(token) == _reserveTokens[1]) {
             uint swapAmount = 0; // calc based on ratio
-            curve.exchange_underlying(token, reserveTokens[0], swapAmount, 0);
+            // curve.exchange_underlying(address(token), _reserveTokens[0], swapAmount, 0);
         }
-        uint daiBalance = IERC20(reserveTokens[0]).balanceOf(address(this));
-        uint susdBalance = IERC20(reserveTokens[1]).balanceOf(address(this));
+        uint daiBalance = IERC20(_reserveTokens[0]).balanceOf(address(this));
+        uint susdBalance = IERC20(_reserveTokens[1]).balanceOf(address(this));
         // Make Aave swap
-        IERC20(reserveTokens[0]).approve(provider.getLendingPoolCore(), daiBalance);
-        IERC20(reserveTokens[1]).approve(provider.getLendingPoolCore(), susdBalance);
-        lendingPool.deposit(reserveTokens[0], daiBalance, refferal);
-        lendingPool.deposit(reserveTokens[1], susdBalance, refferal);
+        IERC20(_reserveTokens[0]).approve(provider.getLendingPoolCore(), daiBalance);
+        IERC20(_reserveTokens[1]).approve(provider.getLendingPoolCore(), susdBalance);
+        lendingPool.deposit(_reserveTokens[0], daiBalance, refferal);
+        lendingPool.deposit(_reserveTokens[1], susdBalance, refferal);
         // Mint DUSD
-        address[] memory inAmounts = new address[](2);
+        uint256[] memory inAmounts = new uint256[](2);
         inAmounts[0] = IERC20(interestTokens[0]).balanceOf(address(this));
         inAmounts[1] = IERC20(interestTokens[1]).balanceOf(address(this));
-        stableIndexPeak.mint(inAmounts, minDusdAmount);
+        stableIndexPeak.mint(inAmounts);
     }
 
     function redeemInSingleCoin(uint dusdAmount, uint minAmount, uint i) external {
         dusd.safeTransferFrom(msg.sender, address(this), dusdAmount);
         stableIndexPeak.redeem(dusdAmount);
+        address[index] memory _reserveTokens = reserveTokens;
         address[index] memory _interestTokens = interestTokens;
-        uint aDai = IERC20(interestTokens[0]).balanceOf(address(this));
-        uint aSusd = IERC20(interestTokens[1]).balanceOf(address(this));
-        aToken(interestTokens[0]).redeem(aDai);
-        aToken(interestTokens[1]).redeem(aSusd);
-        IERC20 token = IERC20(reserveTokens[i]);
-        if (token == reserveTokens[0]) {
-            curve.exchange_underlying(token, reserveTokens[1], aDai, 0); // 1:1 (aDai:Dai)
-            uint susd = IERC20(reserveTokens[1]).balanceOf(address(this));
-            IERC20(reserveTokens[1]).safeTransfer(msg.sender, susd);
+        uint aDai = IERC20(_interestTokens[0]).balanceOf(address(this));
+        uint aSusd = IERC20(_interestTokens[1]).balanceOf(address(this));
+        aToken(_interestTokens[0]).redeem(aDai);
+        aToken(_interestTokens[1]).redeem(aSusd);
+        IERC20 token = IERC20(_reserveTokens[i]);
+        if (address(token) == _reserveTokens[0]) {
+            // curve.exchange_underlying(address(token), _reserveTokens[1], aDai, 0); // 1:1 (aDai:Dai)
+            uint susd = IERC20(_reserveTokens[1]).balanceOf(address(this));
+            IERC20(_reserveTokens[1]).safeTransfer(msg.sender, susd);
         }
-        else if (token == reserveTokens[1]) {
-            curve.exchange_underlying(token, reserveTokens[0], aSusd, 0); // 1:1 (aSUSD:aSusd)
-            uint dai = IERC20(reserveTokens[0]).balanceOf(address(this));
-            IERC20(reserveTokens[0]).safeTransfer(msg.sender, dai);
+        else if (address(token) == _reserveTokens[1]) {
+            // curve.exchange_underlying(address(token), _reserveTokens[0], aSusd, 0); // 1:1 (aSUSD:aSusd)
+            uint dai = IERC20(_reserveTokens[0]).balanceOf(address(this));
+            IERC20(_reserveTokens[0]).safeTransfer(msg.sender, dai);
         }
         core.redeem(dusdAmount, msg.sender);
     }
 
-    // CALC FUNCTIONS
+    // CALC FUNCTIONS (state modified errors)
     function calcMint(uint[index] memory inAmounts) public view returns (uint dusdAmount) {
-        uint[] memory prices = stableIndexPeak.getPrices();
+        address[index] memory _reserveTokens = reserveTokens;
+        uint[] memory prices = stableIndexPeak.getPrices(_reserveTokens);
         for (uint i = 0; i < prices.length; i++) {
             dusdAmount.add(stableIndexPeak.weiToUSD(prices[i].div(1e18)));
         }
@@ -158,19 +173,20 @@ contract StableIndexZap {
 
     // Redeem only aToken deposit (interest is deployed elsewhere)
     function calcRedeem(uint dusdAmount) public view returns (uint[index] memory amounts) {
+        address[index] memory _reserveTokens = reserveTokens;
         uint usd = core.dusdToUsd(dusdAmount, true); // redeem fee
-        uint[] memory prices = stableIndexPeak.getPrices();
+        uint[] memory prices = stableIndexPeak.getPrices(_reserveTokens);
         for (uint i = 0; i < index; i++) {
             amounts[i] = usd.div(stableIndexPeak.weiToUSD(prices[i].div(1e18)));
             // Incorrect think about this more
         }
-        returns amounts;
+        return amounts;
     }   
 
     function calcRedeemInSingleCoin(uint dusdAmount, uint i) public view returns (uint amount) {
-        uint dusd = core.dusdToUsd(dusdAmount, true);
+        uint usd = core.dusdToUsd(dusdAmount, true);
         uint price = stableIndexPeak.getPrice(reserveTokens[i]);
-        amount = dusd.div(stableIndexPeak.weiToUSD(price.div(1e18)));
+        amount = usd.div(stableIndexPeak.weiToUSD(price.div(1e18)));
         return amount;
     }
 

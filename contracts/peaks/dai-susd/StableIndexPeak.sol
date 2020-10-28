@@ -43,11 +43,8 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     ICore core; 
     IERC20 dusd; 
 
-    // Tracking user BPT
-    mapping(address => uint256) private bptBalances;
-
-    // Track user deposits
-    mapping(address => uint256) private deposits; // Solve interest problem
+    // Tracking deposits (aToken => BPool)
+    mapping(address => uint256) private deposits;
 
     function initialize(
         IConfigurableRightsPool _crp,
@@ -64,8 +61,8 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
     }
 
-    // Returns ETHUSD value from chainlink feeds
-    function ethusd() public returns (uint value) {
+    // Returns average ETHUSD value from chainlink feeds
+    function ethusd() public view returns (uint value) {
         uint[] memory feed = oracle.getPriceFeed();
         for (uint i = 0; i < feed.length; i++) {
             value.add(feed[i]);
@@ -79,71 +76,52 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         return value;
     }
 
-    function mint(uint[index] calldata inAmounts, uint minDusdAmount) external returns (uint dusdAmount) {
-        address[index] memory _interestTokens = interestTokens;
-        for(uint i = 0; i < index; i++) {
-            aToken(_interestTokens[i]).transferFrom(msg.sender, address(this), inAmounts[i]);
-        }
-        uint256[] memory prices = getPrices();
-        uint daiValue = inAmounts[0].div(1e18).mul(weiToUSD(prices[0].div(1e18))); // convert USD
-        uint susdValue = inAmounts[1].div(1e18).mul(weiToUSD(prices[1].div(1e18))); // convert USD
-        uint value = daiValue.add(susdValue);
-        joinBPool(inAmounts); // Migrate liquidity
-        dusdAmount = core.mint(value, msg.sender);
-        require(dusdAmount >= minDusdAmount, "Error: Insufficient DUSD");
-        dusd.safeTransfer(msg.sender, dusdAmount);
-        return dusdAmount;
+    // Return prices of reserve tokens (wei)
+    function getPrices(address[] memory _assets) public view returns (uint256[] memory prices) {
+        return priceOracle.getAssetPrices(_assets);
     }
 
-    // Return prices of reserve tokens 
-    function getPrices() internal returns (uint256[] memory prices) {
-        address[index] memory _reserveTokens = reserveTokens;
-        for (uint i = 0; i < index; i++) {
-            prices[i] = priceOracle.getAssetPrice(_reserveTokens[i]);
-        }
-        return prices;
-    }
-
-    // Return price of a single asset
-    function getPrice(address token) external returns (uint price) {
-        price = priceOracle.getAssetPrice(token); // wei value
+    // Return price of a reserve asset (wei)
+    function getPrice(address token) public view returns (uint price) {
+        price = priceOracle.getAssetPrice(token); 
         return price;
     }
 
-    function redeem(uint dusdAmount) external {
-        // Remove liquidity
-        // exitBPool();
-        // Get deposit amount + interest
-        // ASSUME: No interest (for now)
-        uint aDai = IERC20(interestTokens[0]).balanceOf(address(this));
-        uint aSusd = IERC20(interestTokens[1]).balanceOf(address(this)); 
-        aToken(reserveTokens[0]).transfer(msg.sender, aDai);
-        aToken(reserveTokens[1]).transfer(msg.sender, aSusd);
+    function mint(uint[] calldata inAmounts) external returns (uint dusdAmount) {
+        // aTokens (zap -> peak)
+        address[index] memory _interestTokens = interestTokens;
+        for(uint i = 0; i < index; i++) {
+            aToken(_interestTokens[i]).transferFrom(msg.sender, address(this), inAmounts[i]);
+            IERC20(_interestTokens[i]).safeApprove(address(crp), inAmounts[i]);
+        }
+        // Migrate liquidity to BPool via CRP
+        crp.joinPool(0, inAmounts); // Check BPT
     }
 
-    function joinBPool(uint[index] memory inAmounts) internal {
-        uint start = crp.balanceOf(address(this)); // bpt balance (not correct)
+    function redeem(uint dusdAmount) external {
+        // DUSD value
+        uint usd = core.dusdToUsd(dusdAmount);
+        // Remove liquidity
+        exitBPool();
+        // aTokens (peak -> xap)
         address[index] memory _interestTokens = interestTokens;
         for (uint i = 0; i < index; i++) {
-            aToken(_interestTokens[i]).approve(address(crp), inAmounts[i]);
+            uint amount = IERC20(_interestTokens[i]).balanceOf(address(this));
+            aToken(_interestTokens[i]).transfer(msg.sender, amount);
         }
-        crp.joinPool(0, inAmounts);
-        uint end = crp.balanceOf(address(this));
-        bptBalances[msg.sender] = end.sub(start);
-        redirectInterest(address(crp), address(this));
     }
+
+    // Migrating Liquidity functions
 
     function exitBPool(uint bptAmount) internal {
-        uint bpt = bptBalances[msg.sender];
-        if (bpt > 0 && bptAmount <= bpt) {
-            uint start = crp.balanceOf(address(this));
-            crp.exitPoll(bptAmount, [0,0]); 
-            uint end = crp.balanceOf(address(this));
-            bptBalances[msg.sender] = start.sub(end);
-        }
+        
     }
 
-    // Assuming crp have provided peak with allowance
+    function getBPT() internal {
+
+    }
+
+    // Assuming crp have provided peak with allowance (NOT NEEDED)
     function redirectInterest(address _from, address _to) internal onlyOwner {
         address[index] memory _interestTokens = interestTokens;
         for (uint i = 0; i < index; i++) {
@@ -151,19 +129,8 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         }
     }
 
-    function portfolioValue() external returns (uint value) {
-        // Total portfolio value of the peak
-
-        // Case 1  - Redirected Interest
-        uint aDaiInterest = IERC20(interestTokens[0]).balanceOf(address(this));
-        uint aSusdInterest = IERC20(interestTokens[1]).balanceOf(address(this));
-        uint aDaiDeposit = IERC20(interestTokens[0]).balanceOf(address(crp.bPool));
-        uint aSusdDeposit = IERC20(interestTokens[1]).balanceOf(address(crp.bPool));
-        uint sum = aDaiInterest.add(aSusdInterest)
-            .add(aDaiDeposit)
-            .add(aSusdDeposit);
-        value = weiToUSD(sum);
-        return value;
+    function portfolioValue() external view returns (uint) {
+        
     }
 
 }

@@ -6,3 +6,7 @@ interface IConfigurableRightsPool {
     function getDenormalizedWeight(address token) external view returns (uint);
     function getNormalizedWeight(address token) external view returns (uint);
 }
+
+interface BPool {
+    
+}

@@ -10,13 +10,13 @@ interface aToken {
 }
 
 interface LendingPool {
-    function deposit(address _reserve, uint256 _amouny, uint16 _referralCode) external;
+    function deposit(address _reserve, uint256 _amount, uint16 _referralCode) external;
     function getReserveData(address _reserve) external;
 }
 
-interface LendingPoolAddressProvider {
-    function getLendingPool() external;
-    function getLendingPoolCore() external;
+interface LendingPoolAddressesProvider {
+    function getLendingPool() external view returns (address);
+    function getLendingPoolCore() external view returns (address payable);
 }
 
 interface PriceOracleGetter {
