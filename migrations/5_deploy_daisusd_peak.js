@@ -1,3 +1,5 @@
+const fs = require("fs")
+
 // Artifacts
 const Core = artifacts.require("Core")
 const CoreProxy = artifacts.require("CoreProxy")
