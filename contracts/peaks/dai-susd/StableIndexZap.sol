@@ -116,13 +116,13 @@ contract StableIndexZap {
             uint dai = inAmount;
             token.safeApprove(address(curve), 0);
             token.safeApprove(address(curve), dai);
-            curve.exchange(int128(0), int128(3), dai, 0);
+            curve.exchange_underlying(int128(0), int128(3), dai, 0);
         }
         else if (address(token) == _reserveTokens[1]) {
             uint susd = inAmount; // calc based on ratio
             token.safeApprove(address(curve), 0);
             token.safeApprove(address(curve), susd);
-            curve.exchange(int128(3), int128(0), susd, 0);
+            curve.exchange_underlying(int128(3), int128(0), susd, 0);
         }
         // Make Aave swap
         for (uint i = 0; i < index; i++) {
@@ -153,14 +153,14 @@ contract StableIndexZap {
         IERC20 token = IERC20(_reserveTokens[j]);
         if (address(token) == _reserveTokens[0]) {
             uint amount = token.balanceOf(address(this));
-            curve.exchange(int128(0), int128(3), amount, 0); 
+            curve.exchange_underlying(int128(0), int128(3), amount, 0); 
             uint susd = IERC20(_reserveTokens[1]).balanceOf(address(this));
             require(susd >= minAmount, ERR_SLIPPAGE);
             IERC20(_reserveTokens[1]).safeTransfer(msg.sender, susd);
         }
         else if (address(token) == _reserveTokens[1]) {
             uint amount = token.balanceOf(address(this));
-            curve.exchange(int128(3), int128(0), amount, 0); 
+            curve.exchange_underlying(int128(3), int128(0), amount, 0); 
             uint dai = IERC20(_reserveTokens[0]).balanceOf(address(this));
             require(dai >= minAmount, ERR_SLIPPAGE);
             IERC20(_reserveTokens[0]).safeTransfer(msg.sender, dai);
