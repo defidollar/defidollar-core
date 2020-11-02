@@ -44,7 +44,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     IERC20 dusd; 
 
     // Tracking deposits (aToken => BPool)
-    mapping(address => uint256) private deposits;
+    mapping(address => uint[]) private deposits;
 
     function initialize(
         IConfigurableRightsPool _crp,
@@ -72,22 +72,24 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
 
     // Convert aToken wei value to usd
     function weiToUSD(uint price) public returns (uint value) {
-        value = price.mul(ethusd());
-        return value;
+        return price.mul(ethusd());
     }
 
     // Return prices of reserve tokens (wei)
-    function getPrices(address[] memory _assets) public view returns (uint256[] memory prices) {
-        return priceOracle.getAssetPrices(_assets);
+    function getPrices() public view returns (uint256[] memory prices) {
+        address[index] memory _reserveTokens = reserveTokens;
+        for (uint i = 0; i < index; i++) {
+            prices[i] = priceOracle.getAssetPrice(_reserveTokens[i]);
+        }
+        return prices;
     }
 
     // Return price of a reserve asset (wei)
     function getPrice(address token) public view returns (uint price) {
-        price = priceOracle.getAssetPrice(token); 
-        return price;
+        return priceOracle.getAssetPrice(token);
     }
 
-    function mint(uint[] calldata inAmounts) external returns (uint dusdAmount) {
+    function mint(uint[] calldata inAmounts) external {
         // aTokens (zap -> peak)
         address[index] memory _interestTokens = interestTokens;
         for(uint i = 0; i < index; i++) {
@@ -99,26 +101,21 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     }
 
     function redeem(uint dusdAmount) external {
-        // DUSD value
-        uint usd = core.dusdToUsd(dusdAmount);
-        // Remove liquidity
-        exitBPool();
-        // aTokens (peak -> xap)
         address[index] memory _interestTokens = interestTokens;
+        uint[] memory balances;
+        // DUSD value (How many BPT tokens to redeem)
+        // uint usd = core.dusdToUsd(dusdAmount, true);
+        // aToken balances before
         for (uint i = 0; i < index; i++) {
-            uint amount = IERC20(_interestTokens[i]).balanceOf(address(this));
-            aToken(_interestTokens[i]).transfer(msg.sender, amount);
+            balances[i] = IERC20(_interestTokens[i]).balanceOf(address(this));
         }
-    }
-
-    // Migrating Liquidity functions
-
-    function exitBPool(uint bptAmount) internal {
-        
-    }
-
-    function getBPT() internal {
-
+        // Remove liquidity
+        // crp.exitPool();
+        // aTokens balances after (peak -> zap)
+        for (uint i = 0; i < index; i++) {
+            balances[i] = IERC20(_interestTokens[i]).balanceOf(address(this)).sub(balances[i]);
+            aToken(_interestTokens[i]).transfer(msg.sender, balances[i]);
+        }
     }
 
     // Assuming crp have provided peak with allowance (NOT NEEDED)
@@ -129,8 +126,26 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         }
     }
 
+    // USD valuation of stable index peak (aTokens interest + bPool deposits)
     function portfolioValue() external view returns (uint) {
-        
+        return 0;
+    }
+
+    // Internal Functions
+    function peakValue() internal returns (uint interest) {
+        address[index] memory _interestTokens = interestTokens;
+        for (uint i = 0; i < index; i++) {
+            interest.add(weiToUSD(IERC20(_interestTokens[i]).balanceOf(address(this)).div(1e18)));
+        }
+        return interest;
+    }
+
+    function bPoolValue() internal returns (uint value) {
+        address[index] memory _interestTokens;
+        for (uint i = 0; i < index; i++) {
+            value.add(weiToUSD(IERC20(_interestTokens[i]).balanceOf(address(crp)).div(1e18)));
+        }
+        return value;
     }
 
 }
