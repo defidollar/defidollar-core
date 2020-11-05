@@ -109,17 +109,20 @@ contract StableIndexZap {
         token.safeTransferFrom(msg.sender, address(this), inAmount);
         // Get weights of CRP
         address[index] memory _interestTokens = interestTokens;
-        uint daiWeight = crp.getDenormalizedWeight(_interestTokens[0]); // 23.2
-        uint susdWeight = crp.getDenormalizedWeight(_interestTokens[1]); // 16.8
+        uint daiDenorm = crp.getDenormalizedWeight(_interestTokens[0]); // 23.2
+        uint susdDenorm = crp.getDenormalizedWeight(_interestTokens[1]); // 16.8
+        uint totalDenorm = daiDenorm.add(susdDenorm);
         // Faciliate curve swap (Assume just Dai/sUSD in peak)
         if (address(token) == _reserveTokens[0]) {
-            uint dai = inAmount;
+            uint daiRatio = daiDenorm.mul(100).div(totalDenorm);
+            uint dai = inAmount.mul(daiRatio).div(100);
             token.safeApprove(address(curve), 0);
             token.safeApprove(address(curve), dai);
             curve.exchange_underlying(int128(0), int128(3), dai, 0);
         }
         else if (address(token) == _reserveTokens[1]) {
-            uint susd = inAmount; // calc based on ratio
+            uint susdRatio = susdDenorm.mul(100).div(totalDenorm);
+            uint susd = inAmount.mul(susdRatio).div(100); 
             token.safeApprove(address(curve), 0);
             token.safeApprove(address(curve), susd);
             curve.exchange_underlying(int128(3), int128(0), susd, 0);
@@ -130,11 +133,22 @@ contract StableIndexZap {
             IERC20(_reserveTokens[i]).safeApprove(provider.getLendingPoolCore(), swapAmount);
             lendingPool.deposit(_reserveTokens[i], swapAmount, refferal);
         }
-        // Mint DUSD
+        // mint DUSD
         uint256[] memory inAmounts = new uint256[](2);
         inAmounts[0] = IERC20(_interestTokens[0]).balanceOf(address(this));
         inAmounts[1] = IERC20(_interestTokens[1]).balanceOf(address(this));
+        uint256[] memory prices = stableIndexPeak.getPrices();
+        uint value;
+        for(uint i = 0; i < index; i++) {
+            value.add(inAmounts[i].div(1e18).mul(stableIndexPeak.weiToUSD(prices[i].div(1e18))));
+        }
+        dusdAmount = core.mint(value, msg.sender);
+        require(dusdAmount >= minDusdAmount, "Error: Insufficient DUSD");
+        // Migrate liquidity
         stableIndexPeak.mint(inAmounts);
+        // Transfer DUSD
+        dusd.safeTransfer(msg.sender, dusdAmount);
+        return dusdAmount;
     }
 
     function redeemInSingleCoin(uint dusdAmount, uint minAmount, uint j) external {
@@ -169,35 +183,33 @@ contract StableIndexZap {
         core.redeem(dusdAmount, msg.sender);
     }
 
-    // CALC FUNCTIONS (state modified errors)
+    // CALC FUNCTIONS 
     function calcMint(uint[index] memory inAmounts) public view returns (uint dusdAmount) {
-        address[index] memory _reserveTokens = reserveTokens;
         uint[] memory prices = stableIndexPeak.getPrices();
-        for (uint i = 0; i < index; i++) {
-            dusdAmount.add(stableIndexPeak.weiToUSD(prices[i].div(1e18)));
+        for (uint i = 0; i < prices.length; i++) {
+            dusdAmount.add(inAmounts[i].mul(stableIndexPeak.weiToUSD(prices[i].div(1e18))));
         }
         return dusdAmount;
     }
 
-    function calcMintSingleCoin(uint inAmount, uint i) public returns (uint dusdAmount) {
+    function calcMintSingleCoin(uint inAmount, uint i) public view returns (uint dusdAmount) {
         address[index] memory _reserveTokens = reserveTokens;
         uint price = stableIndexPeak.getPrice(_reserveTokens[i]);
-        return stableIndexPeak.weiToUSD(price.div(1e18));
+        return inAmount.mul(stableIndexPeak.weiToUSD(price.div(1e18)));
     }
 
     // Redeem only aToken deposit (interest is deployed elsewhere)
-    function calcRedeem(uint dusdAmount) public returns (uint[index] memory amounts) {
-        address[index] memory _reserveTokens = reserveTokens;
+    function calcRedeem(uint dusdAmount) public view returns (uint[index] memory amounts) {
         uint usd = core.dusdToUsd(dusdAmount, true); // redeem fee
         uint[] memory prices = stableIndexPeak.getPrices();
-        for (uint i = 0; i < index; i++) {
+        for (uint i = 0; i < prices.length; i++) {
             amounts[i] = usd.div(stableIndexPeak.weiToUSD(prices[i].div(1e18)));
             // Incorrect think about this more
         }
         return amounts;
     }   
 
-    function calcRedeemInSingleCoin(uint dusdAmount, uint i) public returns (uint amount) {
+    function calcRedeemInSingleCoin(uint dusdAmount, uint i) public view returns (uint amount) {
         uint usd = core.dusdToUsd(dusdAmount, true);
         uint price = stableIndexPeak.getPrice(reserveTokens[i]);
         amount = usd.div(stableIndexPeak.weiToUSD(price.div(1e18)));

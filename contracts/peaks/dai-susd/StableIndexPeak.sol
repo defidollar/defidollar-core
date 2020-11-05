@@ -7,9 +7,9 @@ import {Math} from "@openzeppelin/contracts/math/Math.sol";
 import {IPeak} from "../../interfaces/IPeak.sol";
 import {ICore} from "../../interfaces/ICore.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
+import {ICurve} from "../../interfaces/ICurve.sol";
 import {aToken, PriceOracleGetter} from "../../interfaces/IAave.sol";
 import {IConfigurableRightsPool, IBPool} from "../../interfaces/IConfigurableRightsPool.sol";
-// PC Token for BPT Balances
 
 import {Initializable} from "../../common/Initializable.sol";
 import {OwnableProxy} from "../../common/OwnableProxy.sol";
@@ -56,13 +56,14 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         // Aave Price Oracle
         priceOracle = _priceOracle;
         oracle = _oracle;
+        // Curve swap
         // Tokens
         core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
         dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
     }
 
     // Returns average ETHUSD value from chainlink feeds
-    function ethusd() internal returns (uint value) {
+    function ethusd() public view returns (uint value) {
         uint[] memory feed = oracle.getPriceFeed();
         for (uint i = 0; i < feed.length; i++) {
             value.add(feed[i]);
@@ -71,7 +72,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     }
 
     // Convert aToken wei value to usd
-    function weiToUSD(uint price) public returns (uint value) {
+    function weiToUSD(uint price) public view returns (uint) {
         return price.mul(ethusd());
     }
 
@@ -104,13 +105,19 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         address[index] memory _interestTokens = interestTokens;
         uint[] memory balances;
         // DUSD value (How many BPT tokens to redeem)
-        // uint usd = core.dusdToUsd(dusdAmount, true);
+        uint usd = core.dusdToUsd(dusdAmount, true);
+        uint bpt = bptValue(dusdAmount).div(usd);
         // aToken balances before
         for (uint i = 0; i < index; i++) {
             balances[i] = IERC20(_interestTokens[i]).balanceOf(address(this));
         }
         // Remove liquidity
-        // crp.exitPool();
+        uint[] memory minAmountsOut;
+        for (uint i = 0; i < index; i++) {
+            minAmountsOut[i] = 0;
+        }
+        require(minAmountsOut.length <= 8, "Error: Balancer pool 8 tokens maximum.");
+        crp.exitPool(bpt, minAmountsOut);
         // aTokens balances after (peak -> zap)
         for (uint i = 0; i < index; i++) {
             balances[i] = IERC20(_interestTokens[i]).balanceOf(address(this)).sub(balances[i]);
@@ -118,8 +125,14 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         }
     }
 
+    function bptValue(uint /*dusdAmount*/) internal view returns (uint bpt) {
+        uint bptTotal = IERC20(address(bPool)).balanceOf(address(this));
+        uint poolValue = bPoolValue();
+        return bptTotal.div(poolValue);
+    }
+
     // Assuming crp have provided peak with allowance (NOT NEEDED)
-    function redirectInterest(address _from, address _to) internal onlyOwner {
+    function redirectInterest(address _from, address _to) public onlyOwner {
         address[index] memory _interestTokens = interestTokens;
         for (uint i = 0; i < index; i++) {
             aToken(_interestTokens[i]).redirectInterestStreamOf(_from, _to);
@@ -128,11 +141,11 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
 
     // USD valuation of stable index peak (aTokens interest + bPool deposits)
     function portfolioValue() external view returns (uint) {
-        return peakValue.add(bPoolValue);
+        return peakValue().add(bPoolValue());
     }
 
     // Internal Functions
-    function peakValue() internal returns (uint interest) {
+    function peakValue() public view returns (uint interest) {
         address[index] memory _interestTokens = interestTokens;
         for (uint i = 0; i < index; i++) {
             interest.add(weiToUSD(IERC20(_interestTokens[i]).balanceOf(address(this)).div(1e18)));
@@ -140,12 +153,34 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         return interest;
     }
 
-    function bPoolValue() internal returns (uint value) {
+    function bPoolValue() public view returns (uint value) {
         address[index] memory _interestTokens;
         for (uint i = 0; i < index; i++) {
             value.add(weiToUSD(IERC20(_interestTokens[i]).balanceOf(address(bPool)).div(1e18)));
         }
         return value;
+    }
+
+    function vars() public view returns (
+        address _crp,
+        address _bPool,
+        address _priceOracle,
+        address _oracle,
+        address _core,
+        address _dusd,
+        address[index] memory _reserveTokens,
+        address[index] memory _interestTokens
+    ) {
+        return(
+            address(crp),
+            address(bPool),
+            address(priceOracle),
+            address(oracle),
+            address(core),
+            address(dusd),
+            reserveTokens,
+            interestTokens
+        );
     }
 
 }

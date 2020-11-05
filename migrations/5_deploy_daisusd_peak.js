@@ -22,7 +22,7 @@ module.exports = async function(deployer, network, accounts) {
     const config = utils.getContractAddresses()
     const peak = {
         coins: ["DAI", "sUSD"], 
-        native: ["aDAI", "aSUSD"] // Possibly BPT?
+        native: ["aDAI", "aSUSD"] 
     }
 
     const coreProxy = await CoreProxy.deployed()
@@ -50,7 +50,18 @@ module.exports = async function(deployer, network, accounts) {
         peak: "stableIndexPeak"
     }
 
-    // Curve susd pool deployment ... (single token swap)
+    // Curve susd pool deployment (singleCoin swaps)
+    let curve = new web3.eth.Contract(susdCurveABI)
+    curve = await curve.deploy({
+        data: fs.readFileSync(`${process.cwd()}/vyper/curveSusd`).toString().slice(0, -1),
+        arguments: [
+            tokens,
+            tokens,
+            curveToken.address,
+            100,
+            4000000
+        ]
+    }).send({ from: accounts[0], gas: 10000000 })
 
     // Contract deployments ...
     await deployer.deploy(StableIndexPeak)
