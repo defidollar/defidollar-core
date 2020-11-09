@@ -19,10 +19,6 @@
  */
 
 const HDWalletProvider = require('@truffle/hdwallet-provider');
-// const infuraKey = "fj4jll3k.....";
-//
-// const fs = require('fs');
-// const mnemonic = fs.readFileSync(".secret").toString().trim();
 const mnemonic = process.env.MNEMONIC
 
 module.exports = {
@@ -67,6 +63,15 @@ module.exports = {
       network_id: 3,       // Ropsten's id
       gas: 9000000,        // Ropsten has a lower block limit than mainnet
       // confirmations: 2,    // # of confs to wait between deployments. (default: 0)
+      timeoutBlocks: 200,  // # of blocks before a deployment times out  (minimum/default: 50)
+      skipDryRun: true,     // Skip dry run before migrations? (default: false for public nets )
+      gasPrice: '10000000000'
+    },
+
+    kovan: {
+      provider: () => new HDWalletProvider(mnemonic, `https://kovan.infura.io/v3/${process.env.INFURA_KEY}`),
+      network_id: 42,       // Ropsten's id
+      gas: 6000000,        // Ropsten has a lower block limit than mainnet
       timeoutBlocks: 200,  // # of blocks before a deployment times out  (minimum/default: 50)
       skipDryRun: true,     // Skip dry run before migrations? (default: false for public nets )
       gasPrice: '10000000000'

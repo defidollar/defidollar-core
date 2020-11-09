@@ -1,6 +1,6 @@
 const assert = require('assert')
 const utils = require('../utils.js')
-const DefiDollarClient = require('@defidollar/core-client-lib')
+const { DefiDollarClient } = require('@defidollar/core-client-lib')
 
 const config = require('../../deployments/development.json')
 const toWei = web3.utils.toWei

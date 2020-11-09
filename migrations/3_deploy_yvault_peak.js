@@ -111,11 +111,12 @@ module.exports = async function(deployer, network, accounts) {
     peak.address = yVaultPeakProxy.address,
     config.contracts.peaks = config.contracts.peaks || {}
     config.contracts.peaks['yVaultPeak'] = peak
+    utils.writeContractAddresses(config)
 
     // todo fix
     if (process.env.INITIALIZE === 'true') {
         // seed initial liquidity
-        const charlie = accounts[3]
+        const charlie = accounts[0]
         const amounts = [100, 100, 100, 100]
         const decimals = [18,6,6,18]
         const tasks = []
@@ -126,9 +127,5 @@ module.exports = async function(deployer, network, accounts) {
         }
         await Promise.all(tasks)
         await curveDeposit.methods.add_liquidity(amounts, '400').send({ from: charlie, gas: 10000000 })
-
-        // delete sUSD token from config
-        delete config.contracts.tokens.sUSD
     }
-    utils.writeContractAddresses(config)
 }

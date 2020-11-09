@@ -2,10 +2,6 @@ const Core = artifacts.require("Core");
 const CoreProxy = artifacts.require("CoreProxy");
 const DUSD = artifacts.require("DUSD");
 const Reserve = artifacts.require("Reserve");
-const Oracle = artifacts.require("Oracle");
-const Aggregator = artifacts.require("MockAggregator");
-const StakeLPTokenProxy = artifacts.require("StakeLPTokenProxy");
-const StakeLPToken = artifacts.require("StakeLPToken");
 
 const CurveSusdPeak = artifacts.require("CurveSusdPeak");
 const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
@@ -27,41 +23,25 @@ async function getArtifacts() {
     const coreProxy = await CoreProxy.deployed()
     const core = await Core.at(coreProxy.address)
     const dusd = await DUSD.deployed()
-    const oracle = await Oracle.deployed()
     const reserves = []
 	const decimals = []
 	const scaleFactor = []
-	const aggregators = []
     for (let i = 0; i < n_coins; i++) {
         reserves.push(await Reserve.at((await core.systemCoins(i))))
 		decimals.push(await reserves[i].decimals())
 		scaleFactor.push(toBN(10 ** decimals[i]))
-		if (i < 4) {
-			aggregators.push(await Aggregator.at(await oracle.refs(i)))
-		}
     }
-	const stakeLPTokenProxy = await StakeLPTokenProxy.deployed()
     const res = {
 		core,
 		dusd,
 		reserves,
 		decimals,
 		scaleFactor,
-		aggregators,
-		ethAggregator: await Aggregator.at(await oracle.ethUsdAggregator()),
-		oracle,
-		stakeLPToken: await StakeLPToken.at(stakeLPTokenProxy.address),
-
-		curveSusdPeak: await CurveSusdPeak.at(CurveSusdPeakProxy.address),
-		curveToken: await MockSusdToken.deployed(),
 
 		yVaultPeak: await YVaultPeak.at(YVaultPeakProxy.address),
 		yVaultZap: await YVaultZap.deployed(),
 		yVault: await MockYvault.deployed()
 	}
-	const { _curveDeposit, _curve } = await res.curveSusdPeak.vars()
-	res.curveSusd = await ICurve.at(_curve)
-	res.curveDeposit = await ICurveDeposit.at(_curveDeposit)
 
 	const { _yCrv, _controller } = await res.yVaultPeak.vars()
 	res.yCrv = await MockSusdToken.at(_yCrv)

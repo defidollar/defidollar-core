@@ -66,9 +66,7 @@ contract Core is OwnableProxy, Initializable, ICore {
         notInitialized
     {
         require(
-            address(_dusd) != address(0) &&
-            address(_stakeLPToken) != address(0) &&
-            address(_oracle) != address(0),
+            address(_dusd) != address(0),
             "0 address during initialization"
         );
         dusd = _dusd;
