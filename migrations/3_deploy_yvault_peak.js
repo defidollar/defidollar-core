@@ -43,7 +43,7 @@ module.exports = async function(deployer, network, accounts) {
         name: "Curve.fi yDAI/yCrvC/yCrvT/yTUSD",
         peak: "yVaultPeak"
     }
-
+    
     let curve = new web3.eth.Contract(susdCurveABI)
     curve = await curve.deploy({
         data: fs.readFileSync(`${process.cwd()}/vyper/curveSusd`).toString().slice(0, -1),
