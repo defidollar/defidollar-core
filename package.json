@@ -4,6 +4,7 @@
   "description": "",
   "main": "index.js",
   "scripts": {
+    "setup:balancer": "cd configurable-rights-pool && truffle compile && truffle migrate --reset && cd ..",
     "compile": "truffle compile",
     "migrate": "truffle migrate --reset",
     "ganache": "ganache-cli -i 420 -l 10000000 -m 'mosquito lizard cloth enhance armed month twice machine decline post toy float'",

@@ -1,12 +1,27 @@
 # DefiDollar
-DefiDollar (DUSD) is a stablecoin backed by [Curve Finance](https://www.curve.fi/) LP tokens.
+DefiDollar ($DUSD) DefiDollar $DUSD is a stablecoin that uses DeFi primitives to stay near the $1 mark.
 
-See [blog post](https://medium.com/@atvanguard/a-curvy-defidollar-c249438c154a).
-
+---
 ### Development
+
+1. Run Ganache
+
+```
+npm run ganache
+```
+
+2. Setup Balancer Deps
+```
+npm run setup:balancer
+```
+
+3. Compile and Migrate
 ```
 npm run compile
-npm run ganache
 npm run migrate
+```
+
+4. Run Tests
+```
 npm t
 ```

@@ -43,7 +43,7 @@ module.exports = async function(deployer, network, accounts) {
         name: "Curve.fi yDAI/yCrvC/yCrvT/yTUSD",
         peak: "yVaultPeak"
     }
-    
+
     let curve = new web3.eth.Contract(susdCurveABI)
     curve = await curve.deploy({
         data: fs.readFileSync(`${process.cwd()}/vyper/curveSusd`).toString().slice(0, -1),
@@ -91,7 +91,7 @@ module.exports = async function(deployer, network, accounts) {
     await Promise.all([
         controller.addPeak(yVaultPeak.address),
         controller.addVault(yCrv.address, yVault.address),
-        core.whitelistPeak(yVaultPeakProxy.address, [0, 1, 2, 4], toWei('1234567'), true),
+        core.whitelistPeak(yVaultPeakProxy.address, [0, 1, 2, 4], toWei('1234567'), false),
         yVaultZap.setDeps(
             curveDeposit.options.address,
             curve.options.address,
@@ -113,7 +113,6 @@ module.exports = async function(deployer, network, accounts) {
     config.contracts.peaks['yVaultPeak'] = peak
     utils.writeContractAddresses(config)
 
-    // todo fix
     if (process.env.INITIALIZE === 'true') {
         // seed initial liquidity
         const charlie = accounts[0]

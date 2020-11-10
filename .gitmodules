@@ -1,0 +1,4 @@
+[submodule "configurable-rights-pool"]
+	path = configurable-rights-pool
+	url = git@github.com:defidollar/configurable-rights-pool.git
+	branch = develop
