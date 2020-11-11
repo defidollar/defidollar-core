@@ -8,7 +8,7 @@ import {IPeak} from "../../interfaces/IPeak.sol";
 import {ICore} from "../../interfaces/ICore.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 import {ICurve} from "../../interfaces/ICurve.sol";
-import {aToken, LendingPoolAddressesProvider, PriceOracleGetter} from "../../interfaces/IAave.sol";
+import {aToken, LendingPoolAddressesProvider, LendingPool, PriceOracleGetter} from "../../interfaces/IAave.sol";
 import {IConfigurableRightsPool, IBPool} from "../../interfaces/IConfigurableRightsPool.sol";
 
 import {Initializable} from "../../common/Initializable.sol";
@@ -56,6 +56,9 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         bPool = _bPool;
         // Aave Price Oracle
         priceOracle = PriceOracleGetter(provider.getPriceOracle());
+        // Lending Pool
+        provider = LendingPoolAddressesProvider(address(0x24a42fD28C976A61Df5D00D0599C34c4f90748c8)); // mainnet address, for other addresses: https://docs.aave.com/developers/developing-on-aave/deployed-contract-instances
+        lendingPool = LendingPool(provider.getLendingPool());
     }
 
     // Returns average ETHUSD value from chainlink feeds
@@ -84,6 +87,24 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     // Return price of a reserve asset (wei)
     function getPrice(address token) public view returns (uint price) {
         return priceOracle.getAssetPrice(token);
+    }
+
+    function mint(uint[] calldata inAmounts) external {
+        // reserve (zap -> peak) => aTokens
+        address[index] memory _reserveTokens = reserveTokens;
+        for(uint i = 0; i < index; i++) {
+            IERC20(_reserveTokens[i]).safeTransfer(msg.sender, address(this), inAmounts[i]);
+            IERC20(_reserveTokens[i]).safeApprove(provider.getLendingPoolCore(), inAmounts[i]); 
+            lendingPool.deposit(_reserveTokens[i], inAmounts[i], refferal);
+        }
+        // Mint DUSD
+        uint256[] memory prices = getPrices();
+        uint value;
+        for(uint i = 0; i < index; i++) {
+            value.add(inAmounts[i].div(1e18).mul(weiToUSD(prices[i].div(1e18))));
+        }
+        dusdAmount = core.mint(value, msg.sender);
+        require(dusdAmount >= minDusdAmount, "Error: Insufficient DUSD");
     }
 
     function mint(uint[] calldata inAmounts) external {

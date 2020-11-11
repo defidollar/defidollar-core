@@ -57,21 +57,30 @@ module.exports = async function(deployer, network, accounts) {
     // bPool deployment
     await crp.methods.createPool(toWei('100') /* initial supply */).send({ from: accounts[0], gas: 6000000 })
 
+    console.log(crp)
+    
+    // const bPoolAddress = await crp.methods.bPool()
+    const bPoolArtifact = JSON.parse(fs.readFileSync('./configurable-rights-pool/build/contracts/BPool.json').toString())
+    const bPool = new web3.eth.Contract(bPoolArtifact.abi, bPoolArtifact.networks['420'].address)
+
+
+    // Deploy Stable Index Peak
     const stableIndexPeakProxy = await deployer.deploy(StableIndexPeakProxy)
     await deployer.deploy(StableIndexPeak)
     const stableIndexPeak = await StableIndexPeak.at(stableIndexPeakProxy.address)
 
+    
     // To-do @Brad
-    await stableIndexPeakProxy.updateAndCall(
-        StableIndexPeak.address,
-        stableIndexPeak.contract.methods.initialize(
-            crp.options.address,
+    //await stableIndexPeakProxy.updateAndCall(
+        //StableIndexPeak.address,
+        //stableIndexPeak.contract.methods.initialize(
+            //crp.options.address,
             // crp bPool address
-        ).encodeABI()
-    )
-    console.log(crp)
-    const bPool = await crp.methods.bPool.call()
-    console.log(bPool.options.address)
+        //).encodeABI()
+    //)
+    //console.log(crp)
+    //const bPool = await crp.methods.bPool.call()
+    //console.log(bPool.options.address)
     
 
     //await stableIndexPeakProxy.updateAndCall(
@@ -81,6 +90,10 @@ module.exports = async function(deployer, network, accounts) {
             //bPool.options.address
         //).encodeABI()
     //)
+
+    // Deploy Stable Index Zap
+    //const stableIndexZap = await deployer.deploy(StableIndexZap, stableIndexPeak.address, /*curve susd pool */,crp.options.address)
+
 
     await core.whitelistPeak(stableIndexPeakProxy.address, [0, 3] /* Dai, sUSD */, toWei('1000'), false)
 

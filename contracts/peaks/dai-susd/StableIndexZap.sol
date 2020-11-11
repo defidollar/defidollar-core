@@ -4,7 +4,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20, SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import {ICore} from "../../interfaces/ICore.sol";
-import {aToken, LendingPool, LendingPoolAddressesProvider} from "../../interfaces/IAave.sol";
+import {aToken} from "../../interfaces/IAave.sol";
 import {ICurve} from "../../interfaces/ICurve.sol";
 import {IConfigurableRightsPool} from "../../interfaces/IConfigurableRightsPool.sol";
 
@@ -43,39 +43,26 @@ contract StableIndexZap {
 
     constructor(
         StableIndexPeak _stableIndexPeak,
-        ICurve _curve,
-        IConfigurableRightsPool _crp
+        IConfigurableRightsPool _crp,
+        ICurve _curve
     ) public {
         // Stable Index Peak
         stableIndexPeak = _stableIndexPeak;
-        // Curve swap
-        curve = _curve;
-        // Lending Pool
-        provider = LendingPoolAddressesProvider(address(0x24a42fD28C976A61Df5D00D0599C34c4f90748c8)); // mainnet address, for other addresses: https://docs.aave.com/developers/developing-on-aave/deployed-contract-instances
-        lendingPool = LendingPool(provider.getLendingPool());
         // Configurable Rights Pool
         crp = _crp;
+        // Curve susd pool swap
+        curve = _curve;
     }
 
     function mint(uint[] calldata inAmounts, uint minDusdAmount) external returns (uint dusdAmount) {
-        // reserve => aTokens swap
+        // reserve => Zap
         address[index] memory _reserveTokens = reserveTokens;
         for (uint i = 0; i < index; i++) {
             if (inAmounts[i] > 0) {
                 IERC20(_reserveTokens[i]).safeTransferFrom(msg.sender, address(this), inAmounts[i]);
-                IERC20(_reserveTokens[i]).safeApprove(provider.getLendingPoolCore(), inAmounts[i]); 
-                lendingPool.deposit(_reserveTokens[i], inAmounts[i], refferal);
             }
         }
-        // mint DUSD
-        uint256[] memory prices = stableIndexPeak.getPrices();
-        uint value;
-        for(uint i = 0; i < index; i++) {
-            value.add(inAmounts[i].div(1e18).mul(stableIndexPeak.weiToUSD(prices[i].div(1e18))));
-        }
-        dusdAmount = core.mint(value, msg.sender);
-        require(dusdAmount >= minDusdAmount, "Error: Insufficient DUSD");
-        // Migrate liquidity
+        // Migrate liquidity + Mint DUSD
         stableIndexPeak.mint(inAmounts);
         // Transfer DUSD
         dusd.safeTransfer(msg.sender, dusdAmount);
