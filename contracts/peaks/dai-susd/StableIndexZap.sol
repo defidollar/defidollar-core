@@ -49,7 +49,7 @@ contract StableIndexZap {
         curve = _curve;
     }
 
-    function mint(uint[] calldata inAmounts, uint minDusdAmount) external {
+    function mint(uint[] calldata inAmounts, uint minDusdAmount) external returns (uint dusdAmount) {
         // reserve => Zap
         address[index] memory _reserveTokens = reserveTokens;
         for (uint i = 0; i < index; i++) {
@@ -58,7 +58,9 @@ contract StableIndexZap {
             }
         }
         // Migrate liquidity + Mint DUSD
-        stableIndexPeak.mint(inAmounts, minDusdAmount);
+        dusdAmount = stableIndexPeak.mint(inAmounts);
+        require(dusdAmount >= minDusdAmount, "Error: Insufficient DUSD");
+        return dusdAmount;
     }
 
     function redeem(uint dusdAmount, uint[] calldata minAmounts) external {
@@ -124,7 +126,7 @@ contract StableIndexZap {
         dusdAmount = core.mint(value, msg.sender);
         require(dusdAmount >= minDusdAmount, "Error: Insufficient DUSD");
         // Migrate liquidity
-        stableIndexPeak.mint(inAmounts);
+        // stableIndexPeak.mint(inAmounts);
         // Transfer DUSD
         dusd.safeTransfer(msg.sender, dusdAmount);
         return dusdAmount;

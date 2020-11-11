@@ -63,7 +63,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         lendingPool = LendingPool(provider.getLendingPool());
     }
 
-    function mint(uint[] calldata inAmounts, uint minDusdAmount) external returns (uint dusdAmount) {
+    function mint(uint[] calldata inAmounts) external returns (uint dusdAmount){
         // reserve (zap -> peak) => aTokens
         address[index] memory _reserveTokens = reserveTokens;
         for(uint i = 0; i < index; i++) {
@@ -78,19 +78,12 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
             value.add(inAmounts[i].div(1e18).mul(weiToUSD(prices[i].div(1e18))));
         }
         dusdAmount = core.mint(value, msg.sender);
-        require(dusdAmount >= minDusdAmount, "Error: Insufficient DUSD");
-        return dusdAmount;
-    }
-
-    function mint(uint[] calldata inAmounts) external {
-        // aTokens (zap -> peak)
+        // Migrate liquidity to BPool via CRP
         address[index] memory _interestTokens = interestTokens;
-        for(uint i = 0; i < index; i++) {
-            aToken(_interestTokens[i]).transferFrom(msg.sender, address(this), inAmounts[i]);
+        for (uint i = 0; i < index; i++) {
             IERC20(_interestTokens[i]).safeApprove(address(crp), inAmounts[i]);
         }
-        // Migrate liquidity to BPool via CRP
-        crp.joinPool(0, inAmounts); // Check BPT
+        crp.joinPool(0, inAmounts);
     }
 
     function redeem(uint dusdAmount) external {
