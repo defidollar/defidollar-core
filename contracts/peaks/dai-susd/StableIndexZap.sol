@@ -93,12 +93,14 @@ contract StableIndexZap {
         return dusdAmount;
     }
 
-    function redeemInSingleCoin(uint dusdAmount, uint minAmount, uint j) external {
+    function redeemInSingleCoin(uint dusdAmount, uint minAmount, uint j) external returns (uint amount){
         // Transfer DUSD
         dusd.safeTransferFrom(msg.sender, address(this), dusdAmount);
         // aTokens (BPool -> Peak -> Zap)
         IERC20 token = IERC20(reserveTokens[j]);
-        stableIndexPeak.redeemSingleSwap(token, dusdAmount, minAmount);
+        amount = stableIndexPeak.redeemSingleSwap(token, dusdAmount, minAmount);
+        // Transfer reserve asset to user
+        token.safeTransfer(msg.sender, amount);
         // Burn DUSD
         core.redeem(dusdAmount, msg.sender);
     }

@@ -54,9 +54,12 @@ module.exports = async function(deployer, network, accounts) {
         aSUSD.mint(admin, params.tokenBalances[1]),
         aSUSD.approve(crp.options.address, params.tokenBalances[1])
     ])
+
     // bPool deployment
     await crp.methods.createPool(toWei('100') /* initial supply */).send({ from: accounts[0], gas: 6000000 })
-    const bPool = await crp.methods.bPool().call({ from: accounts[0]})
+    const bPoolAddress = await crp.methods.bPool().call({ from: accounts[0]})
+    const bPoolArtifact = JSON.parse(fs.readFileSync('./configurable-rights-pool/build/contracts/BPool.json').toString())
+    const bPool = new web3.eth.Contract(bPoolArtifact.abi, bPoolAddress)
 
     // Deploy Stable Index Peak
     const stableIndexPeakProxy = await deployer.deploy(StableIndexPeakProxy)
@@ -64,23 +67,23 @@ module.exports = async function(deployer, network, accounts) {
     const stableIndexPeak = await StableIndexPeak.at(stableIndexPeakProxy.address)
 
     // Deploy Curve susd pool
+    //console.log(crp.options.address)
+    //console.log(bPool)
+    //console.log(bPoolAddress)
+    //console.log(bPool.options.address)
 
-
-    
-    // To-do @Brad
+    // To-do @Brad // Tx revert problem
     await stableIndexPeakProxy.updateAndCall(
         StableIndexPeak.address,
         stableIndexPeak.contract.methods.initialize(
             crp.options.address,
-            bPool,
-            /*curve susd address */
+            bPool.options.address  
         ).encodeABI()
     )
     
 
     // Deploy Stable Index Zap
-    const stableIndexZap = await deployer.deploy(StableIndexZap, stableIndexPeak.address, crp.options.address)
-
+    //const stableIndexZap = await deployer.deploy(StableIndexZap, stableIndexPeak.address, crp.options.address)
 
     await core.whitelistPeak(stableIndexPeakProxy.address, [0, 3] /* Dai, sUSD */, toWei('1000'), false)
 
@@ -88,25 +91,25 @@ module.exports = async function(deployer, network, accounts) {
     // const stableIndexPeak = await StableIndexPeak.at(stableIndexPeakProxy.address)
 
     // Write config to file - For later
-    const config = utils.getContractAddresses()
-    const peak = 'StableIndexPeak'
-    config.contracts.peaks[peak] = {
-        coins: ["DAI", "sUSD"],
-        native: ["aDAI", "aSUSD"],
-        address: stableIndexPeakProxy.address
-    }
-    config.contracts.tokens['aDai'] = {
-        address: aDAI.address,
-        decimals: 18,
-        name: "Aave Dai",
-        peak
-    }
-    config.contracts.tokens['aSUSD'] = {
-        address: aSUSD.address,
-        decimals: 18,
-        name: "Aave aSUSD",
-        peak
-    }
-    utils.writeContractAddresses(config)
+    //const config = utils.getContractAddresses()
+    //peak = 'StableIndexPeak'
+    //config.contracts.peaks[peak] = {
+        //coins: ["DAI", "sUSD"],
+        //native: ["aDAI", "aSUSD"],
+        //address: stableIndexPeakProxy.address
+    //}
+    //config.contracts.tokens['aDai'] = {
+        //address: aDAI.address,
+        //decimals: 18,
+        //name: "Aave Dai",
+        //peak
+    //}
+    //config.contracts.tokens['aSUSD'] = {
+        //address: aSUSD.address,
+        //decimals: 18,
+        //name: "Aave aSUSD",
+        //peak
+    //}
+    //utils.writeContractAddresses(config)
 }
 

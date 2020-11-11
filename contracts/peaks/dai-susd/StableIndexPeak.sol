@@ -38,7 +38,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     IBPool bPool;
 
     // Curve susd pool
-    ICurve curve;
+    ICurve curve = ICurve(0xA5407eAE9Ba41422680e2e00537571bcC53efBfD);
 
     // Aave Oracle & Lending Pool
     LendingPoolAddressesProvider provider;
@@ -55,8 +55,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
 
     function initialize(
         IConfigurableRightsPool _crp,
-        IBPool _bPool,
-        ICurve _curve
+        IBPool _bPool
     ) public notInitialized {
         // CRP & BPool
         crp = _crp;
@@ -67,7 +66,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         provider = LendingPoolAddressesProvider(address(0x24a42fD28C976A61Df5D00D0599C34c4f90748c8)); // mainnet address, for other addresses: https://docs.aave.com/developers/developing-on-aave/deployed-contract-instances
         lendingPool = LendingPool(provider.getLendingPool());
         // Curve susd pool swap
-        curve = _curve;
+        // curve = _curve;
     }
 
     function mint(uint[] calldata inAmounts) external returns (uint dusdAmount){
@@ -159,13 +158,12 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
 
     function redeemSingleSwap(IERC20 token, uint dusdAmount, uint minAmount) external returns (uint) {
         // Migrate liquidity (bPool -> Peak)
-        uint redeemAmount = dusdAmount.div(bptValue());
-
+        migrateOutBPool(dusdAmount);
         // Redeem aTokens
         address[index] memory _interestTokens = interestTokens;
         for (uint i = 0; i < index; i++) {
-            uint swapAmount = IERC20(_interestTokens[i]).balanceOf(address(this));
-            aToken(_interestTokens[i]).redeem(swapAmount);
+            uint redeemAmount = IERC20(_interestTokens[i]).balanceOf(address(this));
+            aToken(_interestTokens[i]).redeem(redeemAmount);
         }
         // Curve swap
         address[index] memory _reserveTokens = reserveTokens;
@@ -199,10 +197,10 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     }
 
     function migrateOutBPool(uint dusdAmount) internal {
-        uint dusd = core.dusdToUsd(dusdAmount, true);
+        uint usd = core.dusdToUsd(dusdAmount, true);
         // Calculate amount of BPT's
-        uint bpt = dusd.div(bptValue());
-        // Remove liquidity
+        uint bpt = usd.div(bptValue());
+        // Remove liquidity (gas inefficient?)
         uint[] memory minAmountsOut;
         for (uint i = 0; i < index; i++) {
             minAmountsOut[i] = 0;
@@ -211,7 +209,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     }
 
     // Balancer pool Token Functions
-    function bptAmount(uint[] memory inAmounts) internal returns (uint bpt) {
+    function bptAmount(uint[] memory inAmounts) internal view returns (uint bpt) {
         // Total BPool Liquidity
         address[index] memory _interestTokens = interestTokens;
         uint aDAI = IERC20(_interestTokens[0]).balanceOf(address(bPool));
