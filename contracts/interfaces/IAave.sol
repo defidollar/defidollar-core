@@ -17,10 +17,12 @@ interface LendingPool {
 interface LendingPoolAddressesProvider {
     function getLendingPool() external view returns (address);
     function getLendingPoolCore() external view returns (address payable);
+    function getPriceOracle() external view returns (address);
 }
 
 interface PriceOracleGetter {
     function getAssetPrice(address _asset) external view returns (uint256);
-    function getAssetPrices(address[] calldata _assets) external view returns (uint256[] memory);
-    function getFallbackOracle() external view returns (address);
+    function getAssetsPrices(address[] calldata _assets) external view returns(uint256[] memory);
+    function getSourceOfAsset(address _asset) external view returns(address);
+    function getFallbackOracle() external view returns(address);
 }

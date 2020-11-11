@@ -5,6 +5,7 @@ const Core = artifacts.require("Core")
 const CoreProxy = artifacts.require("CoreProxy")
 const StableIndexPeak = artifacts.require("StableIndexPeak")
 const StableIndexPeakProxy = artifacts.require("StableIndexPeakProxy")
+const StableIndexZap = artifacts.require("StableIndexZap")
 const MockAToken = artifacts.require("MockAToken")
 
 const utils = require('./utils')
@@ -31,17 +32,18 @@ module.exports = async function(deployer, network, accounts) {
         tokenWeights: [toWei('15'), toWei('10')],
         swapFee: toWei('0.0004') // 0.04%
     }
+    const permissions = {
+        canPauseSwapping: true,
+        canChangeSwapFee: true,
+        canChangeWeights: true,
+        canAddRemoveTokens: true,
+        canWhitelistLPs: false,
+        canChangeCap: true
+    }
     const newCrp = await crpFactory.methods.newCrp(
         JSON.parse(fs.readFileSync('./configurable-rights-pool/build/contracts/BFactory.json').toString()).networks['420'].address,
         params,
-        {
-            canPauseSwapping: true,
-            canChangeSwapFee: true,
-            canChangeWeights: true,
-            canAddRemoveTokens: true,
-            canWhitelistLPs: false,
-            canChangeCap: true
-        }
+        permissions
     ).send({ from: accounts[0], gas: 6000000 })
 
     const crpArtifact = JSON.parse(fs.readFileSync('./configurable-rights-pool/build/contracts/ConfigurableRightsPool.json').toString())
@@ -52,6 +54,7 @@ module.exports = async function(deployer, network, accounts) {
         aSUSD.mint(admin, params.tokenBalances[1]),
         aSUSD.approve(crp.options.address, params.tokenBalances[1])
     ])
+    // bPool deployment
     await crp.methods.createPool(toWei('100') /* initial supply */).send({ from: accounts[0], gas: 6000000 })
 
     const stableIndexPeakProxy = await deployer.deploy(StableIndexPeakProxy)
@@ -59,13 +62,25 @@ module.exports = async function(deployer, network, accounts) {
     const stableIndexPeak = await StableIndexPeak.at(stableIndexPeakProxy.address)
 
     // To-do @Brad
-    // await stableIndexPeakProxy.updateAndCall(
-    //     StableIndexPeak.address,
-    //     stableIndexPeak.contract.methods.initialize(
-    //         crp.options.address,
+    await stableIndexPeakProxy.updateAndCall(
+        StableIndexPeak.address,
+        stableIndexPeak.contract.methods.initialize(
+            crp.options.address,
+            // crp bPool address
+        ).encodeABI()
+    )
+    console.log(crp)
+    const bPool = await crp.methods.bPool.call()
+    console.log(bPool.options.address)
+    
 
-    //     ).encodeABI()
-    // )
+    //await stableIndexPeakProxy.updateAndCall(
+        //StableIndexPeak.address,
+        //stableIndexPeak.contract.methods.initialize(
+            //crp.options.address,
+            //bPool.options.address
+        //).encodeABI()
+    //)
 
     await core.whitelistPeak(stableIndexPeakProxy.address, [0, 3] /* Dai, sUSD */, toWei('1000'), false)
 
@@ -94,3 +109,4 @@ module.exports = async function(deployer, network, accounts) {
     // }
     // utils.writeContractAddresses(config)
 }
+

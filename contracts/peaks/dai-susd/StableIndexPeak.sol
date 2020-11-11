@@ -8,7 +8,7 @@ import {IPeak} from "../../interfaces/IPeak.sol";
 import {ICore} from "../../interfaces/ICore.sol";
 import {IOracle} from "../../interfaces/IOracle.sol";
 import {ICurve} from "../../interfaces/ICurve.sol";
-import {aToken, PriceOracleGetter} from "../../interfaces/IAave.sol";
+import {aToken, LendingPoolAddressesProvider, PriceOracleGetter} from "../../interfaces/IAave.sol";
 import {IConfigurableRightsPool, IBPool} from "../../interfaces/IConfigurableRightsPool.sol";
 
 import {Initializable} from "../../common/Initializable.sol";
@@ -36,30 +36,26 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     IConfigurableRightsPool crp;
     IBPool bPool;
 
-    // Aave Oracle
+    // Aave Oracle & provider
+    LendingPoolAddressesProvider provider = LendingPoolAddressesProvider(address(0x24a42fD28C976A61Df5D00D0599C34c4f90748c8)); 
     PriceOracleGetter priceOracle;
-    IOracle public oracle;
+    
+    // Chainlink Oracle
+    IOracle oracle = IOracle(0x4EaC4c4e9050464067D673102F8E24b2FccEB350);
 
     // Core contract
-    ICore core; 
-    IERC20 dusd; 
+    ICore core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3); 
+    IERC20 dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831); 
 
     function initialize(
         IConfigurableRightsPool _crp,
-        IBPool _bPool,
-        PriceOracleGetter _priceOracle,
-        IOracle _oracle
+        IBPool _bPool
     ) public notInitialized {
         // CRP & BPool
         crp = _crp;
         bPool = _bPool;
         // Aave Price Oracle
-        priceOracle = _priceOracle;
-        oracle = _oracle;
-        // Curve swap
-        // Tokens
-        core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
-        dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
+        priceOracle = PriceOracleGetter(provider.getPriceOracle());
     }
 
     // Returns average ETHUSD value from chainlink feeds
