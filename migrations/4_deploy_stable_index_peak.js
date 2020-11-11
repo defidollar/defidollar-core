@@ -56,43 +56,30 @@ module.exports = async function(deployer, network, accounts) {
     ])
     // bPool deployment
     await crp.methods.createPool(toWei('100') /* initial supply */).send({ from: accounts[0], gas: 6000000 })
-
-    console.log(crp)
-    
-    // const bPoolAddress = await crp.methods.bPool()
-    const bPoolArtifact = JSON.parse(fs.readFileSync('./configurable-rights-pool/build/contracts/BPool.json').toString())
-    const bPool = new web3.eth.Contract(bPoolArtifact.abi, bPoolArtifact.networks['420'].address)
-
+    const bPool = await crp.methods.bPool().call({ from: accounts[0]})
 
     // Deploy Stable Index Peak
     const stableIndexPeakProxy = await deployer.deploy(StableIndexPeakProxy)
     await deployer.deploy(StableIndexPeak)
     const stableIndexPeak = await StableIndexPeak.at(stableIndexPeakProxy.address)
 
+    // Deploy Curve susd pool
+
+
     
     // To-do @Brad
-    //await stableIndexPeakProxy.updateAndCall(
-        //StableIndexPeak.address,
-        //stableIndexPeak.contract.methods.initialize(
-            //crp.options.address,
-            // crp bPool address
-        //).encodeABI()
-    //)
-    //console.log(crp)
-    //const bPool = await crp.methods.bPool.call()
-    //console.log(bPool.options.address)
+    await stableIndexPeakProxy.updateAndCall(
+        StableIndexPeak.address,
+        stableIndexPeak.contract.methods.initialize(
+            crp.options.address,
+            bPool,
+            /*curve susd address */
+        ).encodeABI()
+    )
     
 
-    //await stableIndexPeakProxy.updateAndCall(
-        //StableIndexPeak.address,
-        //stableIndexPeak.contract.methods.initialize(
-            //crp.options.address,
-            //bPool.options.address
-        //).encodeABI()
-    //)
-
     // Deploy Stable Index Zap
-    //const stableIndexZap = await deployer.deploy(StableIndexZap, stableIndexPeak.address, /*curve susd pool */,crp.options.address)
+    const stableIndexZap = await deployer.deploy(StableIndexZap, stableIndexPeak.address, crp.options.address)
 
 
     await core.whitelistPeak(stableIndexPeakProxy.address, [0, 3] /* Dai, sUSD */, toWei('1000'), false)
@@ -101,25 +88,25 @@ module.exports = async function(deployer, network, accounts) {
     // const stableIndexPeak = await StableIndexPeak.at(stableIndexPeakProxy.address)
 
     // Write config to file - For later
-    // const config = utils.getContractAddresses()
-    // const peak = 'StableIndexPeak'
-    // config.contracts.peaks[peak] = {
-    //     coins: ["DAI", "sUSD"],
-    //     native: ["aDAI", "aSUSD"],
-    //     address: stableIndexPeakProxy.address
-    // }
-    // config.contracts.tokens['aDai'] = {
-    //     address: aDAI.address,
-    //     decimals: 18,
-    //     name: "Aave Dai",
-    //     peak
-    // }
-    // config.contracts.tokens['aSUSD'] = {
-    //     address: aSUSD.address,
-    //     decimals: 18,
-    //     name: "Aave aSUSD",
-    //     peak
-    // }
-    // utils.writeContractAddresses(config)
+    const config = utils.getContractAddresses()
+    const peak = 'StableIndexPeak'
+    config.contracts.peaks[peak] = {
+        coins: ["DAI", "sUSD"],
+        native: ["aDAI", "aSUSD"],
+        address: stableIndexPeakProxy.address
+    }
+    config.contracts.tokens['aDai'] = {
+        address: aDAI.address,
+        decimals: 18,
+        name: "Aave Dai",
+        peak
+    }
+    config.contracts.tokens['aSUSD'] = {
+        address: aSUSD.address,
+        decimals: 18,
+        name: "Aave aSUSD",
+        peak
+    }
+    utils.writeContractAddresses(config)
 }
 

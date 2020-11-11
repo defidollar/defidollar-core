@@ -21,6 +21,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
 
     // stablecoins and aTokens
     uint constant public index = 2; // No. of stablecoins in peak
+    string constant ERR_SLIPPAGE = "ERR_SLIPPAGE";
 
     address[index] public reserveTokens = [
         0x6B175474E89094C44Da98b954EedeAC495271d0F, // DAI
@@ -85,7 +86,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         }
         dusdAmount = core.mint(value, msg.sender);
         // Migrate liquidity to BPool via CRP
-        migrateBPool(inAmounts);
+        migrateInBPool(inAmounts);
     }
 
     function redeem(uint dusdAmount) external {
@@ -93,7 +94,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         uint[] memory balances;
         // DUSD value (How many BPT tokens to redeem)
         uint usd = core.dusdToUsd(dusdAmount, true);
-        uint bpt = bptValue(dusdAmount).div(usd);
+        uint bpt = bptValue().div(usd);
         // aToken balances before
         for (uint i = 0; i < index; i++) {
             balances[i] = IERC20(_interestTokens[i]).balanceOf(address(this));
@@ -153,24 +154,87 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         }
         dusdAmount = core.mint(value, msg.sender);
         // Migrate liquidity
-        migrateBPool(inAmounts);
+        migrateInBPool(inAmounts);
     }
 
-    function bptValue(uint /*dusdAmount*/) internal view returns (uint bpt) {
-        uint bptTotal = IERC20(address(bPool)).balanceOf(address(this));
-        uint poolValue = bPoolValue();
-        return bptTotal.div(poolValue);
+    function redeemSingleSwap(IERC20 token, uint dusdAmount, uint minAmount) external returns (uint) {
+        // Migrate liquidity (bPool -> Peak)
+        uint redeemAmount = dusdAmount.div(bptValue());
+
+        // Redeem aTokens
+        address[index] memory _interestTokens = interestTokens;
+        for (uint i = 0; i < index; i++) {
+            uint swapAmount = IERC20(_interestTokens[i]).balanceOf(address(this));
+            aToken(_interestTokens[i]).redeem(swapAmount);
+        }
+        // Curve swap
+        address[index] memory _reserveTokens = reserveTokens;
+        if (address(token) == _reserveTokens[0]) {
+            uint amount = token.balanceOf(address(this));
+            curve.exchange_underlying(int128(0), int128(3), amount, 0); 
+            uint susd = IERC20(_reserveTokens[1]).balanceOf(address(this));
+            require(susd >= minAmount, ERR_SLIPPAGE);
+            IERC20(_reserveTokens[1]).safeTransfer(msg.sender, susd);
+            return susd;
+        }
+        else if (address(token) == _reserveTokens[1]) {
+            uint amount = token.balanceOf(address(this));
+            curve.exchange_underlying(int128(3), int128(0), amount, 0); 
+            uint dai = IERC20(_reserveTokens[0]).balanceOf(address(this));
+            require(dai >= minAmount, ERR_SLIPPAGE);
+            IERC20(_reserveTokens[0]).safeTransfer(msg.sender, dai);
+            return dai;
+        }
     }
 
-    function migrateBPool(uint[] memory inAmounts) internal {
+    // Migrate Liquidity Functions
+    function migrateInBPool(uint[] memory inAmounts) internal {
         address[index] memory _interestTokens = interestTokens;
         for (uint i = 0; i < index; i++) {
             IERC20(_interestTokens[i]).safeApprove(address(crp), inAmounts[i]);
         }
-        crp.joinPool(0, inAmounts);
+        // Calculate BPT's
+        uint bpt = bptAmount(inAmounts);
+        crp.joinPool(bpt, inAmounts);
     }
 
-    // Assuming crp have provided peak with allowance (NOT NEEDED)
+    function migrateOutBPool(uint dusdAmount) internal {
+        uint dusd = core.dusdToUsd(dusdAmount, true);
+        // Calculate amount of BPT's
+        uint bpt = dusd.div(bptValue());
+        // Remove liquidity
+        uint[] memory minAmountsOut;
+        for (uint i = 0; i < index; i++) {
+            minAmountsOut[i] = 0;
+        }
+        crp.exitPool(bpt, minAmountsOut);
+    }
+
+    // Balancer pool Token Functions
+    function bptAmount(uint[] memory inAmounts) internal returns (uint bpt) {
+        // Total BPool Liquidity
+        address[index] memory _interestTokens = interestTokens;
+        uint aDAI = IERC20(_interestTokens[0]).balanceOf(address(bPool));
+        uint aSUSD = IERC20(_interestTokens[1]).balanceOf(address(bPool));
+        uint totalLiquidity = aDAI.add(aSUSD); // wei
+        // Input Liquidity
+        uint inputLiquidity;
+        for (uint i = 0; i < inAmounts.length; i++) {
+            inputLiquidity.add(inAmounts[i]);
+        }
+        // Calculate BPT's
+        uint totalBPT = IERC20(address(crp)).balanceOf(address(this));
+        bpt = totalBPT.mul(inputLiquidity.div(totalLiquidity));
+        return bpt;
+    }
+
+    function bptValue() internal view returns (uint bpt) {
+        uint bptTotal = IERC20(address(crp)).balanceOf(address(this));
+        uint poolValue = bPoolValue();
+        return bptTotal.div(poolValue);
+    }
+
+    // Chainlink Functions
     function redirectInterest(address _from, address _to) public onlyOwner {
         address[index] memory _interestTokens = interestTokens;
         for (uint i = 0; i < index; i++) {
@@ -206,7 +270,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         return priceOracle.getAssetPrice(token);
     }
 
-    // USD valuation of stable index peak (aTokens interest + bPool deposits)
+    // Peak value functions
     function portfolioValue() external view returns (uint) {
         return peakValue().add(bPoolValue());
     }

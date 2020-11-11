@@ -5,7 +5,6 @@ import {SafeERC20, SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20
 
 import {ICore} from "../../interfaces/ICore.sol";
 import {aToken} from "../../interfaces/IAave.sol";
-import {ICurve} from "../../interfaces/ICurve.sol";
 import {IConfigurableRightsPool} from "../../interfaces/IConfigurableRightsPool.sol";
 
 import {StableIndexPeak} from './StableIndexPeak.sol';
@@ -28,9 +27,11 @@ contract StableIndexZap {
         0x625aE63000f46200499120B906716420bd059240  // aSUSD
     ];
 
+    // Core addresses
     ICore core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
     IERC20 dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
-    ICurve curve;
+
+    // Configurable Rights Pool
     IConfigurableRightsPool crp;
 
     // Stable Index Peak
@@ -38,15 +39,12 @@ contract StableIndexZap {
 
     constructor(
         StableIndexPeak _stableIndexPeak,
-        IConfigurableRightsPool _crp,
-        ICurve _curve
+        IConfigurableRightsPool _crp
     ) public {
         // Stable Index Peak
         stableIndexPeak = _stableIndexPeak;
         // Configurable Rights Pool
         crp = _crp;
-        // Curve susd pool swap
-        curve = _curve;
     }
 
     function mint(uint[] calldata inAmounts, uint minDusdAmount) external returns (uint dusdAmount) {
@@ -99,30 +97,8 @@ contract StableIndexZap {
         // Transfer DUSD
         dusd.safeTransferFrom(msg.sender, address(this), dusdAmount);
         // aTokens (BPool -> Peak -> Zap)
-        stableIndexPeak.redeem(dusdAmount);
-        // Redeem aTokens
-        address[index] memory _interestTokens = interestTokens;
-        for (uint i = 0; i < index; i++) {
-            uint swapAmount = IERC20(_interestTokens[i]).balanceOf(address(this));
-            aToken(_interestTokens[i]).redeem(swapAmount);
-        }
-        // Faciliate curve swap
-        address[index] memory _reserveTokens = reserveTokens;
-        IERC20 token = IERC20(_reserveTokens[j]);
-        if (address(token) == _reserveTokens[0]) {
-            uint amount = token.balanceOf(address(this));
-            curve.exchange_underlying(int128(0), int128(3), amount, 0); 
-            uint susd = IERC20(_reserveTokens[1]).balanceOf(address(this));
-            require(susd >= minAmount, ERR_SLIPPAGE);
-            IERC20(_reserveTokens[1]).safeTransfer(msg.sender, susd);
-        }
-        else if (address(token) == _reserveTokens[1]) {
-            uint amount = token.balanceOf(address(this));
-            curve.exchange_underlying(int128(3), int128(0), amount, 0); 
-            uint dai = IERC20(_reserveTokens[0]).balanceOf(address(this));
-            require(dai >= minAmount, ERR_SLIPPAGE);
-            IERC20(_reserveTokens[0]).safeTransfer(msg.sender, dai);
-        }
+        IERC20 token = IERC20(reserveTokens[j]);
+        stableIndexPeak.redeemSingleSwap(token, dusdAmount, minAmount);
         // Burn DUSD
         core.redeem(dusdAmount, msg.sender);
     }
