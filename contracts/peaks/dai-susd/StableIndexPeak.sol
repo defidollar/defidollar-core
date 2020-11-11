@@ -36,6 +36,9 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     IConfigurableRightsPool crp;
     IBPool bPool;
 
+    // Curve susd pool
+    ICurve curve;
+
     // Aave Oracle & Lending Pool
     LendingPoolAddressesProvider provider;
     PriceOracleGetter priceOracle;
@@ -51,7 +54,8 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
 
     function initialize(
         IConfigurableRightsPool _crp,
-        IBPool _bPool
+        IBPool _bPool,
+        ICurve _curve
     ) public notInitialized {
         // CRP & BPool
         crp = _crp;
@@ -61,6 +65,8 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         // Lending Pool
         provider = LendingPoolAddressesProvider(address(0x24a42fD28C976A61Df5D00D0599C34c4f90748c8)); // mainnet address, for other addresses: https://docs.aave.com/developers/developing-on-aave/deployed-contract-instances
         lendingPool = LendingPool(provider.getLendingPool());
+        // Curve susd pool swap
+        curve = _curve;
     }
 
     function mint(uint[] calldata inAmounts) external returns (uint dusdAmount){
@@ -79,11 +85,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         }
         dusdAmount = core.mint(value, msg.sender);
         // Migrate liquidity to BPool via CRP
-        address[index] memory _interestTokens = interestTokens;
-        for (uint i = 0; i < index; i++) {
-            IERC20(_interestTokens[i]).safeApprove(address(crp), inAmounts[i]);
-        }
-        crp.joinPool(0, inAmounts);
+        migrateBPool(inAmounts);
     }
 
     function redeem(uint dusdAmount) external {
@@ -110,10 +112,60 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         }
     }
 
+    function mintSingleSwap(IERC20 token, uint inAmount) external returns (uint dusdAmount) {
+        // CRP Denorm Weights
+        address[index] memory _interestTokens = interestTokens;
+        uint daiDenorm = crp.getDenormalizedWeight(_interestTokens[0]); // 23.2
+        uint susdDenorm = crp.getDenormalizedWeight(_interestTokens[1]); // 16.8
+        uint totalDenorm = daiDenorm.add(susdDenorm);
+        // Faciliate curve swap (Assume just Dai/sUSD in peak)
+        address[index] memory _reserveTokens = reserveTokens;
+        if (address(token) == _reserveTokens[0]) {
+            uint daiRatio = daiDenorm.mul(100).div(totalDenorm);
+            uint dai = inAmount.mul(daiRatio).div(100);
+            token.safeApprove(address(curve), 0);
+            token.safeApprove(address(curve), dai);
+            curve.exchange_underlying(int128(0), int128(3), dai, 0);
+        }
+        else if (address(token) == _reserveTokens[1]) {
+            uint susdRatio = susdDenorm.mul(100).div(totalDenorm);
+            uint susd = inAmount.mul(susdRatio).div(100); 
+            token.safeApprove(address(curve), 0);
+            token.safeApprove(address(curve), susd);
+            curve.exchange_underlying(int128(3), int128(0), susd, 0);
+        }
+        // Make Aave swap
+        for (uint i = 0; i < index; i++) {
+            uint swapAmount = IERC20(_reserveTokens[i]).balanceOf(address(this));
+            IERC20(_reserveTokens[i]).safeApprove(provider.getLendingPoolCore(), swapAmount);
+            lendingPool.deposit(_reserveTokens[i], swapAmount, refferal);
+        }
+        // Mint DUSD
+        uint256[] memory inAmounts = new uint256[](2);
+        inAmounts[0] = IERC20(_interestTokens[0]).balanceOf(address(this));
+        inAmounts[1] = IERC20(_interestTokens[1]).balanceOf(address(this));
+        uint256[] memory prices = getPrices();
+        uint value;
+        for(uint i = 0; i < index; i++) {
+            value.add(inAmounts[i].div(1e18).mul(weiToUSD(prices[i].div(1e18))));
+        }
+        dusdAmount = core.mint(value, msg.sender);
+        // Migrate liquidity
+        migrateBPool(inAmounts);
+    }
+
     function bptValue(uint /*dusdAmount*/) internal view returns (uint bpt) {
         uint bptTotal = IERC20(address(bPool)).balanceOf(address(this));
         uint poolValue = bPoolValue();
         return bptTotal.div(poolValue);
+    }
+
+    function migrateBPool(uint[] memory inAmounts) internal {
+        address[index] memory _interestTokens = interestTokens;
+        for (uint i = 0; i < index; i++) {
+            IERC20(_interestTokens[i]).safeApprove(address(crp), inAmounts[i]);
+        }
+        crp.joinPool(0, inAmounts);
     }
 
     // Assuming crp have provided peak with allowance (NOT NEEDED)
