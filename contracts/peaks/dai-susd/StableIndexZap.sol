@@ -63,7 +63,7 @@ contract StableIndexZap {
             }
         }
         // Migrate liquidity + Mint DUSD
-        stableIndexPeak.mint(inAmounts);
+        stableIndexPeak.mint(inAmounts, minDusdAmount);
         // Transfer DUSD
         dusd.safeTransfer(msg.sender, dusdAmount);
         return dusdAmount;

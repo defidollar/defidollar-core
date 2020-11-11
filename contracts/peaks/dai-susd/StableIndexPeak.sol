@@ -89,7 +89,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         return priceOracle.getAssetPrice(token);
     }
 
-    function mint(uint[] calldata inAmounts) external {
+    function mint(uint[] calldata inAmounts, uint minDusdAmount) external {
         // reserve (zap -> peak) => aTokens
         address[index] memory _reserveTokens = reserveTokens;
         for(uint i = 0; i < index; i++) {
