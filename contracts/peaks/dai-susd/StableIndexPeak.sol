@@ -36,9 +36,11 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     IConfigurableRightsPool crp;
     IBPool bPool;
 
-    // Aave Oracle & provider
-    LendingPoolAddressesProvider provider = LendingPoolAddressesProvider(address(0x24a42fD28C976A61Df5D00D0599C34c4f90748c8)); 
+    // Aave Oracle & Lending Pool
+    LendingPoolAddressesProvider provider;
     PriceOracleGetter priceOracle;
+    LendingPool lendingPool;
+    uint16 refferal = 0;
     
     // Chainlink Oracle
     IOracle oracle = IOracle(0x4EaC4c4e9050464067D673102F8E24b2FccEB350);
@@ -61,39 +63,11 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         lendingPool = LendingPool(provider.getLendingPool());
     }
 
-    // Returns average ETHUSD value from chainlink feeds
-    function ethusd() public view returns (uint value) {
-        uint[] memory feed = oracle.getPriceFeed();
-        for (uint i = 0; i < feed.length; i++) {
-            value.add(feed[i]);
-        }
-        return value.div(feed.length);
-    }
-
-    // Convert aToken wei value to usd
-    function weiToUSD(uint price) public view returns (uint) {
-        return price.mul(ethusd());
-    }
-
-    // Return prices of reserve tokens (wei)
-    function getPrices() public view returns (uint256[] memory prices) {
-        address[index] memory _reserveTokens = reserveTokens;
-        for (uint i = 0; i < index; i++) {
-            prices[i] = priceOracle.getAssetPrice(_reserveTokens[i]);
-        }
-        return prices;
-    }
-
-    // Return price of a reserve asset (wei)
-    function getPrice(address token) public view returns (uint price) {
-        return priceOracle.getAssetPrice(token);
-    }
-
-    function mint(uint[] calldata inAmounts, uint minDusdAmount) external {
+    function mint(uint[] calldata inAmounts, uint minDusdAmount) external returns (uint dusdAmount) {
         // reserve (zap -> peak) => aTokens
         address[index] memory _reserveTokens = reserveTokens;
         for(uint i = 0; i < index; i++) {
-            IERC20(_reserveTokens[i]).safeTransfer(msg.sender, address(this), inAmounts[i]);
+            IERC20(_reserveTokens[i]).safeTransferFrom(msg.sender, address(this), inAmounts[i]);
             IERC20(_reserveTokens[i]).safeApprove(provider.getLendingPoolCore(), inAmounts[i]); 
             lendingPool.deposit(_reserveTokens[i], inAmounts[i], refferal);
         }
@@ -105,6 +79,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         }
         dusdAmount = core.mint(value, msg.sender);
         require(dusdAmount >= minDusdAmount, "Error: Insufficient DUSD");
+        return dusdAmount;
     }
 
     function mint(uint[] calldata inAmounts) external {
@@ -154,6 +129,34 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         for (uint i = 0; i < index; i++) {
             aToken(_interestTokens[i]).redirectInterestStreamOf(_from, _to);
         }
+    }
+
+    // Returns average ETHUSD value from chainlink feeds
+    function ethusd() public view returns (uint value) {
+        uint[] memory feed = oracle.getPriceFeed();
+        for (uint i = 0; i < feed.length; i++) {
+            value.add(feed[i]);
+        }
+        return value.div(feed.length);
+    }
+
+    // Convert aToken wei value to usd
+    function weiToUSD(uint price) public view returns (uint) {
+        return price.mul(ethusd());
+    }
+
+    // Return prices of reserve tokens (wei)
+    function getPrices() public view returns (uint256[] memory prices) {
+        address[index] memory _reserveTokens = reserveTokens;
+        for (uint i = 0; i < index; i++) {
+            prices[i] = priceOracle.getAssetPrice(_reserveTokens[i]);
+        }
+        return prices;
+    }
+
+    // Return price of a reserve asset (wei)
+    function getPrice(address token) public view returns (uint price) {
+        return priceOracle.getAssetPrice(token);
     }
 
     // USD valuation of stable index peak (aTokens interest + bPool deposits)

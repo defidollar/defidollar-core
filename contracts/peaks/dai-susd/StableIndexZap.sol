@@ -32,11 +32,6 @@ contract StableIndexZap {
     IERC20 dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
     ICurve curve;
     IConfigurableRightsPool crp;
-    
-    // Aave Lending Pools
-    uint16 refferal = 0;
-    LendingPoolAddressesProvider provider;
-    LendingPool lendingPool;
 
     // Stable Index Peak
     StableIndexPeak stableIndexPeak;
@@ -54,7 +49,7 @@ contract StableIndexZap {
         curve = _curve;
     }
 
-    function mint(uint[] calldata inAmounts, uint minDusdAmount) external returns (uint dusdAmount) {
+    function mint(uint[] calldata inAmounts, uint minDusdAmount) external {
         // reserve => Zap
         address[index] memory _reserveTokens = reserveTokens;
         for (uint i = 0; i < index; i++) {
@@ -64,9 +59,6 @@ contract StableIndexZap {
         }
         // Migrate liquidity + Mint DUSD
         stableIndexPeak.mint(inAmounts, minDusdAmount);
-        // Transfer DUSD
-        dusd.safeTransfer(msg.sender, dusdAmount);
-        return dusdAmount;
     }
 
     function redeem(uint dusdAmount, uint[] calldata minAmounts) external {
@@ -117,8 +109,8 @@ contract StableIndexZap {
         // Make Aave swap
         for (uint i = 0; i < index; i++) {
             uint swapAmount = IERC20(_reserveTokens[i]).balanceOf(address(this));
-            IERC20(_reserveTokens[i]).safeApprove(provider.getLendingPoolCore(), swapAmount);
-            lendingPool.deposit(_reserveTokens[i], swapAmount, refferal);
+            // IERC20(_reserveTokens[i]).safeApprove(provider.getLendingPoolCore(), swapAmount);
+            // lendingPool.deposit(_reserveTokens[i], swapAmount, refferal);
         }
         // mint DUSD
         uint256[] memory inAmounts = new uint256[](2);
