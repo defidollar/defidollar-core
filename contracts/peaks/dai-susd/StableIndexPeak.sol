@@ -113,6 +113,8 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     }
 
     function mintSingleSwap(IERC20 token, uint inAmount) external returns (uint dusdAmount) {
+        // Transfer reserve (zap -> peak)
+        token.safeTransferFrom(msg.sender, address(this), inAmount);
         // CRP Denorm Weights
         address[index] memory _interestTokens = interestTokens;
         uint daiDenorm = crp.getDenormalizedWeight(_interestTokens[0]); // 23.2

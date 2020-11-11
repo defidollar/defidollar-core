@@ -59,7 +59,7 @@ contract StableIndexZap {
         }
         // Migrate liquidity + Mint DUSD
         dusdAmount = stableIndexPeak.mint(inAmounts);
-        require(dusdAmount >= minDusdAmount, "Error: Insufficient DUSD");
+        require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
         return dusdAmount;
     }
 
@@ -90,7 +90,7 @@ contract StableIndexZap {
         token.safeTransferFrom(msg.sender, address(this), inAmount);
         // Curve swap & DUSD Transfer
         dusdAmount = stableIndexPeak.mintSingleSwap(token, inAmount);
-        require(dusdAmount >= minDusdAmount, "Error: Insufficient DUSD");
+        require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
         dusd.safeTransfer(msg.sender, dusdAmount);
         return dusdAmount;
     }
