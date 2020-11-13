@@ -7,6 +7,7 @@ const StableIndexPeak = artifacts.require("StableIndexPeak")
 const StableIndexPeakProxy = artifacts.require("StableIndexPeakProxy")
 const StableIndexZap = artifacts.require("StableIndexZap")
 const MockAToken = artifacts.require("MockAToken")
+const MockPriceOracle = artifacts.require("MockPriceOracle")
 
 const utils = require('./utils')
 
@@ -15,9 +16,11 @@ const toWei = web3.utils.toWei
 module.exports = async function(deployer, network, accounts) {
     const admin = accounts[0]
 
+    // Deploy core
     const coreProxy = await CoreProxy.deployed()
     const core = await Core.at(coreProxy.address)
 
+    // Mock aTokens
     const aDAI = await MockAToken.new('Aave Dai', 'aDai')
     const aSUSD = await MockAToken.new('Aave sUSD', 'aSUSD')
 
@@ -66,25 +69,37 @@ module.exports = async function(deployer, network, accounts) {
     await deployer.deploy(StableIndexPeak)
     const stableIndexPeak = await StableIndexPeak.at(stableIndexPeakProxy.address)
 
+    // Deploy Stable Index Zap
+    const stableIndexZap = await deployer.deploy(StableIndexZap, stableIndexPeak.address)
+    //console.log(stableIndexZap.methods)
+    
     // Deploy Curve susd pool
     //console.log(crp.options.address)
     //console.log(bPool)
     //console.log(bPoolAddress)
     //console.log(bPool.options.address)
 
+    
+
+    // deploy aave lending pool
+
+
     // To-do @Brad // Tx revert problem
     await stableIndexPeakProxy.updateAndCall(
         StableIndexPeak.address,
         stableIndexPeak.contract.methods.initialize(
             crp.options.address,
-            bPool.options.address  
+            bPool.options.address
         ).encodeABI()
     )
+
+    // deploy aave oracle
+    const MockPriceOracle = await deployer.deploy(MockPriceOracle)
+    console.log(MockPriceOracle)
+
     
-
-    // Deploy Stable Index Zap
-    //const stableIndexZap = await deployer.deploy(StableIndexZap, stableIndexPeak.address, crp.options.address)
-
+    //peak.zap = yVaultZap
+    
     await core.whitelistPeak(stableIndexPeakProxy.address, [0, 3] /* Dai, sUSD */, toWei('1000'), false)
 
     // For later

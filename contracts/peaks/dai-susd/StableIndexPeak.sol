@@ -38,7 +38,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     IBPool bPool;
 
     // Curve susd pool
-    ICurve curve = ICurve(0xA5407eAE9Ba41422680e2e00537571bcC53efBfD);
+    ICurve curve;
 
     // Aave Oracle & Lending Pool
     LendingPoolAddressesProvider provider;
@@ -47,11 +47,11 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
     uint16 refferal = 0;
     
     // Chainlink Oracle
-    IOracle oracle = IOracle(0x4EaC4c4e9050464067D673102F8E24b2FccEB350);
+    IOracle oracle;
 
     // Core contract
-    ICore core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3); 
-    IERC20 dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831); 
+    ICore core;
+    IERC20 dusd;
 
     function initialize(
         IConfigurableRightsPool _crp,
@@ -60,13 +60,17 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         // CRP & BPool
         crp = _crp;
         bPool = _bPool;
-        // Aave Price Oracle
-        priceOracle = PriceOracleGetter(provider.getPriceOracle());
         // Lending Pool
         provider = LendingPoolAddressesProvider(address(0x24a42fD28C976A61Df5D00D0599C34c4f90748c8)); // mainnet address, for other addresses: https://docs.aave.com/developers/developing-on-aave/deployed-contract-instances
         lendingPool = LendingPool(provider.getLendingPool());
+        // Aave Price Oracle
+        priceOracle = PriceOracleGetter(provider.getPriceOracle());
+        oracle = IOracle(0x4EaC4c4e9050464067D673102F8E24b2FccEB350);
+        // Core contracts
+        core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
+        dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
         // Curve susd pool swap
-        // curve = _curve;
+        curve = ICurve(0xA5407eAE9Ba41422680e2e00537571bcC53efBfD);
     }
 
     function mint(uint[] calldata inAmounts) external returns (uint dusdAmount){
@@ -208,7 +212,7 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         crp.exitPool(bpt, minAmountsOut);
     }
 
-    // Balancer pool Token Functions
+    // Balancer pool token Functions
     function bptAmount(uint[] memory inAmounts) internal view returns (uint bpt) {
         // Total BPool Liquidity
         address[index] memory _interestTokens = interestTokens;
@@ -232,13 +236,14 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         return bptTotal.div(poolValue);
     }
 
-    // Chainlink Functions
     function redirectInterest(address _from, address _to) public onlyOwner {
         address[index] memory _interestTokens = interestTokens;
         for (uint i = 0; i < index; i++) {
             aToken(_interestTokens[i]).redirectInterestStreamOf(_from, _to);
         }
     }
+
+    // Chainlink Functions
 
     // Returns average ETHUSD value from chainlink feeds
     function ethusd() public view returns (uint value) {
@@ -273,7 +278,6 @@ contract StableIndexPeak is OwnableProxy, Initializable, IPeak {
         return peakValue().add(bPoolValue());
     }
 
-    // Internal Functions
     function peakValue() public view returns (uint interest) {
         address[index] memory _interestTokens = interestTokens;
         for (uint i = 0; i < index; i++) {

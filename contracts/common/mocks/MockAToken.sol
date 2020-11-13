@@ -9,5 +9,10 @@ contract MockAToken is Reserve {
     {
     }
 
+    function mint(address account, uint256 amount) public returns (bool) {
+        _mint(account, amount);
+        return true;
+    }
+
     function redirectInterestStream(address) external {}
 }

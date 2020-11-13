@@ -31,20 +31,13 @@ contract StableIndexZap {
     ICore core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
     IERC20 dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
 
-    // Configurable Rights Pool
-    IConfigurableRightsPool crp;
-
     // Stable Index Peak
     StableIndexPeak stableIndexPeak;
 
     constructor(
-        StableIndexPeak _stableIndexPeak,
-        IConfigurableRightsPool _crp
+        StableIndexPeak _stableIndexPeak
     ) public {
-        // Stable Index Peak
         stableIndexPeak = _stableIndexPeak;
-        // Configurable Rights Pool
-        crp = _crp;
     }
 
     function mint(uint[] calldata inAmounts, uint minDusdAmount) external returns (uint dusdAmount) {
@@ -58,6 +51,14 @@ contract StableIndexZap {
         // Migrate liquidity + Mint DUSD
         dusdAmount = stableIndexPeak.mint(inAmounts);
         require(dusdAmount >= minDusdAmount, ERR_SLIPPAGE);
+        return dusdAmount;
+    }
+
+    function calcMint(uint[index] memory inAmounts) public view returns (uint dusdAmount) {
+        uint[] memory prices = stableIndexPeak.getPrices();
+        for (uint i = 0; i < prices.length; i++) {
+            dusdAmount.add(inAmounts[i].div(1e18).mul(stableIndexPeak.weiToUSD(prices[i].div(1e18))));
+        }
         return dusdAmount;
     }
 
@@ -106,13 +107,7 @@ contract StableIndexZap {
     }
 
     // CALC FUNCTIONS 
-    function calcMint(uint[index] memory inAmounts) public view returns (uint dusdAmount) {
-        uint[] memory prices = stableIndexPeak.getPrices();
-        for (uint i = 0; i < prices.length; i++) {
-            dusdAmount.add(inAmounts[i].mul(stableIndexPeak.weiToUSD(prices[i].div(1e18))));
-        }
-        return dusdAmount;
-    }
+    
 
     function calcMintSingleCoin(uint inAmount, uint i) public view returns (uint dusdAmount) {
         address[index] memory _reserveTokens = reserveTokens;
@@ -120,7 +115,6 @@ contract StableIndexZap {
         return inAmount.mul(stableIndexPeak.weiToUSD(price.div(1e18)));
     }
 
-    // Redeem only aToken deposit (interest is deployed elsewhere)
     function calcRedeem(uint dusdAmount) public view returns (uint[index] memory amounts) {
         uint usd = core.dusdToUsd(dusdAmount, true); // redeem fee
         uint[] memory prices = stableIndexPeak.getPrices();
