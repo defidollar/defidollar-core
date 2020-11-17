@@ -13,7 +13,6 @@ import {ICore} from "../interfaces/ICore.sol";
 import {Initializable} from "../common/Initializable.sol";
 import {OwnableProxy} from "../common/OwnableProxy.sol";
 
-
 contract Core is OwnableProxy, Initializable, ICore {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
@@ -126,6 +125,15 @@ contract Core is OwnableProxy, Initializable, ICore {
         return dusdAmount;
     }
 
+    function harvest() external {
+        require(msg.sender == authorizedController(), "Only Controller");
+        uint earned = earned();
+        if (earned > 0) {
+            dusd.mint(msg.sender, earned);
+        }
+    }
+
+    // not used
     function dusdToUsd(uint _dusd, bool fee) public view returns(uint usd) {
         usd = _dusd;
         if (fee) {
@@ -146,14 +154,26 @@ contract Core is OwnableProxy, Initializable, ICore {
         }
     }
 
+    function earned() public view returns(uint) {
+        uint _totalAssets = totalSystemAssets();
+        uint supply = dusd.totalSupply();
+        if (_totalAssets > supply) {
+            _totalAssets.sub(supply);
+        }
+        return 0;
+    }
+
+    function authorizedController() public view returns(address) {
+        return address(getStore(0));
+    }
+
     /* ##### Admin functions ##### */
 
-    function collectProtocolIncome(address destination) external onlyOwner {
-        totalAssets = totalSystemAssets();
-        uint supply = dusd.totalSupply();
-        if (totalAssets > supply) {
-            dusd.mint(destination, totalAssets.sub(supply));
-        }
+    function authorizeController(address _controller) external onlyOwner {
+        require(_controller != address(0x0), "Zero Address");
+        setStore(0, uint(_controller));
+        // sanity check
+        require(authorizedController() == _controller, "Sanity Check Failed");
     }
 
     /**

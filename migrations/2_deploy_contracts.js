@@ -2,11 +2,12 @@ const Core = artifacts.require("Core");
 const DUSD = artifacts.require("DUSD");
 const Reserve = artifacts.require("Reserve");
 const CoreProxy = artifacts.require("CoreProxy");
+const ibDUSD = artifacts.require("ibDUSD");
+const ibDUSDProxy = artifacts.require("ibDUSDProxy");
 
 const utils = require('./utils')
 
 const toBN = web3.utils.toBN
-const toWei = web3.utils.toWei
 
 module.exports = async function(deployer, network, accounts) {
     await deployer.deploy(Core);
@@ -14,7 +15,21 @@ module.exports = async function(deployer, network, accounts) {
     const core = await Core.at(CoreProxy.address)
 
     await deployer.deploy(DUSD, CoreProxy.address, "tDUSD", "tDUSD", 18)
-    const config = { contracts: { tokens: { DUSD: { address: DUSD.address, decimals: 18 } } } }
+
+    const _ibDUSDProxy = await deployer.deploy(ibDUSDProxy)
+    await deployer.deploy(ibDUSD)
+    await _ibDUSDProxy.updateImplementation(ibDUSD.address)
+    const _ibDUSD = await ibDUSD.at(_ibDUSDProxy.address)
+    await _ibDUSD.setParams(DUSD.address, core.address, 9950) // 0.5% redeem fee
+    const config = {
+        contracts: {
+            base: CoreProxy.address,
+            tokens: {
+                DUSD: { address: DUSD.address, decimals: 18 },
+                ibDUSD: { address: ibDUSDProxy.address, decimals: 18 }
+            }
+        }
+    }
 
     // initialize system with 4 coins
     const tickerSymbols = ['DAI', 'USDC', 'USDT', 'sUSD', 'TUSD']
@@ -46,6 +61,5 @@ module.exports = async function(deployer, network, accounts) {
     )
     await core.whitelistTokens(tokens)
 
-    config.contracts.base = CoreProxy.address
     utils.writeContractAddresses(config)
 };

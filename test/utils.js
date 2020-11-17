@@ -1,13 +1,11 @@
 const Core = artifacts.require("Core");
 const CoreProxy = artifacts.require("CoreProxy");
 const DUSD = artifacts.require("DUSD");
+const ibDUSDProxy = artifacts.require("ibDUSDProxy");
+const ibDUSD = artifacts.require("ibDUSD");
 const Reserve = artifacts.require("Reserve");
 
-const CurveSusdPeak = artifacts.require("CurveSusdPeak");
-const CurveSusdPeakProxy = artifacts.require("CurveSusdPeakProxy");
 const MockSusdToken = artifacts.require("MockSusdToken");
-const ICurve = artifacts.require("ICurve");
-const ICurveDeposit = artifacts.require("ICurveDeposit");
 
 const YVaultPeak = artifacts.require("YVaultPeak");
 const YVaultPeakProxy = artifacts.require("YVaultPeakProxy");
@@ -20,9 +18,15 @@ const toBN = web3.utils.toBN
 const fromWei = web3.utils.fromWei
 
 async function getArtifacts() {
-    const coreProxy = await CoreProxy.deployed()
-    const core = await Core.at(coreProxy.address)
-    const dusd = await DUSD.deployed()
+	const [ coreProxy, dusd, ibDusdProxy ] = await Promise.all([
+		CoreProxy.deployed(),
+		DUSD.deployed(),
+		ibDUSDProxy.deployed()
+	])
+	const [ core, ibDusd ] = await Promise.all([
+		Core.at(coreProxy.address),
+		ibDUSD.at(ibDusdProxy.address)
+	])
     const reserves = []
 	const decimals = []
 	const scaleFactor = []
@@ -34,6 +38,7 @@ async function getArtifacts() {
     const res = {
 		core,
 		dusd,
+		ibDusd,
 		reserves,
 		decimals,
 		scaleFactor,
@@ -142,5 +147,6 @@ module.exports = {
 	mineOneBlock,
 	printDebugReceipt,
 	assertions,
-	print
+	print,
+	ZERO_ADDRESS: '0x0000000000000000000000000000000000000000'
 }
