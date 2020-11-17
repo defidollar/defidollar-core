@@ -23,32 +23,47 @@ contract ibDUSD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
 
     modifier harvest() {
         controller.harvest();
+        if (totalSupply() == 0) {
+            dusd.safeTransfer(owner(), dusd.balanceOf(address(this)));
+        }
         _;
     }
 
-    function mint(uint _amount) external harvest {
+    function deposit(uint _amount) external harvest {
+        uint _pool = balance();
         dusd.safeTransferFrom(msg.sender, address(this), _amount);
-        uint _supply = totalSupply();
-        uint shares;
-        if (_supply == 0) {
+        uint shares = 0;
+        if (_pool == 0) {
             shares = _amount;
         } else {
-            shares = _amount.mul(_supply).div(dusd.balanceOf(address(this)));
+            shares = _amount.mul(totalSupply()).div(_pool);
         }
         _mint(msg.sender, shares);
     }
 
     function withdraw(uint _shares) external harvest {
+        uint r = balance()
+            .mul(_shares)
+            .mul(redeemFactor)
+            .div(totalSupply().mul(FEE_PRECISION));
         _burn(msg.sender, _shares);
-        uint r = dusd.balanceOf(address(this)).mul(_shares).div(totalSupply());
         dusd.safeTransfer(msg.sender, r);
     }
 
-    function getPricePerFullShare() public view returns (uint) {
-        return dusd.balanceOf(address(this)).add(controller.earned()).mul(1e18).div(totalSupply());
+    /* ##### View ##### */
+
+    function balance() public view returns (uint) {
+        return dusd.balanceOf(address(this));
     }
 
-    /* ### Admin Functions ### */
+    function getPricePerFullShare() public view returns (uint) {
+        if (totalSupply() == 0) {
+            return 1e18;
+        }
+        return balance().add(controller.earned()).mul(1e18).div(totalSupply());
+    }
+
+    /* ##### Admin ##### */
 
     function setParams(
         IERC20 _dusd,
@@ -75,5 +90,6 @@ interface ibController {
     function harvest() external;
     function earned() external view returns(uint);
 }
+
 
 

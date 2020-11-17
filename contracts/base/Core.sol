@@ -126,20 +126,26 @@ contract Core is OwnableProxy, Initializable, ICore {
     }
 
     function harvest() external {
-        require(msg.sender == authorizedController(), "Only Controller");
+        require(msg.sender == authorizedController() || isOwner(), "HARVEST_NO_AUTH");
         uint earned = earned();
         if (earned > 0) {
             dusd.mint(msg.sender, earned);
         }
     }
 
-    // not used
-    function dusdToUsd(uint _dusd, bool fee) public view returns(uint usd) {
-        usd = _dusd;
-        if (fee) {
-            usd = usd.mul(redeemFactor).div(FEE_PRECISION);
+    /* ##### View ##### */
+
+    function authorizedController() public view returns(address) {
+        return address(getStore(0));
+    }
+
+    function earned() public view returns(uint) {
+        uint _totalAssets = totalSystemAssets();
+        uint supply = dusd.totalSupply();
+        if (_totalAssets > supply) {
+            return _totalAssets.sub(supply);
         }
-        return usd;
+        return 0;
     }
 
     function totalSystemAssets() public view returns (uint _totalAssets) {
@@ -154,25 +160,26 @@ contract Core is OwnableProxy, Initializable, ICore {
         }
     }
 
-    function earned() public view returns(uint) {
-        uint _totalAssets = totalSystemAssets();
-        uint supply = dusd.totalSupply();
-        if (_totalAssets > supply) {
-            _totalAssets.sub(supply);
+    /**
+    * @dev Unused but kept for backwards compatibility with CurveSusdPeak.
+    */
+    function dusdToUsd(uint _dusd, bool fee) public view returns(uint usd) {
+        usd = _dusd;
+        if (fee) {
+            usd = usd.mul(redeemFactor).div(FEE_PRECISION);
         }
-        return 0;
+        return usd;
     }
 
-    function authorizedController() public view returns(address) {
-        return address(getStore(0));
-    }
+    /* ##### Admin ##### */
 
-    /* ##### Admin functions ##### */
-
-    function authorizeController(address _controller) external onlyOwner {
+    function authorizeController(address _controller)
+        external
+        onlyOwner
+    {
         require(_controller != address(0x0), "Zero Address");
         setStore(0, uint(_controller));
-        // sanity check
+        // just a sanity check, not strictly required
         require(authorizedController() == _controller, "Sanity Check Failed");
     }
 
@@ -243,6 +250,8 @@ contract Core is OwnableProxy, Initializable, ICore {
         redeemFactor = _redeemFactor;
         colBuffer = _colBuffer;
     }
+
+    /* ##### Internal ##### */
 
     function _whitelistToken(address token)
         internal
