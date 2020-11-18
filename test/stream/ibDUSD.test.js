@@ -76,7 +76,9 @@ contract('ibDUSD', async (accounts) => {
         await this.yVaultPeak.dummyIncrementVirtualPrice();
         assert.strictEqual((await this.ibDusd.getPricePerFullShare()).toString(), toWei('1.4')) // 140 / 100
 
-        await this.client.withdraw('100', { from: alice })
+        await this.client.withdraw(null, true /* isMax */, { from: alice })
+        // OR
+        // await this.client.withdraw('140', false, { from: alice })
 
         const actual = (await Promise.all([
             this.dusd.balanceOf(this.ibDusd.address),

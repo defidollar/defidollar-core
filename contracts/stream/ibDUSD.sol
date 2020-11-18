@@ -17,6 +17,9 @@ contract ibDUSD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
     ibController public controller;
     uint public redeemFactor;
 
+    /**
+    * @dev Since this is a proxy, the values set in the ERC20Detailed constructor are not actually set in the main contract.
+    */
     constructor ()
         public
         ERC20Detailed("interest-bearing DUSD", "ibDUSD", 18) {}
