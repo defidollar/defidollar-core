@@ -1,0 +1,57 @@
+{
+    "contracts": {
+        "tokens": {
+          "DUSD": {
+            "address": "0xbA125322A44Aa62b6B621257C6120d39bEA4d6de",
+            "decimals": 18
+          },
+          "ibDUSD": {
+            "address": "0x24698159aE4a46945f014D250089E1156ebce6b5",
+            "decimals": 18
+          },
+          "DFD": {
+            "address": "0x81e5eb7fea117ea692990dc49c3a8de46054f9ff",
+            "decimals": 18
+          },
+          "DAI": {
+            "address": "0x55071E80056e01625EE30234FC71c1A07BfA66D1",
+            "decimals": 18
+          },
+          "USDC": {
+            "address": "0xa137041CE05F0C6dd08d58FE1F5eA8107FFEd493",
+            "decimals": 6
+          },
+          "USDT": {
+            "address": "0x83492abFF02e47EBb38057E925248CFA8D1BD803",
+            "decimals": 6
+          },
+          "TUSD": {
+            "address": "0xd2E3A2C8326625c9584217aD83833D7E766Ec528",
+            "decimals": 18
+          },
+          "yCRV": {
+            "address": "0xeAC1740e7f57b1e3e4A1124444e12D359a68039E",
+            "decimals": 18,
+            "name": "Curve.fi yDAI/yCrvC/yCrvT/yTUSD",
+            "peak": "yVaultPeak"
+          },
+          "yUSD": {
+            "address": "0x236AE677180fcA881aCD4b97A53aAf569A742699",
+            "decimals": 18,
+            "name": "Yvault-LP-YCurve",
+            "peak": "yVaultPeak"
+          }
+        },
+        "base": "0x559DD8DE795F7091f4457C20A3cb54Af6D57528e",
+        "genesis": "0x8625B1d7Cb8654c440683a12A7aEFbaC2FB7f7bF",
+        "vesting": "0xF95C58Ba296C1d6230DB7219EBe0580D97C0cdb8",
+        "peaks": {
+          "yVaultPeak": {
+            "coins": ["DAI", "USDC", "USDT", "TUSD"],
+            "native": ["yCRV", "yUSD"],
+            "zap": "0x00f33878321587E2663ac236Ffcd86e453AcE23f",
+            "address": "0x598A96A5b27585D520828931faA74428Dc34bC09"
+          }
+        }
+    }
+}

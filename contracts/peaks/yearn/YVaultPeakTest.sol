@@ -22,3 +22,19 @@ contract YVaultPeakTest is YVaultPeak {
         yUSD = _yUSD;
     }
 }
+
+contract YVaultPeakTest2 is YVaultPeakTest {
+    function yCrvToUsd() public view returns (uint) {
+        if (feed[0] == 0) {
+            return super.yCrvToUsd();
+        }
+        return feed[0];
+    }
+
+    function dummyIncrementVirtualPrice() public {
+        if (feed[0] == 0) {
+            feed[0] = super.yCrvToUsd();
+        }
+        feed[0] = feed[0].mul(11).div(10); // 10% raise
+    }
+}
