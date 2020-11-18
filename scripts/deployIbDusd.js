@@ -10,8 +10,8 @@ async function execute() {
         fs.readFileSync(`${process.cwd()}/deployments/kovan.json`).toString()
     )
 
-    const ibDusdProxy = await ibDUSDProxy.new()
     let ibDusd = await ibDUSD.new()
+    const ibDusdProxy = await ibDUSDProxy.new()
     console.log({ ibDusdProxy: ibDusdProxy.address, ibDusd: ibDusd.address })
     await ibDusdProxy.updateImplementation(ibDusd.address)
     ibDusd = await ibDUSD.at(ibDusdProxy.address)
@@ -23,7 +23,7 @@ async function execute() {
 
     let core = await Core.new()
     const coreProxy = await CoreProxy.at(config.contracts.base)
-    await coreProxy.updateImplementation(core.address, { from: '0x238238C3398e0116FAD7bBFdc323f78187135815' }) // contract owner on kovan
+    await coreProxy.updateImplementation(core.address)
     core = await Core.at(coreProxy.address)
     await core.authorizeController(ibDusdProxy.address)
 }
