@@ -90,6 +90,3 @@ interface ibController {
     function harvest() external;
     function earned() external view returns(uint);
 }
-
-
-

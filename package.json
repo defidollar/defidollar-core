@@ -16,7 +16,7 @@
   "license": "ISC",
   "dependencies": {
     "@chainlink/contracts": "0.0.7-beta",
-    "@defidollar/core-client-lib": "github:defidollar/core-client-lib#f8cdd643ce4939f1e713c64e692425deff571d32",
+    "@defidollar/core-client-lib": "github:defidollar/core-client-lib#fd66b48acd773bf1c369bc337fbadbc0fb5477df",
     "@openzeppelin/contracts": "^2.5.1"
   },
   "devDependencies": {

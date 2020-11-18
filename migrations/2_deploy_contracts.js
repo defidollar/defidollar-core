@@ -16,11 +16,11 @@ module.exports = async function(deployer, network, accounts) {
 
     await deployer.deploy(DUSD, CoreProxy.address, "tDUSD", "tDUSD", 18)
 
-    const _ibDUSDProxy = await deployer.deploy(ibDUSDProxy)
+    const ibDusdProxy = await deployer.deploy(ibDUSDProxy)
     await deployer.deploy(ibDUSD)
-    await _ibDUSDProxy.updateImplementation(ibDUSD.address)
-    const _ibDUSD = await ibDUSD.at(_ibDUSDProxy.address)
-    await _ibDUSD.setParams(DUSD.address, core.address, 9950) // 0.5% redeem fee
+    await ibDusdProxy.updateImplementation(ibDUSD.address)
+    const ibDusd = await ibDUSD.at(ibDusdProxy.address)
+    await ibDusd.setParams(DUSD.address, core.address, 9950) // 0.5% redeem fee
     const config = {
         contracts: {
             base: CoreProxy.address,

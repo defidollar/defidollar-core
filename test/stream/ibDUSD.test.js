@@ -5,6 +5,8 @@ const YVaultPeakProxy = artifacts.require("YVaultPeakProxy");
 const ibDUSDProxy = artifacts.require("ibDUSDProxy");
 
 const utils = require('../utils.js')
+const { SavingsClient } = require('@defidollar/core-client-lib')
+const config = require('../../deployments/development.json')
 
 const fromWei = web3.utils.fromWei
 const toWei = web3.utils.toWei
@@ -17,6 +19,7 @@ contract('ibDUSD', async (accounts) => {
         const artifacts = await utils.getArtifacts()
         Object.assign(this, artifacts)
         this.reserves = this.reserves.slice(0, 3).concat([this.reserves[4]])
+        this.client = new SavingsClient(web3, config)
     })
 
     it('authorizeController fails from non-admin account', async () => {
@@ -51,15 +54,17 @@ contract('ibDUSD', async (accounts) => {
         assert.strictEqual((await this.ibDusd.balanceOf(alice)).toString(), '0')
 
         const amount = toWei('100')
-        await this.dusd.approve(this.ibDusd.address, amount)
-        await this.ibDusd.deposit(amount)
-        assert.strictEqual((await this.dusd.balanceOf(alice)).toString(), toWei('300'))
-        assert.strictEqual((await this.dusd.balanceOf(this.ibDusd.address)).toString(), toWei('100'))
-        assert.strictEqual((await this.ibDusd.balanceOf(alice)).toString(), amount)
-    })
+        await this.client.approve('100', { from: alice })
+        assert.strictEqual(await this.client.allowance(alice), amount)
+        await this.client.deposit('100', { from: alice })
+        assert.strictEqual(await this.client.allowance(alice), '0')
 
-    it('getPricePerFullShare', async () => {
         assert.strictEqual((await this.ibDusd.getPricePerFullShare()).toString(), toWei('1'))
+        assert.strictEqual((await this.dusd.balanceOf(this.ibDusd.address)).toString(), toWei('100'))
+        const { ibDusd, dusd, withrawable } = await this.client.balanceOf(alice)
+        assert.strictEqual(ibDusd, amount)
+        assert.strictEqual(dusd, toWei('300'))
+        assert.strictEqual(withrawable, toWei('100'))
     })
 
     it('withdraw', async () => {
@@ -71,20 +76,23 @@ contract('ibDUSD', async (accounts) => {
         await this.yVaultPeak.dummyIncrementVirtualPrice();
         assert.strictEqual((await this.ibDusd.getPricePerFullShare()).toString(), toWei('1.4')) // 140 / 100
 
-        await this.ibDusd.withdraw(toWei('100')) // withdraw entire
+        await this.client.withdraw('100', { from: alice })
 
         const actual = (await Promise.all([
-            this.dusd.balanceOf(alice),
             this.dusd.balanceOf(this.ibDusd.address),
-            this.ibDusd.balanceOf(alice),
             this.ibDusd.totalSupply(),
             this.ibDusd.getPricePerFullShare() // back to one post-withdraw
         ])).map(v => v.toString())
-        const expected = [ toWei('439.3') /* 300 + .995 * 140 */, toWei('0.7'), '0', '0', toWei('1') ]
+        const expected = [ toWei('0.7'), '0', toWei('1') ]
 
         for (let i = 0; i < expected.length; i++) {
             assert.strictEqual(actual[i], expected[i])
         }
+
+        const { ibDusd, dusd, withrawable } = await this.client.balanceOf(alice)
+        assert.strictEqual(ibDusd, '0')
+        assert.strictEqual(dusd, toWei('439.3') /* 300 + .995 * 140 */)
+        assert.strictEqual(withrawable, '0')
     })
 
     it('transfer residue to owner', async () => {
