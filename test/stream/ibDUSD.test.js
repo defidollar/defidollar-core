@@ -59,7 +59,15 @@ contract('ibDUSD', async (accounts) => {
         this.yVaultPeak = await YVaultPeakTest2.at(YVaultPeakProxy.address)
 
         await this.yVaultPeak.dummyIncrementVirtualPrice();
-        assert.strictEqual((await this.ibDusd.getPricePerFullShare()).toString(), toWei('1.4')) // 140 / 100
+
+        /*
+            dummyIncrementVirtualPrice bumps the virtual price by 10%
+            Since there are 400 DUSD/yCRV LP tokens, net system revenue = $40
+            Revenue sharing of 75:25 b/w ibDUSD:ibDFD is hardcoded in migrations, so net revenue is $30 for ibDUSD
+            Only 100 DUSD are deposited in ibDUSD, so pricePerFullShare = 130 / 100 = 1.3
+        */
+
+        assert.strictEqual((await this.ibDusd.getPricePerFullShare()).toString(), toWei('1.3'))
 
         await this.client.withdraw(null, true /* isMax */, { from: alice })
         // OR
@@ -70,7 +78,7 @@ contract('ibDUSD', async (accounts) => {
             this.ibDusd.totalSupply(),
             this.ibDusd.getPricePerFullShare() // back to one post-withdraw
         ])).map(v => v.toString())
-        const expected = [ toWei('0.7'), '0', toWei('1') ]
+        const expected = [ toWei('0.65') /* 0.5% of 130 */, '0', toWei('1') ]
 
         for (let i = 0; i < expected.length; i++) {
             assert.strictEqual(actual[i], expected[i])
@@ -78,7 +86,7 @@ contract('ibDUSD', async (accounts) => {
 
         const { ibDusd, dusd, withrawable } = await this.client.balanceOf(alice)
         assert.strictEqual(ibDusd, '0')
-        assert.strictEqual(dusd, toWei('439.3') /* 300 + .995 * 140 */)
+        assert.strictEqual(dusd, toWei('429.35') /* 300 + .995 * 130 */)
         assert.strictEqual(withrawable, '0')
     })
 
@@ -87,6 +95,17 @@ contract('ibDUSD', async (accounts) => {
         await ibDusdProxy.transferOwnership(accounts[9])
         await this.yVaultPeak.dummyIncrementVirtualPrice();
 
+        /*
+            virtual_price is bumped by 10% again; so
+                virtual_price = 1.1 ^ 2 = 1.21
+                totalSystemAssets = 1.21 * 400 = 484
+                net revenue = 84
+                fresh revenue = 84 - 40 = 44
+                ibDUSD's share in fresh revenue = .75 * 44 = 33
+            ibDUSD has 0.65 in fee leftover from the test above
+            So, 0.65 + 33 = 33.65 has accrued before someone stakes again
+        */
+
         const amount = toWei('100')
         await this.dusd.approve(this.ibDusd.address, amount)
         await this.ibDusd.deposit(amount)
@@ -94,18 +113,23 @@ contract('ibDUSD', async (accounts) => {
         const actual = (await Promise.all([
             this.dusd.balanceOf(alice),
             this.dusd.balanceOf(this.ibDusd.address),
+            this.ibDusd.getPricePerFullShare(),
             this.ibDusd.balanceOf(alice),
             this.ibDusd.totalSupply(),
-            this.ibDusd.getPricePerFullShare(),
             this.dusd.balanceOf(accounts[9])
         ])).map(v => v.toString())
 
-        // virtual_price = 1.1 ^ 2, totalSystemAssets = 1.21 * 400 = 484
-        // (440 - 0.7) was withdrawn, so 44.7 has accrued before someone stakes again
-        const expected = [ toWei('339.3'), toWei('100'), toWei('100'), toWei('100'), toWei('1'), toWei('44.7') ]
+        const expected = [
+            '329.35', // 429.35 - 100 (deposited amount)
+            '100', // transfers residue to owner before accepting a fresh deposit
+            '1', // for fresh deposits pricePerFullShare = 1 again
+            '100',
+            '100',
+            '33.65' // transferred to owner
+        ]
 
         for (let i = 0; i < expected.length; i++) {
-            assert.strictEqual(actual[i], expected[i])
+            assert.strictEqual(actual[i], toWei(expected[i]))
         }
     })
 })

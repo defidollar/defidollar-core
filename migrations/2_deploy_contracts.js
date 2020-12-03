@@ -18,23 +18,11 @@ module.exports = async function(deployer, network, accounts) {
     const core = await Core.at(CoreProxy.address)
 
     await deployer.deploy(DUSD, CoreProxy.address, "tDUSD", "tDUSD", 18)
-
-    const comptroller = await deployer.deploy(Comptroller, DUSD.address, CoreProxy.address)
-
-    const ibDusdProxy = await deployer.deploy(ibDUSDProxy)
-    await deployer.deploy(ibDUSD)
-    await ibDusdProxy.updateImplementation(ibDUSD.address)
-    const ibDusd = await ibDUSD.at(ibDusdProxy.address)
-    await ibDusd.setParams(DUSD.address, comptroller.address, 9950) // 0.5% redeem fee
-
-    await comptroller.addBeneficiary(ibDusdProxy.address, [10000])
-
     const config = {
         contracts: {
             base: CoreProxy.address,
             tokens: {
-                DUSD: { address: DUSD.address, decimals: 18 },
-                ibDUSD: { address: ibDUSDProxy.address, decimals: 18 }
+                DUSD: { address: DUSD.address, decimals: 18 }
             }
         }
     }
@@ -45,7 +33,7 @@ module.exports = async function(deployer, network, accounts) {
     const reserves = []
     const tokens = []
     for(let i = 0; i < tickerSymbols.length; i++) {
-        const reserve = await Reserve.new(tickerSymbols[i],tickerSymbols[i],decimals[i])
+        const reserve = await Reserve.new(tickerSymbols[i], tickerSymbols[i], decimals[i])
         reserves.push(reserve)
         tokens.push(reserve.address)
         if (process.env.INITIALIZE === 'true') {
@@ -67,9 +55,6 @@ module.exports = async function(deployer, network, accounts) {
             0, // 0 colBuffer
         ).encodeABI()
     )
-    await Promise.all([
-        core.whitelistTokens(tokens),
-        core.authorizeController(comptroller.address)
-    ])
+    await core.whitelistTokens(tokens)
     utils.writeContractAddresses(config)
 };

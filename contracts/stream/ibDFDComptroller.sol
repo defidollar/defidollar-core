@@ -6,6 +6,7 @@ import {Math} from "@openzeppelin/contracts/math/Math.sol";
 import {Ownable} from "@openzeppelin/contracts/ownership/Ownable.sol";
 
 import {IComptroller} from "../interfaces/IComptroller.sol";
+import {Uni} from "../interfaces/Uni.sol";
 
 contract IRewardDistributionRecipient is Ownable {
     address public rewardDistribution;
@@ -121,14 +122,4 @@ contract ibDFDComptroller is IRewardDistributionRecipient {
             emit Harvested(_dusd, amounts[1]);
         }
     }
-}
-
-interface Uni {
-    function swapExactTokensForTokens(
-        uint256,
-        uint256,
-        address[] calldata,
-        address,
-        uint256
-    ) external returns (uint[] memory);
 }
