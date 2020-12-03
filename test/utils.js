@@ -5,6 +5,8 @@ const ibDUSDProxy = artifacts.require("ibDUSDProxy");
 const ibDUSD = artifacts.require("ibDUSD");
 const Reserve = artifacts.require("Reserve");
 
+const Comptroller = artifacts.require("Comptroller");
+
 const MockSusdToken = artifacts.require("MockSusdToken");
 
 const YVaultPeak = artifacts.require("YVaultPeak");
@@ -43,6 +45,7 @@ async function getArtifacts() {
 		decimals,
 		scaleFactor,
 
+		comptroller: await Comptroller.deployed(),
 		yVaultPeak: await YVaultPeak.at(YVaultPeakProxy.address),
 		yVaultZap: await YVaultZap.deployed(),
 		yVault: await MockYvault.deployed()

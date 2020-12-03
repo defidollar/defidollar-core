@@ -2,6 +2,9 @@ const Core = artifacts.require("Core");
 const DUSD = artifacts.require("DUSD");
 const Reserve = artifacts.require("Reserve");
 const CoreProxy = artifacts.require("CoreProxy");
+
+
+const Comptroller = artifacts.require("Comptroller");
 const ibDUSD = artifacts.require("ibDUSD");
 const ibDUSDProxy = artifacts.require("ibDUSDProxy");
 
@@ -16,11 +19,16 @@ module.exports = async function(deployer, network, accounts) {
 
     await deployer.deploy(DUSD, CoreProxy.address, "tDUSD", "tDUSD", 18)
 
+    const comptroller = await deployer.deploy(Comptroller, DUSD.address, CoreProxy.address)
+
     const ibDusdProxy = await deployer.deploy(ibDUSDProxy)
     await deployer.deploy(ibDUSD)
     await ibDusdProxy.updateImplementation(ibDUSD.address)
     const ibDusd = await ibDUSD.at(ibDusdProxy.address)
-    await ibDusd.setParams(DUSD.address, core.address, 9950) // 0.5% redeem fee
+    await ibDusd.setParams(DUSD.address, comptroller.address, 9950) // 0.5% redeem fee
+
+    await comptroller.addBeneficiary(ibDusdProxy.address, [10000])
+
     const config = {
         contracts: {
             base: CoreProxy.address,
@@ -59,7 +67,9 @@ module.exports = async function(deployer, network, accounts) {
             0, // 0 colBuffer
         ).encodeABI()
     )
-    await core.whitelistTokens(tokens)
-
+    await Promise.all([
+        core.whitelistTokens(tokens),
+        core.authorizeController(comptroller.address)
+    ])
     utils.writeContractAddresses(config)
 };

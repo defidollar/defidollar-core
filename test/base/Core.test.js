@@ -124,5 +124,14 @@ contract('Core', async (accounts) => {
                 assert.equal(e.reason, 'NOT_OWNER')
             }
         })
+
+        it('authorizeController fails', async () => {
+        try {
+            await this.core.authorizeController(accounts[0], { from: accounts[1] })
+            assert.fail('expected to revert')
+        } catch (e) {
+            assert.strictEqual(e.reason, 'NOT_OWNER')
+        }
+    })
     })
 })

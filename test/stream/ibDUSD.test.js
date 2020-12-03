@@ -22,21 +22,6 @@ contract('ibDUSD', async (accounts) => {
         this.client = new SavingsClient(web3, config)
     })
 
-    it('authorizeController fails from non-admin account', async () => {
-        try {
-            await this.core.authorizeController(this.ibDusd.address, { from: accounts[1] })
-            assert.fail('expected to revert')
-        } catch (e) {
-            assert.strictEqual(e.reason, 'NOT_OWNER')
-        }
-    })
-
-    it('authorizeController ', async () => {
-        assert.strictEqual(await this.core.authorizedController(), utils.ZERO_ADDRESS)
-        await this.core.authorizeController(this.ibDusd.address)
-        assert.strictEqual(await this.core.authorizedController(), this.ibDusd.address)
-    })
-
     it('yVaultZap.mint', async () => {
         this.amounts = [100, 100, 100, 100]
         const tasks = []

@@ -7,6 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import {Initializable} from "../common/Initializable.sol";
 import {OwnableProxy} from "../common/OwnableProxy.sol";
+import {IComptroller} from "../interfaces/IComptroller.sol";
 
 contract ibDUSD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
     using SafeERC20 for IERC20;
@@ -14,7 +15,7 @@ contract ibDUSD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
     uint constant FEE_PRECISION = 10000;
 
     IERC20 public dusd;
-    ibController public controller;
+    IComptroller public controller;
     uint public redeemFactor;
 
     /**
@@ -26,6 +27,7 @@ contract ibDUSD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
 
     modifier harvest() {
         controller.harvest();
+        // If there are no DUSD staked, the meanwhile accrued interest goes to the governance safe
         if (totalSupply() == 0) {
             uint bal = dusd.balanceOf(address(this));
             if (bal > 0) {
@@ -66,14 +68,17 @@ contract ibDUSD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
         if (totalSupply() == 0) {
             return 1e18;
         }
-        return balance().add(controller.earned()).mul(1e18).div(totalSupply());
+        return balance()
+            .add(controller.earned())
+            .mul(1e18)
+            .div(totalSupply());
     }
 
     /* ##### Admin ##### */
 
     function setParams(
         IERC20 _dusd,
-        ibController _controller,
+        IComptroller _controller,
         uint _redeemFactor
     )   external
         onlyOwner
@@ -90,9 +95,4 @@ contract ibDUSD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
         controller = _controller;
         redeemFactor = _redeemFactor;
     }
-}
-
-interface ibController {
-    function harvest() external;
-    function earned() external view returns(uint);
 }

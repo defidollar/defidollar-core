@@ -11,55 +11,50 @@ contract Comptroller is Ownable {
 
     uint constant MAX = 10000;
 
-    struct Beneficiary {
-        uint share;
-        uint pendingWithdrawl;
-    }
-    mapping(address => Beneficiary) public account;
     address[] public beneficiaries;
+    uint[] public allocations;
 
     IERC20 public dusd;
     ICore public core;
+
+    event Harvested(uint indexed revenue);
 
     constructor(IERC20 _dusd, ICore _core) public {
         dusd = _dusd;
         core = _core;
     }
 
-    function harvest() external {
-        core.harvest();
-        uint revenue = dusd.balanceOf(address(this));
-        if (revenue == 0) {
-            return;
-        }
-        for (uint i = 0; i < beneficiaries.length; i++) {
-            Beneficiary storage beneficiary = account[beneficiaries[i]];
-            beneficiary.pendingWithdrawl =
-                beneficiary.pendingWithdrawl
-                .add(
-                    revenue.mul(beneficiary.share).div(MAX)
-                );
-        }
-    }
-
     /**
-    * @notice Beneficiaries can claim their respective accrued withdrawls after the last harvest.
-    * @dev Doesn't require an ACL because beneficiary.pendingWithdrawl will always be == 0,
-           for accounts that are not whitelisted beneficiaries.
+    * @notice Harvests all accrued income from core and transfers it to beneficiaries
+    * @dev All beneficiaries should account for that fact that they can have dusd transferred to them at any time
+    * @dev Any account call harvest
     */
-    function claim() external {
-        _claim(msg.sender);
+    function harvest() external {
+        // address(this) needs to be the authorizedController() in core
+        core.harvest();
+
+        // any extraneous dusd tokens in the contract will also be harvested
+        uint revenue = dusd.balanceOf(address(this));
+        emit Harvested(revenue);
+        if (revenue > 0) {
+            for (uint i = 0; i < beneficiaries.length; i++) {
+                if (allocations[i] > 0) {
+                    dusd.safeTransfer(beneficiaries[i], revenue.mul(allocations[i]).div(MAX));
+                }
+            }
+        }
     }
 
-    /* ##### Internal ##### */
-
-    function _claim(address _beneficiary) internal {
-        Beneficiary storage beneficiary = account[_beneficiary];
-        uint withdraw = beneficiary.pendingWithdrawl;
-        if (withdraw > 0) {
-            beneficiary.pendingWithdrawl = 0;
-            dusd.safeTransfer(_beneficiary, withdraw);
+    function earned() external view returns(uint) {
+        uint revenue = dusd.balanceOf(address(this)).add(core.earned());
+        if (revenue > 0) {
+            for (uint i = 0; i < beneficiaries.length; i++) {
+                if (beneficiaries[i] == msg.sender && allocations[i] > 0) {
+                    return revenue.mul(allocations[i]).div(MAX);
+                }
+            }
         }
+        return 0;
     }
 
     /* ##### Admin ##### */
@@ -72,7 +67,6 @@ contract Comptroller is Ownable {
         onlyOwner
     {
         require(beneficiary != address(0x0), "ZERO_ADDRESS");
-        account[beneficiary] = Beneficiary(0, 0);
         beneficiaries.push(beneficiary);
         modifyAllocation(_allocations);
     }
@@ -86,9 +80,9 @@ contract Comptroller is Ownable {
         require(beneficiaries.length == _allocations.length, "MALFORMED_INPUT");
         uint total = 0;
         for (uint i = 0; i < _allocations.length; i++) {
-            account[beneficiaries[i]].share = _allocations[i];
             total = total.add(_allocations[i]);
         }
         require(total == MAX, "INVALID_ALLOCATIONS");
+        allocations = _allocations;
     }
 }
