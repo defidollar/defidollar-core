@@ -49,7 +49,7 @@ contract Comptroller is Ownable {
         uint revenue = dusd.balanceOf(address(this)).add(core.earned());
         if (revenue > 0) {
             for (uint i = 0; i < beneficiaries.length; i++) {
-                if (beneficiaries[i] == msg.sender && allocations[i] > 0) {
+                if (beneficiaries[i] == msg.sender) {
                     return revenue.mul(allocations[i]).div(MAX);
                 }
             }
