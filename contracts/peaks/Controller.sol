@@ -22,6 +22,9 @@ contract Controller is OwnableProxy {
     // Reserved storage space to allow for layout changes in the future.
     uint256[20] private _gap;
 
+    event PeakAdded(address indexed peak);
+    event VaultAdded(address indexed token, address indexed vault);
+
     modifier onlyPeak() {
         require(peaks[msg.sender], "!peak");
         _;
@@ -34,8 +37,7 @@ contract Controller is OwnableProxy {
         IVault vault = vaults[address(token)];
         uint b = token.balanceOf(address(this));
         if (b > 0) {
-            token.safeApprove(address(vault), 0);
-            token.safeApprove(address(vault), b);
+            token.approve(address(vault), b);
             vault.deposit(b);
         }
     }
@@ -74,13 +76,17 @@ contract Controller is OwnableProxy {
     // Privileged methods
 
     function addPeak(address peak) external onlyOwner {
+        require(!peaks[peak], "Peak is already added");
         require(Address.isContract(peak), "peak is !contract");
         peaks[peak] = true;
+        emit PeakAdded(peak);
     }
 
     function addVault(address token, address vault) external onlyOwner {
+        require(address(vaults[token]) == address(0x0), "vault is already added for token");
         require(Address.isContract(token), "token is !contract");
         require(Address.isContract(vault), "vault is !contract");
         vaults[token] = IVault(vault);
+        emit VaultAdded(token, vault);
     }
 }
