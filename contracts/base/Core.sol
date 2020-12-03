@@ -47,10 +47,8 @@ contract Core is OwnableProxy, Initializable, ICore {
 
     event Mint(address indexed account, uint amount);
     event Redeem(address indexed account, uint amount);
-    event FeedUpdated(uint[] feed);
     event TokenWhiteListed(address indexed token);
     event PeakWhitelisted(address indexed peak);
-    event UpdateDeficitState(bool inDeficit);
 
     /**
     * @dev Used to initialize contract state from the proxy
@@ -68,13 +66,13 @@ contract Core is OwnableProxy, Initializable, ICore {
             address(_dusd) != address(0),
             "0 address during initialization"
         );
-        dusd = _dusd;
-        stakeLPToken = _stakeLPToken;
-        oracle = _oracle;
         require(
             _redeemFactor <= FEE_PRECISION && _colBuffer <= FEE_PRECISION,
             "Incorrect upper bound for fee"
         );
+        dusd = _dusd;
+        stakeLPToken = _stakeLPToken;
+        oracle = _oracle;
         redeemFactor = _redeemFactor;
         colBuffer = _colBuffer;
     }
@@ -90,7 +88,7 @@ contract Core is OwnableProxy, Initializable, ICore {
         external
         returns(uint)
     {
-        Peak memory peak = peaks[msg.sender];
+        Peak storage peak = peaks[msg.sender];
         uint tvl = peak.amount.add(dusdAmount);
         require(
             dusdAmount > 0
@@ -98,7 +96,7 @@ contract Core is OwnableProxy, Initializable, ICore {
             && tvl <= peak.ceiling,
             "ERR_MINT"
         );
-        peaks[msg.sender].amount = tvl;
+        peak.amount = tvl;
         dusd.mint(account, dusdAmount);
         emit Mint(account, dusdAmount);
         return dusdAmount;
@@ -114,12 +112,12 @@ contract Core is OwnableProxy, Initializable, ICore {
         external
         returns(uint usd)
     {
-        Peak memory peak = peaks[msg.sender];
+        Peak storage peak = peaks[msg.sender];
         require(
             dusdAmount > 0 && peak.state != PeakState.Extinct,
             "ERR_REDEEM"
         );
-        peaks[msg.sender].amount = peak.amount.sub(peak.amount.min(dusdAmount));
+        peak.amount = peak.amount.sub(peak.amount.min(dusdAmount));
         dusd.burn(account, dusdAmount);
         emit Redeem(account, dusdAmount);
         return dusdAmount;
@@ -206,8 +204,7 @@ contract Core is OwnableProxy, Initializable, ICore {
     function whitelistPeak(
         address peak,
         uint[] calldata _systemCoins,
-        uint ceiling,
-        bool /* shouldUpdateFeed */
+        uint ceiling
     )   external
         onlyOwner
     {

@@ -91,7 +91,7 @@ module.exports = async function(deployer, network, accounts) {
     await Promise.all([
         controller.addPeak(yVaultPeak.address),
         controller.addVault(yCrv.address, yVault.address),
-        core.whitelistPeak(yVaultPeakProxy.address, [0, 1, 2, 4], toWei('1234567'), true),
+        core.whitelistPeak(yVaultPeakProxy.address, [0, 1, 2, 4], toWei('1234567')),
         yVaultZap.setDeps(
             curveDeposit.options.address,
             curve.options.address,
