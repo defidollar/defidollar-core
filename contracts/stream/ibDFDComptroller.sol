@@ -34,15 +34,15 @@ contract ibDFDComptroller is IRewardDistributionRecipient {
 
     /*
         Todo (before deployment)
-        1. Provide comptroller address
+        1. Provide comptroller and beneficiary (ibDFD vault) address
         2. Make the following constant
     */
+    address public uni = address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+    address public beneficiary; // ibDFD
     IERC20 public dfd = IERC20(0x20c36f062a31865bED8a5B1e512D9a1A20AA333A);
     IERC20 public dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
-    IComptroller public comptroller = IComptroller(0x0);
-    address public uni = address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
+    IComptroller public comptroller;
 
-    address public beneficiary; // ibDFD
 
     uint public periodFinish;
     uint public rewardRate;
@@ -53,10 +53,6 @@ contract ibDFDComptroller is IRewardDistributionRecipient {
     event RewardAdded(uint reward);
     event RewardPaid(address indexed user, uint256 reward);
     event Harvested(uint indexed dusd, uint indexed dfd);
-
-    constructor(address _beneficiary) public {
-        beneficiary = _beneficiary;
-    }
 
     modifier updateReward() {
         uint _lastTimeRewardApplicable = lastTimeRewardApplicable();
@@ -70,8 +66,9 @@ contract ibDFDComptroller is IRewardDistributionRecipient {
     }
 
     function lastTimeRewardApplicable() public view returns (uint256) {
-        return Math.min(block.timestamp, periodFinish);
+        return Math.min(_timestamp(), periodFinish);
     }
+
 
     function getReward()
         external
@@ -82,6 +79,14 @@ contract ibDFDComptroller is IRewardDistributionRecipient {
         rewardPaid = rewardStored;
         dfd.safeTransfer(beneficiary, reward);
         emit RewardPaid(beneficiary, reward);
+    }
+
+    function availableReward() public view returns(uint) {
+        return lastTimeRewardApplicable()
+            .sub(lastUpdateTime)
+            .mul(rewardRate)
+            .add(rewardStored)
+            .sub(rewardPaid);
     }
 
     function notifyRewardAmount(uint256 reward)
@@ -102,14 +107,16 @@ contract ibDFDComptroller is IRewardDistributionRecipient {
         emit RewardAdded(reward);
     }
 
-    function harvest() external {
+    function harvest()
+        onlyOwner
+        external
+    {
         // This contract will receive dusd because it should be a registered beneficiary
         comptroller.harvest();
 
         uint256 _dusd = dusd.balanceOf(address(this));
         if (_dusd > 0) {
-            dusd.safeApprove(uni, 0);
-            dusd.safeApprove(uni, _dusd);
+            dusd.approve(uni, _dusd);
 
             address[] memory path = new address[](3);
             path[0] = address(dusd);
@@ -121,5 +128,9 @@ contract ibDFDComptroller is IRewardDistributionRecipient {
             }
             emit Harvested(_dusd, amounts[1]);
         }
+    }
+
+    function _timestamp() internal view returns (uint) {
+        return block.timestamp;
     }
 }

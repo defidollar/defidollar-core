@@ -7,7 +7,7 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import {Initializable} from "../common/Initializable.sol";
 import {OwnableProxy} from "../common/OwnableProxy.sol";
-import {IComptroller} from "../interfaces/IComptroller.sol";
+import {IibDFDComptroller} from "../interfaces/IComptroller.sol";
 
 contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
     using SafeERC20 for IERC20;
@@ -16,7 +16,7 @@ contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
     address public constant dusd = address(0xD533a949740bb3306d119CC777fa900bA034cd52);
 
     IERC20 public dfd;
-    IComptroller public comptroller;
+    IibDFDComptroller public comptroller;
     uint public redeemFactor;
 
     /**
@@ -26,7 +26,19 @@ contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
         public
         ERC20Detailed("ibDFD Implementation", "ibDFD_i", 18) {}
 
-    function deposit(uint _amount) external {
+    modifier getReward() {
+        comptroller.getReward();
+        // If there are no DUSD staked, the meanwhile accrued interest goes to the governance safe
+        if (totalSupply() == 0) {
+            uint bal = dfd.balanceOf(address(this));
+            if (bal > 0) {
+                dfd.safeTransfer(owner(), bal);
+            }
+        }
+        _;
+    }
+
+    function deposit(uint _amount) external getReward {
         uint _pool = balance();
         dfd.safeTransferFrom(msg.sender, address(this), _amount);
         uint shares = 0;
@@ -38,7 +50,7 @@ contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
         _mint(msg.sender, shares);
     }
 
-    function withdraw(uint _shares) external {
+    function withdraw(uint _shares) external getReward {
         uint r = balance()
             .mul(_shares)
             .mul(redeemFactor)
@@ -57,14 +69,14 @@ contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
         if (totalSupply() == 0) {
             return 1e18;
         }
-        return balance().mul(1e18).div(totalSupply());
+        return balance().add(comptroller.availableReward()).mul(1e18).div(totalSupply());
     }
 
     /* ##### Admin ##### */
 
     function setParams(
         IERC20 _dfd,
-        IComptroller _comptroller,
+        IibDFDComptroller _comptroller,
         uint _redeemFactor
     )
         external
