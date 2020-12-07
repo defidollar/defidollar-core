@@ -26,7 +26,6 @@ module.exports = async function(deployer, network, accounts) {
         coins: ["DAI", "USDC", "USDT", "TUSD"],
         native: ["yCRV", "yUSD"]
     }
-    // TUSD
     const coreProxy = await CoreProxy.deployed()
     const core = await Core.at(coreProxy.address)
     const reserves = []

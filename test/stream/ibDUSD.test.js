@@ -22,21 +22,6 @@ contract('ibDUSD', async (accounts) => {
         this.client = new SavingsClient(web3, config)
     })
 
-    it('authorizeController fails from non-admin account', async () => {
-        try {
-            await this.core.authorizeController(this.ibDusd.address, { from: accounts[1] })
-            assert.fail('expected to revert')
-        } catch (e) {
-            assert.strictEqual(e.reason, 'NOT_OWNER')
-        }
-    })
-
-    it('authorizeController ', async () => {
-        assert.strictEqual(await this.core.authorizedController(), utils.ZERO_ADDRESS)
-        await this.core.authorizeController(this.ibDusd.address)
-        assert.strictEqual(await this.core.authorizedController(), this.ibDusd.address)
-    })
-
     it('yVaultZap.mint', async () => {
         this.amounts = [100, 100, 100, 100]
         const tasks = []
@@ -74,7 +59,15 @@ contract('ibDUSD', async (accounts) => {
         this.yVaultPeak = await YVaultPeakTest2.at(YVaultPeakProxy.address)
 
         await this.yVaultPeak.dummyIncrementVirtualPrice();
-        assert.strictEqual((await this.ibDusd.getPricePerFullShare()).toString(), toWei('1.4')) // 140 / 100
+
+        /*
+            dummyIncrementVirtualPrice bumps the virtual price by 10%
+            Since there are 400 DUSD/yCRV LP tokens, net system revenue = $40
+            Revenue sharing of 75:25 b/w ibDUSD:ibDFD is hardcoded in migrations, so net revenue is $30 for ibDUSD
+            Only 100 DUSD are deposited in ibDUSD, so pricePerFullShare = 130 / 100 = 1.3
+        */
+
+        assert.strictEqual((await this.ibDusd.getPricePerFullShare()).toString(), toWei('1.3'))
 
         await this.client.withdraw(null, true /* isMax */, { from: alice })
         // OR
@@ -85,7 +78,7 @@ contract('ibDUSD', async (accounts) => {
             this.ibDusd.totalSupply(),
             this.ibDusd.getPricePerFullShare() // back to one post-withdraw
         ])).map(v => v.toString())
-        const expected = [ toWei('0.7'), '0', toWei('1') ]
+        const expected = [ toWei('0.65') /* 0.5% of 130 */, '0', toWei('1') ]
 
         for (let i = 0; i < expected.length; i++) {
             assert.strictEqual(actual[i], expected[i])
@@ -93,34 +86,7 @@ contract('ibDUSD', async (accounts) => {
 
         const { ibDusd, dusd, withrawable } = await this.client.balanceOf(alice)
         assert.strictEqual(ibDusd, '0')
-        assert.strictEqual(dusd, toWei('439.3') /* 300 + .995 * 140 */)
+        assert.strictEqual(dusd, toWei('429.35') /* 300 + .995 * 130 */)
         assert.strictEqual(withrawable, '0')
-    })
-
-    it('transfer residue to owner', async () => {
-        const ibDusdProxy = await ibDUSDProxy.deployed()
-        await ibDusdProxy.transferOwnership(accounts[9])
-        await this.yVaultPeak.dummyIncrementVirtualPrice();
-
-        const amount = toWei('100')
-        await this.dusd.approve(this.ibDusd.address, amount)
-        await this.ibDusd.deposit(amount)
-
-        const actual = (await Promise.all([
-            this.dusd.balanceOf(alice),
-            this.dusd.balanceOf(this.ibDusd.address),
-            this.ibDusd.balanceOf(alice),
-            this.ibDusd.totalSupply(),
-            this.ibDusd.getPricePerFullShare(),
-            this.dusd.balanceOf(accounts[9])
-        ])).map(v => v.toString())
-
-        // virtual_price = 1.1 ^ 2, totalSystemAssets = 1.21 * 400 = 484
-        // (440 - 0.7) was withdrawn, so 44.7 has accrued before someone stakes again
-        const expected = [ toWei('339.3'), toWei('100'), toWei('100'), toWei('100'), toWei('1'), toWei('44.7') ]
-
-        for (let i = 0; i < expected.length; i++) {
-            assert.strictEqual(actual[i], expected[i])
-        }
     })
 })

@@ -2,6 +2,9 @@ const Core = artifacts.require("Core");
 const DUSD = artifacts.require("DUSD");
 const Reserve = artifacts.require("Reserve");
 const CoreProxy = artifacts.require("CoreProxy");
+
+
+const Comptroller = artifacts.require("Comptroller");
 const ibDUSD = artifacts.require("ibDUSD");
 const ibDUSDProxy = artifacts.require("ibDUSDProxy");
 
@@ -15,18 +18,11 @@ module.exports = async function(deployer, network, accounts) {
     const core = await Core.at(CoreProxy.address)
 
     await deployer.deploy(DUSD, CoreProxy.address, "tDUSD", "tDUSD", 18)
-
-    const ibDusdProxy = await deployer.deploy(ibDUSDProxy)
-    await deployer.deploy(ibDUSD)
-    await ibDusdProxy.updateImplementation(ibDUSD.address)
-    const ibDusd = await ibDUSD.at(ibDusdProxy.address)
-    await ibDusd.setParams(DUSD.address, core.address, 9950) // 0.5% redeem fee
     const config = {
         contracts: {
             base: CoreProxy.address,
             tokens: {
-                DUSD: { address: DUSD.address, decimals: 18 },
-                ibDUSD: { address: ibDUSDProxy.address, decimals: 18 }
+                DUSD: { address: DUSD.address, decimals: 18 }
             }
         }
     }
@@ -37,7 +33,7 @@ module.exports = async function(deployer, network, accounts) {
     const reserves = []
     const tokens = []
     for(let i = 0; i < tickerSymbols.length; i++) {
-        const reserve = await Reserve.new(tickerSymbols[i],tickerSymbols[i],decimals[i])
+        const reserve = await Reserve.new(tickerSymbols[i], tickerSymbols[i], decimals[i])
         reserves.push(reserve)
         tokens.push(reserve.address)
         if (process.env.INITIALIZE === 'true') {
@@ -60,6 +56,5 @@ module.exports = async function(deployer, network, accounts) {
         ).encodeABI()
     )
     await core.whitelistTokens(tokens)
-
     utils.writeContractAddresses(config)
 };

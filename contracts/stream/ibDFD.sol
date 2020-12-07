@@ -7,15 +7,15 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import {Initializable} from "../common/Initializable.sol";
 import {OwnableProxy} from "../common/OwnableProxy.sol";
-import {IComptroller} from "../interfaces/IComptroller.sol";
+import {IDFDComptroller} from "../interfaces/IComptroller.sol";
 
-contract ibDUSD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
+contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
     using SafeERC20 for IERC20;
 
     uint constant FEE_PRECISION = 10000;
 
-    IERC20 public dusd;
-    IComptroller public controller;
+    IERC20 public dfd;
+    IDFDComptroller public comptroller;
     uint public redeemFactor;
 
     /**
@@ -23,16 +23,16 @@ contract ibDUSD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
     */
     constructor ()
         public
-        ERC20Detailed("interest-bearing DUSD", "ibDUSD", 18) {}
+        ERC20Detailed("ibDFD Implementation", "ibDFD_i", 18) {}
 
-    modifier harvest() {
-        controller.harvest();
+    modifier getReward() {
+        comptroller.getReward();
         _;
     }
 
-    function deposit(uint _amount) external harvest {
+    function deposit(uint _amount) external getReward {
         uint _pool = balance();
-        dusd.safeTransferFrom(msg.sender, address(this), _amount);
+        dfd.safeTransferFrom(msg.sender, address(this), _amount);
         uint shares = 0;
         if (_pool == 0) {
             shares = _amount;
@@ -42,50 +42,49 @@ contract ibDUSD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
         _mint(msg.sender, shares);
     }
 
-    function withdraw(uint _shares) external harvest {
+    function withdraw(uint _shares) external getReward {
         uint r = balance()
             .mul(_shares)
             .mul(redeemFactor)
             .div(totalSupply().mul(FEE_PRECISION));
         _burn(msg.sender, _shares);
-        dusd.safeTransfer(msg.sender, r);
+        dfd.safeTransfer(msg.sender, r);
     }
 
     /* ##### View ##### */
 
     function balance() public view returns (uint) {
-        return dusd.balanceOf(address(this));
+        return dfd.balanceOf(address(this));
     }
 
     function getPricePerFullShare() public view returns (uint) {
         if (totalSupply() == 0) {
             return 1e18;
         }
-        return balance()
-            .add(controller.earned(address(this)))
-            .mul(1e18)
-            .div(totalSupply());
+        return balance().add(comptroller.availableReward()).mul(1e18).div(totalSupply());
     }
 
     /* ##### Admin ##### */
 
     function setParams(
-        IERC20 _dusd,
-        IComptroller _controller,
+        IERC20 _dfd,
+        IDFDComptroller _comptroller,
         uint _redeemFactor
-    )   external
+    )
+        external
         onlyOwner
     {
         require(
-            address(_dusd) != address(0) && address(_controller) != address(0),
+            address(_dfd) != address(0) && address(_comptroller) != address(0),
             "0 address during initialization"
         );
         require(
             _redeemFactor <= FEE_PRECISION,
             "Incorrect upper bound for fee"
         );
-        dusd = _dusd;
-        controller = _controller;
+        dfd = _dfd;
+        comptroller = _comptroller;
         redeemFactor = _redeemFactor;
     }
 }
+

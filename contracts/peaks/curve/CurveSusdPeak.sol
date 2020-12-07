@@ -8,6 +8,7 @@ import {Math} from "@openzeppelin/contracts/math/Math.sol";
 import {ICurveDeposit, ICurve, IUtil} from "../../interfaces/ICurve.sol";
 import {ICore} from "../../interfaces/ICore.sol";
 import {IPeak} from "../../interfaces/IPeak.sol";
+import {Uni} from "../../interfaces/Uni.sol";
 
 import {Initializable} from "../../common/Initializable.sol";
 import {OwnableProxy} from "../../common/OwnableProxy.sol";
@@ -357,6 +358,3 @@ contract CurveSusdPeak is OwnableProxy, Initializable, IPeak {
     }
 }
 
-interface Uni {
-    function swapExactTokensForTokens(uint, uint, address[] calldata, address, uint) external;
-}
