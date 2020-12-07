@@ -7,16 +7,15 @@ import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 
 import {Initializable} from "../common/Initializable.sol";
 import {OwnableProxy} from "../common/OwnableProxy.sol";
-import {IibDFDComptroller} from "../interfaces/IComptroller.sol";
+import {IDFDComptroller} from "../interfaces/IComptroller.sol";
 
 contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
     using SafeERC20 for IERC20;
 
     uint constant FEE_PRECISION = 10000;
-    address public constant dusd = address(0xD533a949740bb3306d119CC777fa900bA034cd52);
 
     IERC20 public dfd;
-    IibDFDComptroller public comptroller;
+    IDFDComptroller public comptroller;
     uint public redeemFactor;
 
     /**
@@ -69,7 +68,7 @@ contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
 
     function setParams(
         IERC20 _dfd,
-        IibDFDComptroller _comptroller,
+        IDFDComptroller _comptroller,
         uint _redeemFactor
     )
         external

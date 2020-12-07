@@ -3,9 +3,9 @@ pragma solidity 0.5.17;
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {IComptroller} from "../interfaces/IComptroller.sol";
-import {ibDFDComptroller} from "./ibDFDComptroller.sol";
+import {DFDComptroller} from "./DFDComptroller.sol";
 
-contract ibDFDComptrollerTest is ibDFDComptroller {
+contract DFDComptrollerTest is DFDComptroller {
     uint public travelled;
 
     function increaseBlockTime(uint duration) public onlyOwner {

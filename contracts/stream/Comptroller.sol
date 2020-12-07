@@ -5,7 +5,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {SafeERC20, SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import {ICore} from "../interfaces/ICore.sol";
 
-contract Comptroller is Ownable {
+import {IComptroller} from "../interfaces/IComptroller.sol";
+
+contract Comptroller is Ownable, IComptroller {
     using SafeMath for uint;
     using SafeERC20 for IERC20;
 
@@ -38,18 +40,16 @@ contract Comptroller is Ownable {
         emit Harvested(revenue);
         if (revenue > 0) {
             for (uint i = 0; i < beneficiaries.length; i++) {
-                if (allocations[i] > 0) {
-                    dusd.safeTransfer(beneficiaries[i], revenue.mul(allocations[i]).div(MAX));
-                }
+                dusd.safeTransfer(beneficiaries[i], revenue.mul(allocations[i]).div(MAX));
             }
         }
     }
 
-    function earned() external view returns(uint) {
+    function earned(address account) external view returns(uint) {
         uint revenue = dusd.balanceOf(address(this)).add(core.earned());
         if (revenue > 0) {
             for (uint i = 0; i < beneficiaries.length; i++) {
-                if (beneficiaries[i] == msg.sender) {
+                if (beneficiaries[i] == account) {
                     return revenue.mul(allocations[i]).div(MAX);
                 }
             }

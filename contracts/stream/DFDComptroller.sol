@@ -5,10 +5,10 @@ import {SafeERC20, SafeMath} from "@openzeppelin/contracts/token/ERC20/SafeERC20
 import {Math} from "@openzeppelin/contracts/math/Math.sol";
 import {Ownable} from "@openzeppelin/contracts/ownership/Ownable.sol";
 
-import {IComptroller} from "../interfaces/IComptroller.sol";
+import {IComptroller, IDFDComptroller} from "../interfaces/IComptroller.sol";
 import {Uni} from "../interfaces/Uni.sol";
 
-contract IRewardDistributionRecipient is Ownable {
+contract RewardDistributionRecipient is Ownable {
     address public rewardDistribution;
 
     function notifyRewardAmount(uint256 reward) external;
@@ -26,7 +26,7 @@ contract IRewardDistributionRecipient is Ownable {
     }
 }
 
-contract ibDFDComptroller is IRewardDistributionRecipient {
+contract DFDComptroller is RewardDistributionRecipient, IDFDComptroller {
     using SafeERC20 for IERC20;
     using SafeMath for uint;
 

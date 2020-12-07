@@ -62,7 +62,7 @@ contract ibDUSD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
             return 1e18;
         }
         return balance()
-            .add(controller.earned())
+            .add(controller.earned(address(this)))
             .mul(1e18)
             .div(totalSupply());
     }

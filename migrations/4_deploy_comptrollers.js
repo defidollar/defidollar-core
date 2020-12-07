@@ -4,7 +4,7 @@ const Reserve = artifacts.require("Reserve");
 const CoreProxy = artifacts.require("CoreProxy");
 
 const Comptroller = artifacts.require("Comptroller");
-const ibDFDComptroller = artifacts.require("ibDFDComptrollerTest");
+const DFDComptroller = artifacts.require("DFDComptrollerTest");
 const ibDUSD = artifacts.require("ibDUSD");
 const ibDUSDProxy = artifacts.require("ibDUSDProxy");
 const ibDFD = artifacts.require("ibDFD");
@@ -37,7 +37,7 @@ module.exports = async function(deployer, network, accounts) {
     const [ dfd, ibDfdProxy, ibDfdComptroller ] = await Promise.all([
         Reserve.new('DefiDollar DAO', 'DFD', 18),
         deployer.deploy(ibDFDProxy),
-        deployer.deploy(ibDFDComptroller),
+        deployer.deploy(DFDComptroller),
         deployer.deploy(MockUniswap),
         deployer.deploy(ibDFD),
     ])
