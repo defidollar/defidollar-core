@@ -89,47 +89,4 @@ contract('ibDUSD', async (accounts) => {
         assert.strictEqual(dusd, toWei('429.35') /* 300 + .995 * 130 */)
         assert.strictEqual(withrawable, '0')
     })
-
-    it('transfer residue to owner', async () => {
-        const ibDusdProxy = await ibDUSDProxy.deployed()
-        await ibDusdProxy.transferOwnership(accounts[9])
-        await this.yVaultPeak.dummyIncrementVirtualPrice();
-
-        /*
-            virtual_price is bumped by 10% again; so
-                virtual_price = 1.1 ^ 2 = 1.21
-                totalSystemAssets = 1.21 * 400 = 484
-                net revenue = 84
-                fresh revenue = 84 - 40 = 44
-                ibDUSD's share in fresh revenue = .75 * 44 = 33
-            ibDUSD has 0.65 in fee leftover from the test above
-            So, 0.65 + 33 = 33.65 has accrued before someone stakes again
-        */
-
-        const amount = toWei('100')
-        await this.dusd.approve(this.ibDusd.address, amount)
-        await this.ibDusd.deposit(amount)
-
-        const actual = (await Promise.all([
-            this.dusd.balanceOf(alice),
-            this.dusd.balanceOf(this.ibDusd.address),
-            this.ibDusd.getPricePerFullShare(),
-            this.ibDusd.balanceOf(alice),
-            this.ibDusd.totalSupply(),
-            this.dusd.balanceOf(accounts[9])
-        ])).map(v => v.toString())
-
-        const expected = [
-            '329.35', // 429.35 - 100 (deposited amount)
-            '100', // transfers residue to owner before accepting a fresh deposit
-            '1', // for fresh deposits pricePerFullShare = 1 again
-            '100',
-            '100',
-            '33.65' // transferred to owner
-        ]
-
-        for (let i = 0; i < expected.length; i++) {
-            assert.strictEqual(actual[i], toWei(expected[i]))
-        }
-    })
 })

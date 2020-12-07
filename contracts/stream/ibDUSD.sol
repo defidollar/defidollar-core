@@ -27,13 +27,6 @@ contract ibDUSD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
 
     modifier harvest() {
         controller.harvest();
-        // If there are no DUSD staked, the meanwhile accrued interest goes to the governance safe
-        if (totalSupply() == 0) {
-            uint bal = dusd.balanceOf(address(this));
-            if (bal > 0) {
-                dusd.safeTransfer(owner(), bal);
-            }
-        }
         _;
     }
 

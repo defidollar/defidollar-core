@@ -28,13 +28,6 @@ contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
 
     modifier getReward() {
         comptroller.getReward();
-        // If there are no DUSD staked, the meanwhile accrued interest goes to the governance safe
-        if (totalSupply() == 0) {
-            uint bal = dfd.balanceOf(address(this));
-            if (bal > 0) {
-                dfd.safeTransfer(owner(), bal);
-            }
-        }
         _;
     }
 
