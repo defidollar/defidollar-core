@@ -3,7 +3,7 @@ const DUSD = artifacts.require("DUSD");
 const Reserve = artifacts.require("Reserve");
 const CoreProxy = artifacts.require("CoreProxy");
 
-const Comptroller = artifacts.require("Comptroller");
+const Comptroller = artifacts.require("ComptrollerTest");
 const DFDComptroller = artifacts.require("DFDComptrollerTest");
 const ibDUSD = artifacts.require("ibDUSD");
 const ibDUSDProxy = artifacts.require("ibDUSDProxy");
@@ -21,7 +21,8 @@ module.exports = async function(deployer, network, accounts) {
     ])
     const core = await Core.at(coreProxy.address)
 
-    const comptroller = await deployer.deploy(Comptroller, dusd.address, core.address)
+    const comptroller = await deployer.deploy(Comptroller)
+    await comptroller.setParams(dusd.address, core.address)
     await core.authorizeController(comptroller.address)
 
     // ibDUSD
@@ -30,7 +31,6 @@ module.exports = async function(deployer, network, accounts) {
     await ibDusdProxy.updateImplementation(ibDUSD.address)
     const ibDusd = await ibDUSD.at(ibDusdProxy.address)
     await ibDusd.setParams(DUSD.address, comptroller.address, 9950) // 0.5% redeem fee
-    await comptroller.addBeneficiary(ibDusdProxy.address, [10000])
     config.contracts.tokens.ibDUSD = { address: ibDUSDProxy.address, decimals: 18 }
 
     // ibDFD
@@ -52,7 +52,9 @@ module.exports = async function(deployer, network, accounts) {
             dusd.address,
             comptroller.address
         ),
-        comptroller.addBeneficiary(ibDfdComptroller.address, [7500, 2500]) // 75:25 revenue sharing
+        comptroller.modifyBeneficiaries(
+            [ibDusdProxy.address, ibDfdComptroller.address], [7500, 2500] // 75:25 revenue sharing
+        )
     ])
 
     config.contracts.tokens.ibDFD = { address: ibDFDProxy.address, decimals: 18 }

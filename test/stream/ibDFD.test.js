@@ -62,7 +62,7 @@ contract('ibDFD', async (accounts) => {
     })
 
     it('harvest', async () => {
-        await this.ibDfdComptroller.harvest()
+        await this.ibDfdComptroller.harvest(0)
         assert.strictEqual(fromWei(await this.dusd.balanceOf(this.ibDfdComptroller.address)), '0')
         assert.strictEqual(fromWei(await this.dfd.balanceOf(this.ibDfdComptroller.address)), '0') // transferred to ibdusd
 

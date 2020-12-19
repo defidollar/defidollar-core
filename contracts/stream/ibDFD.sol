@@ -25,12 +25,8 @@ contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
         public
         ERC20Detailed("ibDFD Implementation", "ibDFD_i", 18) {}
 
-    modifier getReward() {
+    function deposit(uint _amount) external {
         comptroller.getReward();
-        _;
-    }
-
-    function deposit(uint _amount) external getReward {
         uint _pool = balance();
         dfd.safeTransferFrom(msg.sender, address(this), _amount);
         uint shares = 0;
@@ -42,7 +38,8 @@ contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
         _mint(msg.sender, shares);
     }
 
-    function withdraw(uint _shares) external getReward {
+    function withdraw(uint _shares) external {
+        comptroller.getReward();
         uint r = balance()
             .mul(_shares)
             .mul(redeemFactor)

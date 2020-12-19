@@ -38,11 +38,10 @@ contract DFDComptroller is RewardDistributionRecipient, IDFDComptroller {
         2. Make the following constant
     */
     address public uni = address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
-    address public beneficiary; // ibDFD
     IERC20 public dfd = IERC20(0x20c36f062a31865bED8a5B1e512D9a1A20AA333A);
     IERC20 public dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
+    address public beneficiary; // ibDFD
     IComptroller public comptroller;
-
 
     uint public periodFinish;
     uint public rewardRate;
@@ -54,46 +53,24 @@ contract DFDComptroller is RewardDistributionRecipient, IDFDComptroller {
     event RewardPaid(address indexed user, uint256 reward);
     event Harvested(uint indexed dusd, uint indexed dfd);
 
-    modifier updateReward() {
-        uint _lastTimeRewardApplicable = lastTimeRewardApplicable();
-        rewardStored = rewardStored.add(
-            _lastTimeRewardApplicable
-                .sub(lastUpdateTime)
-                .mul(rewardRate)
-        );
-        lastUpdateTime = _lastTimeRewardApplicable;
-        _;
-    }
-
-    function lastTimeRewardApplicable() public view returns (uint256) {
-        return Math.min(_timestamp(), periodFinish);
-    }
-
-
     function getReward()
         external
-        updateReward
     {
+        _updateReward();
         require(msg.sender == beneficiary, "GET_REWARD_NO_AUTH");
         uint reward = rewardStored.sub(rewardPaid);
-        rewardPaid = rewardStored;
-        dfd.safeTransfer(beneficiary, reward);
-        emit RewardPaid(beneficiary, reward);
-    }
-
-    function availableReward() public view returns(uint) {
-        return lastTimeRewardApplicable()
-            .sub(lastUpdateTime)
-            .mul(rewardRate)
-            .add(rewardStored)
-            .sub(rewardPaid);
+        if (reward > 0) {
+            rewardPaid = rewardStored;
+            dfd.safeTransfer(beneficiary, reward);
+            emit RewardPaid(beneficiary, reward);
+        }
     }
 
     function notifyRewardAmount(uint256 reward)
         external
         onlyRewardDistribution
-        updateReward
     {
+        _updateReward();
         dfd.safeTransferFrom(msg.sender, address(this), reward);
         if (block.timestamp >= periodFinish) {
             rewardRate = reward.div(DURATION);
@@ -107,7 +84,7 @@ contract DFDComptroller is RewardDistributionRecipient, IDFDComptroller {
         emit RewardAdded(reward);
     }
 
-    function harvest()
+    function harvest(uint amountOutMin)
         onlyOwner
         external
     {
@@ -118,16 +95,42 @@ contract DFDComptroller is RewardDistributionRecipient, IDFDComptroller {
         if (_dusd > 0) {
             dusd.approve(uni, _dusd);
 
-            address[] memory path = new address[](3);
+            address[] memory path = new address[](2);
             path[0] = address(dusd);
             path[1] = address(dfd);
 
-            uint[] memory amounts = Uni(uni).swapExactTokensForTokens(_dusd, uint256(0), path, address(this), now.add(1800));
+            uint[] memory amounts = Uni(uni).swapExactTokensForTokens(_dusd, amountOutMin, path, address(this), block.timestamp);
             if (amounts[1] > 0) {
                 dfd.safeTransfer(beneficiary, amounts[1]);
             }
             emit Harvested(_dusd, amounts[1]);
         }
+    }
+
+    /* ##### View ##### */
+
+    function lastTimeRewardApplicable() public view returns (uint256) {
+        return Math.min(_timestamp(), periodFinish);
+    }
+
+    function availableReward() public view returns(uint) {
+        return lastTimeRewardApplicable()
+            .sub(lastUpdateTime)
+            .mul(rewardRate)
+            .add(rewardStored)
+            .sub(rewardPaid);
+    }
+
+    /* ##### Internal ##### */
+
+    function _updateReward() internal {
+        uint _lastTimeRewardApplicable = lastTimeRewardApplicable();
+        rewardStored = rewardStored.add(
+            _lastTimeRewardApplicable
+                .sub(lastUpdateTime)
+                .mul(rewardRate)
+        );
+        lastUpdateTime = _lastTimeRewardApplicable;
     }
 
     function _timestamp() internal view returns (uint) {
