@@ -25,12 +25,8 @@ contract ibDUSD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
         public
         ERC20Detailed("interest-bearing DUSD", "ibDUSD", 18) {}
 
-    modifier harvest() {
+    function deposit(uint _amount) external {
         controller.harvest();
-        _;
-    }
-
-    function deposit(uint _amount) external harvest {
         uint _pool = balance();
         dusd.safeTransferFrom(msg.sender, address(this), _amount);
         uint shares = 0;
@@ -42,7 +38,8 @@ contract ibDUSD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
         _mint(msg.sender, shares);
     }
 
-    function withdraw(uint _shares) external harvest {
+    function withdraw(uint _shares) external {
+        controller.harvest();
         uint r = balance()
             .mul(_shares)
             .mul(redeemFactor)

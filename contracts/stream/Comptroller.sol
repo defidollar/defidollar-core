@@ -16,15 +16,13 @@ contract Comptroller is Ownable, IComptroller {
     address[] public beneficiaries;
     uint[] public allocations;
 
-    IERC20 public dusd;
-    ICore public core;
+    /*
+        Todo (before deployment): Make the following constant
+    */
+    IERC20 public dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
+    ICore public core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
 
     event Harvested(uint indexed revenue);
-
-    constructor(IERC20 _dusd, ICore _core) public {
-        dusd = _dusd;
-        core = _core;
-    }
 
     /**
     * @notice Harvests all accrued income from core and transfers it to beneficiaries
@@ -39,17 +37,27 @@ contract Comptroller is Ownable, IComptroller {
         uint revenue = dusd.balanceOf(address(this));
         emit Harvested(revenue);
         if (revenue > 0) {
-            for (uint i = 0; i < beneficiaries.length; i++) {
-                dusd.safeTransfer(beneficiaries[i], revenue.mul(allocations[i]).div(MAX));
+            address[] memory _beneficiaries = beneficiaries;
+            uint beneficiariesLength = _beneficiaries.length;
+            for (uint i = 0; i < beneficiariesLength; i++) {
+                dusd.safeTransfer(_beneficiaries[i], revenue.mul(allocations[i]).div(MAX));
             }
         }
     }
 
-    function earned(address account) external view returns(uint) {
+    /* ##### View ##### */
+
+    function earned(address account)
+        external
+        view
+        returns(uint)
+    {
         uint revenue = dusd.balanceOf(address(this)).add(core.earned());
         if (revenue > 0) {
-            for (uint i = 0; i < beneficiaries.length; i++) {
-                if (beneficiaries[i] == account) {
+            address[] memory _beneficiaries = beneficiaries;
+            uint beneficiariesLength = _beneficiaries.length;
+            for (uint i = 0; i < beneficiariesLength; i++) {
+                if (_beneficiaries[i] == account) {
                     return revenue.mul(allocations[i]).div(MAX);
                 }
             }
@@ -59,30 +67,21 @@ contract Comptroller is Ownable, IComptroller {
 
     /* ##### Admin ##### */
 
-    function addBeneficiary(
-        address beneficiary,
+    function modifyBeneficiaries(
+        address[] calldata _beneficiaries,
         uint[] calldata _allocations
     )
         external
         onlyOwner
     {
-        require(beneficiary != address(0x0), "ZERO_ADDRESS");
-        beneficiaries.push(beneficiary);
-        modifyAllocation(_allocations);
-    }
-
-    function modifyAllocation(
-        uint[] memory _allocations
-    )
-        public
-        onlyOwner
-    {
-        require(beneficiaries.length == _allocations.length, "MALFORMED_INPUT");
+        require(_beneficiaries.length == _allocations.length, "MALFORMED_INPUT");
         uint total = 0;
         for (uint i = 0; i < _allocations.length; i++) {
+            require(_beneficiaries[i] != address(0x0), "ZERO_ADDRESS");
             total = total.add(_allocations[i]);
         }
         require(total == MAX, "INVALID_ALLOCATIONS");
         allocations = _allocations;
+        beneficiaries = _beneficiaries;
     }
 }
