@@ -4,7 +4,7 @@ const DUSD = artifacts.require("DUSD");
 const Reserve = artifacts.require("Reserve");
 
 // Stream
-const Comptroller = artifacts.require("Comptroller");
+const Comptroller = artifacts.require("ComptrollerTest");
 const ibDUSDProxy = artifacts.require("ibDUSDProxy");
 const ibDUSD = artifacts.require("ibDUSD");
 const ibDFDProxy = artifacts.require("ibDFDProxy");
