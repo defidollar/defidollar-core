@@ -32,26 +32,39 @@ contract DFDComptroller is RewardDistributionRecipient, IDFDComptroller {
 
     uint public constant DURATION = 7 days;
 
-    /*
-        Todo (before deployment)
-        1. Provide comptroller and beneficiary (ibDFD vault) address
-        2. Make the following constant
-    */
-    address public uni = address(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
-    IERC20 public dfd = IERC20(0x20c36f062a31865bED8a5B1e512D9a1A20AA333A);
-    IERC20 public dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
-    address public beneficiary; // ibDFD
+    address public bal;
+    IERC20 public dusd;
+    IERC20 public dfd;
     IComptroller public comptroller;
 
+    // Mainnet
+    // address public constant bal = address(0xD8E9690eFf99E21a2de25E0b148ffaf47F47C972);
+    // IERC20 public constant dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
+    // IERC20 public constant dfd = IERC20(0x20c36f062a31865bED8a5B1e512D9a1A20AA333A);
+    // IComptroller public constant comptroller = IComptroller(<>);
+
+    // Kovan
+    // address public constant bal = address(0xe6976680e732eCbd78571C49B28dbB6F0BB057Aa);
+    // IERC20 public constant dfd = IERC20(0x81e5EB7FEa117Ea692990dc49C3A8de46054f9ff);
+    // IERC20 public constant dusd = IERC20(0xbA125322A44Aa62b6B621257C6120d39bEA4d6de);
+    // IComptroller public constant comptroller = IComptroller(0x8DBD83251F99A31f0093C875ca105c1D313BE933);
+
+    address public beneficiary;
     uint public periodFinish;
     uint public rewardRate;
     uint public lastUpdateTime;
     uint public rewardStored;
     uint public rewardPaid;
+    mapping(address => bool) public isHarvester;
 
     event RewardAdded(uint reward);
     event RewardPaid(address indexed user, uint256 reward);
     event Harvested(uint indexed dusd, uint indexed dfd);
+
+    modifier onlyHarvester() {
+        require(isHarvester[_msgSender()], "Caller is not authorized harvester");
+        _;
+    }
 
     function getReward()
         external
@@ -84,8 +97,8 @@ contract DFDComptroller is RewardDistributionRecipient, IDFDComptroller {
         emit RewardAdded(reward);
     }
 
-    function harvest(uint amountOutMin)
-        onlyOwner
+    function harvest(uint minAmountOut)
+        onlyHarvester
         external
     {
         // This contract will receive dusd because it should be a registered beneficiary
@@ -93,18 +106,27 @@ contract DFDComptroller is RewardDistributionRecipient, IDFDComptroller {
 
         uint256 _dusd = dusd.balanceOf(address(this));
         if (_dusd > 0) {
-            dusd.approve(uni, _dusd);
-
-            address[] memory path = new address[](2);
-            path[0] = address(dusd);
-            path[1] = address(dfd);
-
-            uint[] memory amounts = Uni(uni).swapExactTokensForTokens(_dusd, amountOutMin, path, address(this), block.timestamp);
-            if (amounts[1] > 0) {
-                dfd.safeTransfer(beneficiary, amounts[1]);
+            dusd.approve(bal, _dusd);
+            (uint tokenAmountOut,) = Uni(bal).swapExactAmountIn(address(dusd), _dusd, address(dfd), minAmountOut, uint(-1) /* max */);
+            if (tokenAmountOut > 0) {
+                dfd.safeTransfer(beneficiary, tokenAmountOut);
             }
-            emit Harvested(_dusd, amounts[1]);
+            emit Harvested(_dusd, tokenAmountOut);
         }
+    }
+
+    function setHarvester(address _harvester, bool _status)
+        external
+        onlyOwner
+    {
+        isHarvester[_harvester] = _status;
+    }
+
+    function setBeneficiary(address _beneficiary)
+        external
+        onlyOwner
+    {
+        beneficiary = _beneficiary;
     }
 
     /* ##### View ##### */

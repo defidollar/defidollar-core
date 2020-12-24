@@ -28,13 +28,21 @@ contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
     function deposit(uint _amount) external {
         comptroller.getReward();
         uint _pool = balance();
-        dfd.safeTransferFrom(msg.sender, address(this), _amount);
+
+        // If no funds are staked, send the accrued reward to governance multisig
+        uint totalSupply = totalSupply();
+        if (totalSupply == 0) {
+            dfd.safeTransfer(owner(), _pool);
+            _pool = 0;
+        }
+
         uint shares = 0;
         if (_pool == 0) {
             shares = _amount;
         } else {
-            shares = _amount.mul(totalSupply()).div(_pool);
+            shares = _amount.mul(totalSupply).div(_pool);
         }
+        dfd.safeTransferFrom(msg.sender, address(this), _amount);
         _mint(msg.sender, shares);
     }
 
@@ -63,6 +71,9 @@ contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
 
     /* ##### Admin ##### */
 
+    /**
+    * @dev This is also used for initializing the proxy
+    */
     function setParams(
         IERC20 _dfd,
         IDFDComptroller _comptroller,

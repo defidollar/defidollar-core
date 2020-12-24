@@ -16,11 +16,16 @@ contract Comptroller is Ownable, IComptroller {
     address[] public beneficiaries;
     uint[] public allocations;
 
-    /*
-        Todo (before deployment): Make the following constant
-    */
-    IERC20 public dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
-    ICore public core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
+    IERC20 public dusd;
+    ICore public core;
+
+    // Mainnet
+    // IERC20 public constant dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
+    // ICore public constant core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
+
+    // Kovan
+    // IERC20 public constant dusd = IERC20(0xbA125322A44Aa62b6B621257C6120d39bEA4d6de);
+    // ICore public constant core = ICore(0x559DD8DE795F7091f4457C20A3cb54Af6D57528e);
 
     event Harvested(uint indexed revenue);
 

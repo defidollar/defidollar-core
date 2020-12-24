@@ -111,4 +111,23 @@ contract('ibDFD', async (accounts) => {
         assert.strictEqual(parseInt(fromWei(dfd)), 433) // previous=300 + withdrawn = (.995 * 134) = 433.33
         assert.strictEqual(withrawable, '0')
     })
+
+    it('deposit again', async () => {
+        await this.ibDfd.transferOwnership(charlie) // residue rewards will accrue to charlie
+
+        assert.strictEqual((await this.ibDfd.balanceOf(alice)).toString(), '0')
+
+        const amount = toWei('100')
+        await this.client.approve('100', { from: alice })
+        assert.strictEqual(await this.client.allowance(alice), amount)
+        await this.client.deposit('100', { from: alice, gas: 1000000 })
+        assert.strictEqual(await this.client.allowance(alice), '0')
+
+        assert.strictEqual((await this.ibDfd.getPricePerFullShare()).toString(), toWei('1'))
+        assert.strictEqual((await this.dfd.balanceOf(this.ibDfd.address)).toString(), toWei('100'))
+        assert.strictEqual(fromWei(await this.dfd.balanceOf(charlie)).substr(0, 4), '0.67')
+        const { ibDfd, withrawable } = await this.client.balanceOf(alice)
+        assert.strictEqual(ibDfd, amount)
+        assert.strictEqual(withrawable, toWei('100'))
+    })
 })

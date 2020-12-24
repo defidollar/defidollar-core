@@ -8,7 +8,7 @@ import {DFDComptroller} from "./DFDComptroller.sol";
 contract DFDComptrollerTest is DFDComptroller {
     uint public travelled;
 
-    function increaseBlockTime(uint duration) public onlyOwner {
+    function increaseBlockTime(uint duration) public {
         travelled = travelled.add(duration);
     }
 
@@ -21,16 +21,14 @@ contract DFDComptrollerTest is DFDComptroller {
     }
 
     function setParams(
-        address _uni,
-        address _beneficiary,
+        address _bal,
         IERC20 _dfd,
         IERC20 _dusd,
         IComptroller _comptroller
     )
         external
     {
-        uni = _uni;
-        beneficiary = _beneficiary;
+        bal = _bal;
         dfd = _dfd;
         dusd = _dusd;
         comptroller = _comptroller;

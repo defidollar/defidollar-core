@@ -45,9 +45,10 @@ module.exports = async function(deployer, network, accounts) {
     const ibDfd = await ibDUSD.at(ibDfdProxy.address)
     await Promise.all([
         ibDfd.setParams(dfd.address, ibDfdComptroller.address, 9950), // 0.5% redeem fee
+        ibDfdComptroller.setBeneficiary(ibDfdProxy.address),
+        ibDfdComptroller.setHarvester(accounts[0], true),
         ibDfdComptroller.setParams(
             MockUniswap.address,
-            ibDfdProxy.address,
             dfd.address,
             dusd.address,
             comptroller.address

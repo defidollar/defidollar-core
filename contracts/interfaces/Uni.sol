@@ -8,4 +8,13 @@ interface Uni {
         address to,
         uint deadline
     ) external returns (uint[] memory amounts);
+
+    // Balancer swap function
+    function swapExactAmountIn(
+        address tokenIn,
+        uint tokenAmountIn,
+        address tokenOut,
+        uint minAmountOut,
+        uint maxPrice
+    ) external returns (uint tokenAmountOut, uint spotPriceAfter);
 }

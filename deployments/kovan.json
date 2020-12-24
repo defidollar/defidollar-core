@@ -5,10 +5,6 @@
             "address": "0xbA125322A44Aa62b6B621257C6120d39bEA4d6de",
             "decimals": 18
           },
-          "ibDUSD": {
-            "address": "0x24698159aE4a46945f014D250089E1156ebce6b5",
-            "decimals": 18
-          },
           "DFD": {
             "address": "0x81e5eb7fea117ea692990dc49c3a8de46054f9ff",
             "decimals": 18
@@ -40,6 +36,14 @@
             "decimals": 18,
             "name": "Yvault-LP-YCurve",
             "peak": "yVaultPeak"
+          },
+          "ibDUSD": {
+            "address": "0x24698159aE4a46945f014D250089E1156ebce6b5",
+            "decimals": 18
+          },
+          "ibDFD": {
+            "address": "0x1e7bb21A3C4eADE102E7Bfd3D7Ad60efc09ef462",
+            "decimals": 18
           }
         },
         "base": "0x559DD8DE795F7091f4457C20A3cb54Af6D57528e",
