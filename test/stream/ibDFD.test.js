@@ -124,8 +124,8 @@ contract('ibDFD', async (accounts) => {
         assert.strictEqual(await this.client.allowance(alice), '0')
 
         assert.strictEqual((await this.ibDfd.getPricePerFullShare()).toString(), toWei('1'))
-        assert.strictEqual((await this.dfd.balanceOf(this.ibDfd.address)).toString(), toWei('100'))
-        assert.strictEqual(fromWei(await this.dfd.balanceOf(charlie)).substr(0, 4), '0.67')
+        assert.strictEqual(fromWei(await this.dfd.balanceOf(charlie)).substr(0, 4), '0.67') // .005 * 134
+        assert.strictEqual((await this.dfd.balanceOf(this.ibDfd.address)).toString(), toWei('100')) // should have only deposited funds
         const { ibDfd, withrawable } = await this.client.balanceOf(alice)
         assert.strictEqual(ibDfd, amount)
         assert.strictEqual(withrawable, toWei('100'))

@@ -27,34 +27,33 @@ async function deploy() {
     ).contracts
 
     // 1. Comptroller (Set DUSD and Core address in the contract)
-    let comptroller = await Comptroller.at('0x8DBD83251F99A31f0093C875ca105c1D313BE933')
-    // let comptroller = await Comptroller.new()
+    let comptroller = await Comptroller.new()
     console.log({ comptroller: comptroller.address })
 
     // 2. ibDFD
-    let ibDfd = await ibDFD.at('0x1e7bb21A3C4eADE102E7Bfd3D7Ad60efc09ef462')
-    // let ibDfd = await ibDFD.new()
-    // console.log({ ibDfd: ibDfd.address })
-    // let ibDfdProxy = await ibDFDProxy.new()
-    // console.log({ ibDfdProxy: ibDfdProxy.address })
-    // await ibDfdProxy.updateImplementation(ibDfd.address)
-    // ibDfd = await ibDFD.at(ibDfdProxy.address)
+    let ibDfd = await ibDFD.new()
+    console.log({ ibDfd: ibDfd.address })
+    let ibDfdProxy = await ibDFDProxy.new()
+    console.log({ ibDfdProxy: ibDfdProxy.address })
+    await ibDfdProxy.updateImplementation(ibDfd.address)
+    ibDfd = await ibDFD.at(ibDfdProxy.address)
 
     // 3. DFDComptroller (Set addresses before deployment)
-    let dfdComptroller = await DFDComptroller.new()
+    let dfdComptroller = await DFDComptroller.at('0xd4B089787f6F49d83F904394A386C6B38aCae442')
+    // let dfdComptroller = await DFDComptroller.new()
     console.log({ dfdComptroller: dfdComptroller.address })
-
-    await ibDfd.setParams(config.tokens.DFD.address, dfdComptroller.address, 9950) // 0.5% redeem fee
-    await comptroller.modifyBeneficiaries(
-        [config.tokens.ibDUSD.address, dfdComptroller.address], [5000, 5000] // 50:50 revenue split
-    )
+    await dfdComptroller.setHarvester('0x238238C3398e0116FAD7bBFdc323f78187135815', true)
+    await dfdComptroller.setBeneficiary(ibDfd.address)
+    // await ibDfd.setParams(config.tokens.DFD.address, dfdComptroller.address, 9950) // 0.5% redeem fee
+    // await comptroller.modifyBeneficiaries(
+    //     [config.tokens.ibDUSD.address, dfdComptroller.address], [5000, 5000] // 50:50 revenue split
+    // )
     // const core = await Core.at(config.base)
     // await core.authorizeController(comptroller.address)
     // await core.authorizeController(comptroller.address, { from: '0x5b5cF8620292249669e1DCC73B753d01543D6Ac7' })
 
     // await dfdComptroller.setParams(
     //     '0xD8E9690eFf99E21a2de25E0b148ffaf47F47C972', // balancer pool
-    //     ibDfdProxy.address,
     //     config.tokens.DFD.address,
     //     config.tokens.DUSD.address,
     //     comptroller.address

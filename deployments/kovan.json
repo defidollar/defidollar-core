@@ -49,6 +49,7 @@
         "base": "0x559DD8DE795F7091f4457C20A3cb54Af6D57528e",
         "genesis": "0x8625B1d7Cb8654c440683a12A7aEFbaC2FB7f7bF",
         "vesting": "0xF95C58Ba296C1d6230DB7219EBe0580D97C0cdb8",
+        "comptroller": "0x8DBD83251F99A31f0093C875ca105c1D313BE933",
         "peaks": {
           "yVaultPeak": {
             "coins": ["DAI", "USDC", "USDT", "TUSD"],

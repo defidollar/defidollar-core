@@ -15,6 +15,13 @@ contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
     uint constant FEE_PRECISION = 10000;
 
     IERC20 public dfd;
+
+    // Mainnet
+    // IERC20 public constant dfd = IERC20(0x20c36f062a31865bED8a5B1e512D9a1A20AA333A);
+
+    // Kovan
+    // IERC20 public constant dfd = IERC20(0x81e5EB7FEa117Ea692990dc49C3A8de46054f9ff);
+
     IDFDComptroller public comptroller;
     uint public redeemFactor;
 
@@ -75,7 +82,6 @@ contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
     * @dev This is also used for initializing the proxy
     */
     function setParams(
-        IERC20 _dfd,
         IDFDComptroller _comptroller,
         uint _redeemFactor
     )
@@ -83,16 +89,21 @@ contract ibDFD is OwnableProxy, Initializable, ERC20, ERC20Detailed {
         onlyOwner
     {
         require(
-            address(_dfd) != address(0) && address(_comptroller) != address(0),
-            "0 address during initialization"
+            address(_comptroller) != address(0),
+            "_comptroller == 0"
         );
         require(
             _redeemFactor <= FEE_PRECISION,
             "Incorrect upper bound for fee"
         );
-        dfd = _dfd;
         comptroller = _comptroller;
         redeemFactor = _redeemFactor;
+    }
+}
+
+contract ibDFDTest is ibDFD {
+    function setDFD(address _dfd) external {
+        dfd = IERC20(_dfd);
     }
 }
 
