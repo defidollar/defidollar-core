@@ -7,7 +7,7 @@ const Comptroller = artifacts.require("ComptrollerTest");
 const DFDComptroller = artifacts.require("DFDComptrollerTest");
 const ibDUSD = artifacts.require("ibDUSD");
 const ibDUSDProxy = artifacts.require("ibDUSDProxy");
-const ibDFD = artifacts.require("ibDFD");
+const ibDFD = artifacts.require("ibDFDTest");
 const ibDFDProxy = artifacts.require("ibDFDProxy");
 const MockUniswap = artifacts.require("MockUniswap");
 
@@ -34,7 +34,7 @@ module.exports = async function(deployer, network, accounts) {
     config.contracts.tokens.ibDUSD = { address: ibDUSDProxy.address, decimals: 18 }
 
     // ibDFD
-    const [ dfd, ibDfdProxy, ibDfdComptroller ] = await Promise.all([
+    const [ dfd, ibDfdProxy, dfdComptroller ] = await Promise.all([
         Reserve.new('DefiDollar DAO', 'DFD', 18),
         deployer.deploy(ibDFDProxy),
         deployer.deploy(DFDComptroller),
@@ -42,18 +42,24 @@ module.exports = async function(deployer, network, accounts) {
         deployer.deploy(ibDFD),
     ])
     await ibDfdProxy.updateImplementation(ibDFD.address)
-    const ibDfd = await ibDUSD.at(ibDfdProxy.address)
+    const ibDfd = await ibDFD.at(ibDfdProxy.address)
+    // Essentials
     await Promise.all([
-        ibDfd.setParams(dfd.address, ibDfdComptroller.address, 9950), // 0.5% redeem fee
-        ibDfdComptroller.setParams(
+        ibDfd.setParams(dfdComptroller.address, 9950), // 0.5% redeem fee
+        dfdComptroller.setBeneficiary(ibDfdProxy.address),
+        dfdComptroller.setHarvester(accounts[0], true),
+        comptroller.modifyBeneficiaries(
+            [ibDusdProxy.address, dfdComptroller.address], [7500, 2500] // 75:25 revenue sharing
+        )
+    ])
+    // Need to be called only while running tests locally. Will be hardcoded for network deployments.
+    await Promise.all([
+        ibDfd.setDFD(dfd.address),
+        dfdComptroller.setParams(
             MockUniswap.address,
-            ibDfdProxy.address,
             dfd.address,
             dusd.address,
             comptroller.address
-        ),
-        comptroller.modifyBeneficiaries(
-            [ibDusdProxy.address, ibDfdComptroller.address], [7500, 2500] // 75:25 revenue sharing
         )
     ])
 

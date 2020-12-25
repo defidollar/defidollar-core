@@ -5,6 +5,14 @@
                 "address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
                 "decimals": 18
             },
+            "ibDUSD": {
+                "address": "0x42600c4f6d84Aa4D246a3957994da411FA8A4E1c",
+                "decimals": 18
+            },
+            "DFD": {
+                "address": "0x20c36f062a31865bed8a5b1e512d9a1a20aa333a",
+                "decimals": 18
+            },
             "USDC": {
                 "address": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
                 "decimals": 6

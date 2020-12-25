@@ -5,10 +5,6 @@
             "address": "0xbA125322A44Aa62b6B621257C6120d39bEA4d6de",
             "decimals": 18
           },
-          "ibDUSD": {
-            "address": "0x24698159aE4a46945f014D250089E1156ebce6b5",
-            "decimals": 18
-          },
           "DFD": {
             "address": "0x81e5eb7fea117ea692990dc49c3a8de46054f9ff",
             "decimals": 18
@@ -40,11 +36,21 @@
             "decimals": 18,
             "name": "Yvault-LP-YCurve",
             "peak": "yVaultPeak"
+          },
+          "ibDUSD": {
+            "address": "0x24698159aE4a46945f014D250089E1156ebce6b5",
+            "decimals": 18
+          },
+          "ibDFD": {
+            "address": "0x3eB898114206631dc8b5e2206627e6A0e066e784",
+            "decimals": 18
           }
         },
         "base": "0x559DD8DE795F7091f4457C20A3cb54Af6D57528e",
         "genesis": "0x8625B1d7Cb8654c440683a12A7aEFbaC2FB7f7bF",
         "vesting": "0xF95C58Ba296C1d6230DB7219EBe0580D97C0cdb8",
+        "comptroller": "0xF7621a2faC09Fc131978678b5034B6eD2768E67a",
+        "dfdComptroller": "0xDDC6CDF7603d2a1A89310a8E2A918Bc17760991C",
         "peaks": {
           "yVaultPeak": {
             "coins": ["DAI", "USDC", "USDT", "TUSD"],
