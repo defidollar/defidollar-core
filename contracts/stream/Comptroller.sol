@@ -90,3 +90,10 @@ contract Comptroller is Ownable, IComptroller {
         beneficiaries = _beneficiaries;
     }
 }
+
+contract ComptrollerTest is Comptroller {
+    function setParams(IERC20 _dusd, ICore _core) external {
+        dusd = _dusd;
+        core = _core;
+    }
+}

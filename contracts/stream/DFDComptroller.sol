@@ -47,7 +47,7 @@ contract DFDComptroller is RewardDistributionRecipient, IDFDComptroller {
     // address public constant bal = address(0xe6976680e732eCbd78571C49B28dbB6F0BB057Aa);
     // IERC20 public constant dfd = IERC20(0x81e5EB7FEa117Ea692990dc49C3A8de46054f9ff);
     // IERC20 public constant dusd = IERC20(0xbA125322A44Aa62b6B621257C6120d39bEA4d6de);
-    // IComptroller public constant comptroller = IComptroller(0x8DBD83251F99A31f0093C875ca105c1D313BE933);
+    // IComptroller public constant comptroller = IComptroller(0xF7621a2faC09Fc131978678b5034B6eD2768E67a);
 
     address public beneficiary;
     uint public periodFinish;
@@ -157,5 +157,35 @@ contract DFDComptroller is RewardDistributionRecipient, IDFDComptroller {
 
     function _timestamp() internal view returns (uint) {
         return block.timestamp;
+    }
+}
+
+contract DFDComptrollerTest is DFDComptroller {
+    uint public travelled;
+
+    function increaseBlockTime(uint duration) public {
+        travelled = travelled.add(duration);
+    }
+
+    function _timestamp() internal view returns (uint) {
+        return block.timestamp.add(travelled);
+    }
+
+    function timestamp() public view returns (uint) {
+        return _timestamp();
+    }
+
+    function setParams(
+        address _bal,
+        IERC20 _dfd,
+        IERC20 _dusd,
+        IComptroller _comptroller
+    )
+        external
+    {
+        bal = _bal;
+        dfd = _dfd;
+        dusd = _dusd;
+        comptroller = _comptroller;
     }
 }
