@@ -5,10 +5,6 @@
                 "address": "0x6B175474E89094C44Da98b954EedeAC495271d0F",
                 "decimals": 18
             },
-            "ibDUSD": {
-                "address": "0x42600c4f6d84Aa4D246a3957994da411FA8A4E1c",
-                "decimals": 18
-            },
             "DFD": {
                 "address": "0x20c36f062a31865bed8a5b1e512d9a1a20aa333a",
                 "decimals": 18
@@ -45,6 +41,14 @@
             },
             "yUSD": {
                 "address": "0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c",
+                "decimals": 18
+            },
+            "ibDUSD": {
+                "address": "0x42600c4f6d84Aa4D246a3957994da411FA8A4E1c",
+                "decimals": 18
+            },
+            "ibDFD": {
+                "address": "0xde157688a36AC94b6E5f52e99c196f79Ac71CEA3",
                 "decimals": 18
             }
         },
@@ -100,6 +104,8 @@
         },
         "oracle": "0x4EaC4c4e9050464067D673102F8E24b2FccEB350",
         "base": "0xE449Ca7d10b041255E7e989D158Bee355d8f88d3",
-        "valley": "0xb47638956e3D95f591D0a38F6F47EA6cAFee78B6"
+        "valley": "0xb47638956e3D95f591D0a38F6F47EA6cAFee78B6",
+        "Comptroller": "0xf79b548ff56E661ee19a59303178E444E9e81FCc",
+        "DFDComptroller": "0xF5F850daDdc393CE325D8ac395519224F498460F"
     }
 }
