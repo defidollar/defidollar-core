@@ -141,7 +141,7 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
             .div(1e18);
     }
 
-    function portfolioValue() external view returns(uint) {
+    function portfolioValue() public view returns(uint) {
         (,uint total) = yCrvDistribution();
         return total.mul(yCrvToUsd()).div(1e18);
     }
@@ -166,17 +166,6 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
 
     // Privileged methods
 
-    function migrate() external onlyOwner {
-        address newYusd = 0x4B5BfD52124784745c1071dcB244C6688d2533d3;
-        uint bal = yUSD.balanceOf(address(controller));
-        controller.withdraw(yUSD, bal);
-        IMigrate migrator = IMigrate(0x1824df8D751704FA10FA371d62A37f9B8772ab90);
-        yUSD.safeApprove(address(migrator), bal);
-        migrator.migrateAll(address(yUSD), newYusd);
-        yUSD = IERC20(newYusd);
-        yCrv.safeApprove(newYusd, uint(-1));
-    }
-
     function setParams(uint _min, uint _redeemMultiplier) external onlyOwner {
         _setParams(_min, _redeemMultiplier);
     }
@@ -185,6 +174,24 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
         require(min <= MAX && redeemMultiplier <= MAX, "Invalid");
         min = _min;
         redeemMultiplier = _redeemMultiplier;
+    }
+
+    // Migration
+
+    function migrate() external {
+        address newYusd = 0x4B5BfD52124784745c1071dcB244C6688d2533d3;
+        require(address(yUSD) != newYusd, "ALREADY_MIGRATED");
+        uint bal = yUSD.balanceOf(address(controller));
+        controller.withdraw(yUSD, bal);
+        IMigrate migrator = IMigrate(0x1824df8D751704FA10FA371d62A37f9B8772ab90);
+        yUSD.safeApprove(address(migrator), bal);
+        migrator.migrateAll(address(yUSD), newYusd);
+
+        yUSD = IERC20(newYusd);
+        IERC20 dusd = IERC20(0x5BC25f649fc4e26069dDF4cF4010F9f706c23831);
+        require(portfolioValue() > dusd.totalSupply(), "SANITY_FAILED");
+
+        yCrv.safeApprove(newYusd, uint(-1)); // Required henceforth
     }
 }
 
