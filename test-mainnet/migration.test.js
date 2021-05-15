@@ -53,14 +53,15 @@ describe('Migration (mainnet-fork)', function() {
     it('mint', async function() {
         zap = await ethers.getContractAt('YVaultZap', '0xdE1F578292e75F26dfaebc78Aa0eCcca45b13521')
         const usdc = await ethers.getContractAt('IERC20', '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48')
-        const amount = constants._1e6.mul(100000)
+        const amount = constants._1e6.mul(10000000)
         await getUsdc(alice, amount)
         await usdc.approve(zap.address, amount)
         await zap.mint([0,amount,0,0], 0)
         console.log({
             portfolioValue: (await peak.portfolioValue()).div(constants._1e18).toString(),
             dusd: (await dusd.totalSupply()).div(constants._1e18).toString(),
-            bal: (await dusd.balanceOf(alice)).div(constants._1e18).toString()
+            bal: (await dusd.balanceOf(alice)).div(constants._1e18).toString(),
+            newYusdBal: (await newYusd.balanceOf(peak.address)).div(constants._1e18).toString()
         })
     })
 

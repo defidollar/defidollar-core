@@ -64,7 +64,7 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
     }
 
     function _earn(uint amount) internal {
-        IYVault(address(yUSD)).deposit(amount); // inf approval has already been made
+        IYVault(address(yUSD)).deposit(amount);
     }
 
     function yCrvDistribution() public view returns (uint here, uint total) {

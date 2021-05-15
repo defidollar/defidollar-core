@@ -8,7 +8,7 @@ require("@nomiclabs/hardhat-waffle");
 /**
  * @type import('hardhat/config').HardhatUserConfig
  */
-const PRIVATE_KEY = `0x${process.env.PRIVATE_KEY || '2c82e50c6a97068737361ecbb34b8c1bd8eb145130735d57752de896ee34c74b'}`
+const PRIVATE_KEY = `0x${process.env.PRIVATE_KEY || 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'}`
 
 module.exports = {
     solidity: {
