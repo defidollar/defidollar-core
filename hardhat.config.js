@@ -1,6 +1,5 @@
 require("@nomiclabs/hardhat-waffle");
-// require('@nomiclabs/hardhat-web3');
-// require("@nomiclabs/hardhat-etherscan");
+require("@nomiclabs/hardhat-etherscan");
 
 // You need to export an object to set up your config
 // Go to https://hardhat.org/config/ to learn more
@@ -8,7 +7,7 @@ require("@nomiclabs/hardhat-waffle");
 /**
  * @type import('hardhat/config').HardhatUserConfig
  */
-const PRIVATE_KEY = `0x${process.env.PRIVATE_KEY || 'ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff'}`
+const PRIVATE_KEY = `0x${process.env.PRIVATE_KEY || 'ac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80'}`
 
 module.exports = {
     solidity: {
@@ -34,7 +33,7 @@ module.exports = {
         mainnet: {
             url: `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`,
             chainId: 1,
-            gasPrice: 70000000000, // 70 gwei
+            gasPrice: 85000000000, // 85 gwei
             accounts: [ PRIVATE_KEY ]
         }
     },
