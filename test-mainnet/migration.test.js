@@ -31,20 +31,24 @@ describe('Migration (mainnet-fork)', function() {
             ethers.getContractAt('IERC20', '0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c'),
             ethers.getContractAt('IERC20', '0x4B5BfD52124784745c1071dcB244C6688d2533d3')
         ]))
-        const peakImpl = await YVaultPeak.deploy()
+        // const peakImpl = await YVaultPeak.deploy()
+        const peakImpl = await ethers.getContractAt('YVaultPeak', '0xee39e4a6820ffc4edaa80fd3b5a59788d515832b')
         await impersonateAccount(dfdMultisig)
 
         const ycrvBal = await ycrv.balanceOf(peak.address)
         const oldPV = await peak.portfolioValue()
 
+        console.log({
+            oldPV: oldPV.div(constants._1e18).toString(),
+        })
+        console.log(peakProxy.interface.encodeFunctionData('updateAndCall', [ peakImpl.address, peakImpl.interface.encodeFunctionData('migrate', []) ]))
         await peakProxy.connect(ethers.provider.getSigner(dfdMultisig)).updateAndCall(peakImpl.address, peakImpl.interface.encodeFunctionData('migrate', []))
 
         expect(await ycrv.balanceOf(peak.address)).to.eq(ycrvBal)
         expect(await yUSD.balanceOf('0x88ff54ed47402a97f6e603737f26bb9e4e6cb03d')).to.eq(constants.ZERO)
 
         console.log({
-            oldPV: oldPV.div(constants._1e18).toString(),
-            portfolioValue: (await peak.portfolioValue()).div(constants._1e18).toString(),
+            newPV: (await peak.portfolioValue()).div(constants._1e18).toString(),
             dusd: (await dusd.totalSupply()).div(constants._1e18).toString(),
             newYusdBal: (await newYusd.balanceOf(peak.address)).div(constants._1e18).toString()
         })
@@ -76,7 +80,7 @@ describe('Migration (mainnet-fork)', function() {
         ])
         console.log((await dai.balanceOf(alice)).div(constants._1e18).toString())
         console.log((await usdt.balanceOf(alice)).div(constants._1e6).toString())
-        console.log((await tusd.balanceOf(alice)).div(constants._1e6).toString())
+        console.log((await tusd.balanceOf(alice)).div(constants._1e18).toString())
     })
 
     it('savings.withdraw', async function() {

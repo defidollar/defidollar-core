@@ -1,4 +1,4 @@
-async function setupMainnetContracts(blockNumber = 12438610) {
+async function setupMainnetContracts(blockNumber = 12440145) {
     await network.provider.request({
         method: "hardhat_reset",
         params: [{
