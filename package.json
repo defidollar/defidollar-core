@@ -20,10 +20,18 @@
     "@openzeppelin/contracts": "^2.5.1"
   },
   "devDependencies": {
+    "@nomiclabs/hardhat-ethers": "^2.0.2",
+    "@nomiclabs/hardhat-etherscan": "^2.1.2",
+    "@nomiclabs/hardhat-waffle": "^2.0.1",
+    "@nomiclabs/hardhat-web3": "^2.0.0",
     "@truffle/hdwallet-provider": "^1.0.42",
+    "chai": "^4.3.4",
     "csv-writer": "^1.6.0",
     "eth-gas-reporter": "^0.2.17",
+    "ethereum-waffle": "^3.3.0",
+    "ethers": "^5.1.4",
     "ganache": "^6.4.4",
+    "hardhat": "^2.3.0",
     "solidity-coverage": "^0.7.9",
     "truffle": "^5.1.36",
     "truffle-plugin-verify": "^0.3.11"
