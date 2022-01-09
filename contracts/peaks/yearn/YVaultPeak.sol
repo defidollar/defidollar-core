@@ -31,21 +31,21 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
 
     IController controller;
 
-    // function initialize(IController _controller)
-    //     public
-    //     notInitialized
-    // {
-    //     controller = _controller;
-    //     // these need to be initialzed here, because the contract is used via a proxy
-    //     core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
-    //     ySwap = ICurve(0x45F783CCE6B7FF23B2ab2D70e416cdb7D6055f51);
-    //     yCrv = IERC20(0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8);
-    //     yUSD = IERC20(0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c);
-    //     _setParams(
-    //         200, // 200.div(10000) implies to keep 2% of yCRV in the contract
-    //         9998 // 9998.div(10000) implies a redeem fee of .02%
-    //     );
-    // }
+    function initialize(IController _controller)
+        public
+        notInitialized
+    {
+        controller = _controller;
+        // these need to be initialzed here, because the contract is used via a proxy
+        core = ICore(0xE449Ca7d10b041255E7e989D158Bee355d8f88d3);
+        ySwap = ICurve(0x45F783CCE6B7FF23B2ab2D70e416cdb7D6055f51);
+        yCrv = IERC20(0xdF5e0e81Dff6FAF3A7e52BA697820c5e32D806A8);
+        yUSD = IERC20(0x5dbcF33D8c2E976c6b560249878e6F1491Bca25c);
+        _setParams(
+            200, // 200.div(10000) implies to keep 2% of yCRV in the contract
+            9998 // 9998.div(10000) implies a redeem fee of .02%
+        );
+    }
 
     function mintWithYcrv(uint inAmount) external returns(uint dusdAmount) {
         yCrv.safeTransferFrom(msg.sender, address(this), inAmount);
@@ -122,7 +122,7 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
         if (here < r) {
             // if it is still not enough, we make a best effort to deposit yCRV to yUSD
             _earn(yCrv.balanceOf(address(this)));
-            r = yUSD.balanceOf(address(this));
+            r = r.min(yUSD.balanceOf(address(this)));
         }
         require(r >= minOut, ERR_INSUFFICIENT_FUNDS);
         yUSD.safeTransfer(msg.sender, r);
