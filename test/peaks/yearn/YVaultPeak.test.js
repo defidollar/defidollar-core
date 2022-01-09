@@ -23,7 +23,7 @@ contract('YVaultPeak', async (accounts) => {
         await Promise.all(tasks)
     })
 
-    it.only('yVaultZap.mint', async () => {
+    it('yVaultZap.mint', async () => {
         this.amounts = [100, 100, 100, 100]
         const tasks = []
         for (let i = 0; i < n_coins; i++) {
