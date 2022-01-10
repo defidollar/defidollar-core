@@ -31,6 +31,9 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
 
     IController controller;
 
+    /**
+    * @dev has been commented out in the latest proxy update
+    */
     function initialize(IController _controller)
         public
         notInitialized
@@ -117,7 +120,6 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
     function redeemInYusd(uint dusdAmount, uint minOut) external {
         core.redeem(dusdAmount, msg.sender);
         uint r = dusdAmount.mul(1e18).div(yUSDToUsd()).mul(redeemMultiplier).div(MAX);
-        // there should be no reason that this contract has yUSD, however being safe doesn't hurt
         uint here = yUSD.balanceOf(address(this));
         if (here < r) {
             // if it is still not enough, we make a best effort to deposit yCRV to yUSD
@@ -178,6 +180,9 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
 
     // Migration
 
+    /**
+    * @dev has been commented out in the latest proxy update
+    */
     function migrate() external {
         address newYusd = 0x4B5BfD52124784745c1071dcB244C6688d2533d3;
         require(address(yUSD) != newYusd, "ALREADY_MIGRATED");
@@ -195,6 +200,9 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
     }
 }
 
+/**
+* @dev has been commented out in the latest proxy update
+*/
 interface IMigrate {
     function migrateAll(address, address) external;
 }

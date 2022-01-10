@@ -31,7 +31,7 @@
     "ethereum-waffle": "^3.3.0",
     "ethers": "^5.1.4",
     "ganache": "^6.4.4",
-    "hardhat": "^2.3.0",
+    "hardhat": "^2.8.2",
     "solidity-coverage": "^0.7.9",
     "truffle": "^5.4.27",
     "truffle-plugin-verify": "^0.3.11"
