@@ -90,7 +90,7 @@ contract YVaultPeak is OwnableProxy, Initializable, IPeak {
             // withdraw only as much as needed from the vault
             uint _withdraw = _yCrv.sub(here).mul(1e18).div(IYVault(address(yUSD)).pricePerShare());
             IYVault(address(yUSD)).withdraw(_withdraw);
-            _yCrv = yCrv.balanceOf(address(this));
+            _yCrv = _yCrv.min(yCrv.balanceOf(address(this)));
         }
         require(_yCrv >= minOut, ERR_INSUFFICIENT_FUNDS);
         yCrv.safeTransfer(msg.sender, _yCrv);

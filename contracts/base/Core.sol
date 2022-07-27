@@ -228,10 +228,6 @@ contract Core is OwnableProxy, Initializable, ICore {
         external
         onlyOwner
     {
-        require(
-            peaks[peak].state != PeakState.Extinct,
-            "Peak is extinct"
-        );
         peaks[peak].ceiling = ceiling;
         peaks[peak].state = state;
     }
